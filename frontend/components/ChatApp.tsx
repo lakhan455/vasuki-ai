@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   FormEvent,
@@ -11,7 +11,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import ReactMarkdown from "react-markdown";
 
-import { generateImage, sendChat, type ChatMessage } from "@/lib/api";
+import { generateImage, sendChat, warmBackend, type ChatMessage } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 const VASUKI_LOGO_URL =
@@ -175,6 +175,16 @@ export default function ChatApp() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void warmBackend();
+
+    const intervalId = window.setInterval(() => {
+      void warmBackend();
+    }, 10 * 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -463,7 +473,7 @@ export default function ChatApp() {
         <div className="pv-auth-card">
           <Logo className="pv-auth-logo" />
           <h1>Vasuki AI</h1>
-          <p>Securely loading your account…</p>
+          <p>Securely loading your accountâ€¦</p>
           <div className="pv-auth-spinner" />
         </div>
       </main>
@@ -573,7 +583,7 @@ export default function ChatApp() {
 
         <div className="pv-recent">
           <p className="pv-section-label">
-            Recent {historyBusy ? "· loading…" : ""}
+            Recent {historyBusy ? "Â· loadingâ€¦" : ""}
           </p>
 
           {chatRecords.length === 0 && !historyBusy ? (
@@ -1017,3 +1027,4 @@ function Icon({
 
   return <svg {...common}>{paths[name]}</svg>;
 }
+

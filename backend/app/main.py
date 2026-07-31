@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
@@ -66,16 +66,6 @@ async def health() -> dict:
 async def research(request: ResearchRequest) -> dict:
     current_date = _current_date()
 
-    identity_answer = fixed_identity_reply(query)
-    if identity_answer:
-        return ChatResponse(
-            answer=identity_answer,
-            provider="vasuki-identity",
-            sources=[],
-            context_trimmed=False,
-            original_context_chars=sum(len(item["content"]) for item in raw_messages),
-            used_context_chars=len(query),
-        )
 
     require_current = needs_live_web(request.query)
     results, provider = await search_web(
@@ -107,6 +97,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
     )
     current_date = _current_date()
 
+    identity_answer = fixed_identity_reply(query)
+    if identity_answer:
+        return ChatResponse(
+            answer=identity_answer,
+            provider="vasuki-identity",
+            sources=[],
+            context_trimmed=False,
+            original_context_chars=sum(
+                len(item["content"]) for item in raw_messages
+            ),
+            used_context_chars=len(query),
+        )
+
     # Accuracy-first: factual/current questions always use live evidence,
     # even if the UI web toggle is off.
     require_current = needs_live_web(query)
@@ -116,7 +119,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     web_context = ""
 
     if should_search:
-        max_results = 12 if require_current else 8
+        max_results = 6 if require_current else 4
         sources, search_provider = await search_web(
             query,
             settings,
@@ -126,13 +129,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
         if require_current and not sources:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Live verification was required, but no reliable evidence "
-                    "was returned. The AI refused to guess from old model memory. "
-                    f"Search status: {search_provider}"
+            return ChatResponse(
+                answer=(
+                    "Live verification service is temporarily unavailable. "
+                    "Please retry in a few seconds so I do not guess from old information."
                 ),
+                provider="truth-guard",
+                sources=[],
+                context_trimmed=False,
+                original_context_chars=sum(
+                    len(item["content"]) for item in raw_messages
+                ),
+                used_context_chars=len(query),
             )
 
         if is_all_india_state_cm_query(query):
@@ -225,3 +233,4 @@ async def ocr(file: UploadFile = File(...)) -> dict:
         return await extract_text(file, settings)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+

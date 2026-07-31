@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import re
@@ -19,9 +19,9 @@ FRESHNESS_TERMS = (
     "weather", "release date", "version", "ceo", "president", "prime minister",
     "chief minister", "minister", "governor", "office holder", "law", "rule", "regulation",
     "election", "result", "winner", "cabinet", "appointment", "resigned", "sworn in",
-    "अभी", "वर्तमान", "वर्तमान में", "आज", "नवीनतम", "लेटेस्ट", "ताजा", "ताज़ा",
-    "मुख्यमंत्री", "प्रधानमंत्री", "राष्ट्रपति", "मंत्री", "राज्यपाल", "सीएम", "कीमत",
-    "मौसम", "स्कोर", "शेड्यूल", "रिलीज", "नियम", "कानून", "चुनाव", "नतीजे",
+    "à¤…à¤­à¥€", "à¤µà¤°à¥à¤¤à¤®à¤¾à¤¨", "à¤µà¤°à¥à¤¤à¤®à¤¾à¤¨ à¤®à¥‡à¤‚", "à¤†à¤œ", "à¤¨à¤µà¥€à¤¨à¤¤à¤®", "à¤²à¥‡à¤Ÿà¥‡à¤¸à¥à¤Ÿ", "à¤¤à¤¾à¤œà¤¾", "à¤¤à¤¾à¤œà¤¼à¤¾",
+    "à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤ªà¥à¤°à¤§à¤¾à¤¨à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¤ªà¤¤à¤¿", "à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤°à¤¾à¤œà¥à¤¯à¤ªà¤¾à¤²", "à¤¸à¥€à¤à¤®", "à¤•à¥€à¤®à¤¤",
+    "à¤®à¥Œà¤¸à¤®", "à¤¸à¥à¤•à¥‹à¤°", "à¤¶à¥‡à¤¡à¥à¤¯à¥‚à¤²", "à¤°à¤¿à¤²à¥€à¤œ", "à¤¨à¤¿à¤¯à¤®", "à¤•à¤¾à¤¨à¥‚à¤¨", "à¤šà¥à¤¨à¤¾à¤µ", "à¤¨à¤¤à¥€à¤œà¥‡",
 )
 
 DYNAMIC_FACT_TERMS = (
@@ -32,37 +32,37 @@ DYNAMIC_FACT_TERMS = (
 )
 
 OFFICEHOLDER_TERMS = (
-    "chief minister", "मुख्यमंत्री", " cm ", "president", "राष्ट्रपति", "prime minister",
-    "प्रधानमंत्री", "governor", "राज्यपाल", "minister", "मंत्री", "ceo", "chairman",
+    "chief minister", "à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", " cm ", "president", "à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¤ªà¤¤à¤¿", "prime minister",
+    "à¤ªà¥à¤°à¤§à¤¾à¤¨à¤®à¤‚à¤¤à¥à¤°à¥€", "governor", "à¤°à¤¾à¤œà¥à¤¯à¤ªà¤¾à¤²", "minister", "à¤®à¤‚à¤¤à¥à¤°à¥€", "ceo", "chairman",
     "mayor", "office holder", "mukhyamantri", "pradhanmantri", "rashtrapati",
-    "rajyapal", "mantri", "सी एम", "cm of", "who is the cm", "kon cm", "ka cm",
+    "rajyapal", "mantri", "à¤¸à¥€ à¤à¤®", "cm of", "who is the cm", "kon cm", "ka cm",
 )
 
 INDIA_TERMS = (
-    "india", "indian", " ind ", "bharat", "भारत", "इंडिया", "rajasthan", "राजस्थान",
-    "tamil nadu", "तमिलनाडु", "state", "states", "राज्य", "union territory",
-    "केंद्र शासित", "chief minister", "मुख्यमंत्री", " cm ",
+    "india", "indian", " ind ", "bharat", "à¤­à¤¾à¤°à¤¤", "à¤‡à¤‚à¤¡à¤¿à¤¯à¤¾", "rajasthan", "à¤°à¤¾à¤œà¤¸à¥à¤¥à¤¾à¤¨",
+    "tamil nadu", "à¤¤à¤®à¤¿à¤²à¤¨à¤¾à¤¡à¥", "state", "states", "à¤°à¤¾à¤œà¥à¤¯", "union territory",
+    "à¤•à¥‡à¤‚à¤¦à¥à¤° à¤¶à¤¾à¤¸à¤¿à¤¤", "chief minister", "à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", " cm ",
 )
 
 ALL_STATE_CM_TERMS = (
     "all state cm", "all states cm", "all state chief minister", "all states chief minister",
     "chief ministers of all states", "all indian states cm", "all india state cm",
-    "सभी राज्यों के मुख्यमंत्री", "सारे राज्यों के मुख्यमंत्री", "सभी राज्य के मुख्यमंत्री",
-    "राज्यों के सीएम", "sabhi rajya ke cm", "sabhi rajyon ke cm", "sare state ke cm",
+    "à¤¸à¤­à¥€ à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤•à¥‡ à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤¸à¤¾à¤°à¥‡ à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤•à¥‡ à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤¸à¤­à¥€ à¤°à¤¾à¤œà¥à¤¯ à¤•à¥‡ à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€",
+    "à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤•à¥‡ à¤¸à¥€à¤à¤®", "sabhi rajya ke cm", "sabhi rajyon ke cm", "sare state ke cm",
     "all state ke cm", "all states ke cm", "state ke cm ki list", "all cm list",
 )
 
 # User's spelling/roman-Hindi variants are intentionally covered.
 ALL_STATE_CM_REGEX = re.compile(
-    r"(?:all|sabhi|sare|saare|सभी|सारे).{0,30}(?:state|states|rajya|rajyon|राज्य).{0,30}"
-    r"(?:cm|chief\s*minister|mukhyamantri|मुख्यमंत्री|सीएम)",
+    r"(?:all|sabhi|sare|saare|à¤¸à¤­à¥€|à¤¸à¤¾à¤°à¥‡).{0,30}(?:state|states|rajya|rajyon|à¤°à¤¾à¤œà¥à¤¯).{0,30}"
+    r"(?:cm|chief\s*minister|mukhyamantri|à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€|à¤¸à¥€à¤à¤®)",
     re.IGNORECASE | re.DOTALL,
 )
 
 FACTUAL_PREFIXES = (
     "who ", "what ", "when ", "where ", "which ", "how many ", "how much ",
     "tell me", "give me", "list ", "name ", "is ", "are ",
-    "कौन", "क्या", "कब", "कहाँ", "कितने", "बताओ", "सूची", "नाम",
+    "à¤•à¥Œà¤¨", "à¤•à¥à¤¯à¤¾", "à¤•à¤¬", "à¤•à¤¹à¤¾à¤", "à¤•à¤¿à¤¤à¤¨à¥‡", "à¤¬à¤¤à¤¾à¤“", "à¤¸à¥‚à¤šà¥€", "à¤¨à¤¾à¤®",
     "kon", "kya", "kab", "kaha", "kitne", "batao", "list do", "name do",
 )
 
@@ -132,9 +132,9 @@ def needs_live_web(query: str) -> bool:
     normalized = _normalized(query)
     return (
         any(term in normalized for term in FRESHNESS_TERMS)
+        or any(term in normalized for term in DYNAMIC_FACT_TERMS)
         or _is_officeholder_query(query)
         or is_all_india_state_cm_query(query)
-        or _looks_factual(query)
     )
 
 
@@ -388,8 +388,8 @@ async def search_web(
             settings,
             max_results=min(max_results, 8),
             topic="general",
-            search_depth="advanced",
-            content_limit=3000,
+            search_depth="basic",
+            content_limit=1600,
         )
     ]
 
@@ -402,8 +402,8 @@ async def search_web(
                 max_results=min(max_results, 8),
                 topic="news",
                 time_range="year",
-                search_depth="advanced",
-                content_limit=2500,
+                search_depth="basic",
+                content_limit=1400,
             )
         )
 
@@ -416,8 +416,8 @@ async def search_web(
                 max_results=min(max_results, 8),
                 topic="general",
                 include_domains=OFFICIAL_INDIA_DOMAINS,
-                search_depth="advanced",
-                content_limit=3000,
+                search_depth="basic",
+                content_limit=1600,
             )
         )
 
@@ -434,7 +434,7 @@ async def search_web(
     if len(ranked) < min(4, max_results):
         try:
             ranked = _dedupe_and_rank(
-                ranked + await exa_search(base_query, settings, max_results=max_results, content_limit=2800),
+                ranked + await exa_search(base_query, settings, max_results=max_results, content_limit=1600),
                 max_results,
             )
         except Exception as exc:
@@ -443,3 +443,4 @@ async def search_web(
     if ranked:
         return ranked, "tavily+exa" if settings.exa_api else "tavily"
     return [], "; ".join(errors) if errors else "No research API configured"
+
