@@ -29,3 +29,13 @@ frontend/.env.local
 frontend/.next
 frontend/node_modules
 backend/.venv
+
+backend/app/*.backup.py
+backend/app/main.before-timezone-fix.py
+backend/app/services/*.backup.py
+backend/*-backup-*/
+frontend/app/*.backup*
+frontend/components/*.backup.tsx
+frontend/*-backup-*/
+force-auth-backup-*/
+auth-brand-backup-*/
