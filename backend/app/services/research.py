@@ -1,8 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import re
 import time
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from urllib.parse import urlparse
 
@@ -29,6 +30,8 @@ DYNAMIC_FACT_TERMS = (
     "flight", "train", "availability", "deadline", "admission", "vacancy", "job opening",
     "software version", "api", "documentation", "policy", "tax", "interest rate",
     "medical guideline", "treatment guideline", "recall", "outage", "status",
+    "subscriber", "subscribers", "followers", "most subscribed", "highest subscribed",
+    "box office", "ott", "streaming availability", "rating", "ranking",
 )
 
 OFFICEHOLDER_TERMS = (
@@ -90,6 +93,200 @@ REPUTABLE_NEWS_HOSTS = {
     "timesofindia.indiatimes.com", "deccanherald.com", "business-standard.com",
 }
 
+
+@dataclass(frozen=True, slots=True)
+class ResearchProfile:
+    key: str
+    label: str
+    keywords: tuple[str, ...]
+    primary_domains: tuple[str, ...]
+    reference_domains: tuple[str, ...]
+
+
+RESEARCH_PROFILES = (
+    ResearchProfile(
+        key="movies",
+        label="movies, TV and streaming",
+        keywords=(
+            "movie", "film", "cinema", "actor", "actress", "cast", "director",
+            "trailer", "box office", "web series", "tv series", "episode", "season",
+            "ott", "streaming", "netflix", "prime video", "disney+", "hotstar",
+            "imdb", "rotten tomatoes", "metacritic", "मूवी", "फिल्म", "वेब सीरीज",
+        ),
+        primary_domains=(
+            "netflix.com", "primevideo.com", "disneyplus.com", "hotstar.com",
+            "max.com", "hbo.com", "apple.com", "peacocktv.com", "paramountplus.com",
+            "sonypictures.com", "warnerbros.com", "universalpictures.com",
+            "paramount.com", "marvel.com", "starwars.com",
+        ),
+        reference_domains=(
+            "imdb.com", "rottentomatoes.com", "metacritic.com", "boxofficemojo.com",
+            "justwatch.com", "variety.com", "hollywoodreporter.com", "deadline.com",
+        ),
+    ),
+    ResearchProfile(
+        key="youtube_social",
+        label="YouTube and social platforms",
+        keywords=(
+            "youtube", "youtuber", "subscriber", "subscribers", "channel",
+            "instagram", "facebook", "twitter", "x.com", "tiktok", "followers",
+            "सोशल मीडिया", "सब्सक्राइबर", "यूट्यूब",
+        ),
+        primary_domains=(
+            "youtube.com", "blog.youtube", "about.youtube", "support.google.com",
+            "instagram.com", "facebook.com", "x.com", "tiktok.com",
+        ),
+        reference_domains=(
+            "socialblade.com", "tubefilter.com", "statista.com", "variety.com",
+            "reuters.com", "forbes.com",
+        ),
+    ),
+    ResearchProfile(
+        key="games",
+        label="video games",
+        keywords=(
+            "game", "gaming", "gta", "playstation", "xbox", "nintendo", "steam",
+            "epic games", "release date", "system requirements", "गेम",
+        ),
+        primary_domains=(
+            "rockstargames.com", "playstation.com", "xbox.com", "nintendo.com",
+            "steampowered.com", "store.epicgames.com", "ea.com", "ubisoft.com",
+            "activision.com", "bethesda.net",
+        ),
+        reference_domains=(
+            "ign.com", "gamespot.com", "polygon.com", "eurogamer.net",
+            "pcgamer.com", "theverge.com",
+        ),
+    ),
+    ResearchProfile(
+        key="technology",
+        label="technology, software and APIs",
+        keywords=(
+            "software", "api", "sdk", "framework", "library", "version", "documentation",
+            "android", "ios", "windows", "linux", "openai", "google ai", "github",
+            "python", "javascript", "typescript", "next.js", "flutter", "टेक",
+        ),
+        primary_domains=(
+            "github.com", "docs.github.com", "developer.android.com", "developer.apple.com",
+            "learn.microsoft.com", "developers.google.com", "cloud.google.com",
+            "platform.openai.com", "openai.com", "docs.python.org", "nodejs.org",
+            "nextjs.org", "flutter.dev",
+        ),
+        reference_domains=(
+            "stackoverflow.com", "developer.mozilla.org", "theverge.com",
+            "arstechnica.com", "techcrunch.com",
+        ),
+    ),
+    ResearchProfile(
+        key="medical",
+        label="health and medicine",
+        keywords=(
+            "health", "medical", "medicine", "disease", "symptom", "treatment",
+            "drug", "vaccine", "doctor", "hospital", "स्वास्थ्य", "दवा", "बीमारी",
+        ),
+        primary_domains=(
+            "who.int", "cdc.gov", "nih.gov", "fda.gov", "nhs.uk", "icmr.gov.in",
+            "mohfw.gov.in", "clinicaltrials.gov",
+        ),
+        reference_domains=(
+            "pubmed.ncbi.nlm.nih.gov", "cochranelibrary.com", "mayoclinic.org",
+            "nejm.org", "thelancet.com", "bmj.com",
+        ),
+    ),
+    ResearchProfile(
+        key="finance",
+        label="finance, markets and companies",
+        keywords=(
+            "stock", "share price", "market cap", "crypto", "finance", "bank",
+            "interest rate", "company results", "earnings", "nse", "bse", "rbi",
+            "शेयर", "स्टॉक", "बैंक",
+        ),
+        primary_domains=(
+            "rbi.org.in", "sebi.gov.in", "nseindia.com", "bseindia.com", "sec.gov",
+            "investor.gov",
+        ),
+        reference_domains=(
+            "reuters.com", "bloomberg.com", "ft.com", "wsj.com", "cnbc.com",
+            "moneycontrol.com", "economictimes.indiatimes.com",
+        ),
+    ),
+    ResearchProfile(
+        key="sports",
+        label="sports",
+        keywords=(
+            "sports", "cricket", "football", "soccer", "nba", "nfl", "ipl", "match",
+            "score", "schedule", "standings", "player", "खेल", "क्रिकेट", "मैच",
+        ),
+        primary_domains=(
+            "icc-cricket.com", "bcci.tv", "iplt20.com", "fifa.com", "uefa.com",
+            "nba.com", "nfl.com", "nhl.com", "mlb.com", "olympics.com",
+        ),
+        reference_domains=(
+            "espn.com", "espncricinfo.com", "bbc.com", "skysports.com", "reuters.com",
+        ),
+    ),
+    ResearchProfile(
+        key="travel",
+        label="travel and transport",
+        keywords=(
+            "travel", "trip", "flight", "train", "hotel", "visa", "tourism", "airport",
+            "railway", "यात्रा", "फ्लाइट", "ट्रेन", "होटल",
+        ),
+        primary_domains=(
+            "irctc.co.in", "indianrail.gov.in", "airindia.com", "goindigo.in",
+            "emirates.com", "qatarairways.com", "iata.org", "incredibleindia.gov.in",
+        ),
+        reference_domains=(
+            "tripadvisor.com", "lonelyplanet.com", "skyscanner.com", "booking.com",
+            "reuters.com",
+        ),
+    ),
+    ResearchProfile(
+        key="research",
+        label="academic research",
+        keywords=(
+            "research paper", "doi", "journal", "study", "academic", "thesis",
+            "literature review", "paper", "रिसर्च", "शोध पत्र",
+        ),
+        primary_domains=(
+            "doi.org", "pubmed.ncbi.nlm.nih.gov", "arxiv.org", "nature.com",
+            "science.org", "springer.com", "sciencedirect.com", "ieee.org",
+        ),
+        reference_domains=(
+            "semanticscholar.org", "crossref.org", "researchgate.net", "scholar.google.com",
+        ),
+    ),
+)
+
+PRIMARY_PLATFORM_DOMAINS = {
+    domain for profile in RESEARCH_PROFILES for domain in profile.primary_domains
+}
+TRUSTED_REFERENCE_DOMAINS = {
+    domain for profile in RESEARCH_PROFILES for domain in profile.reference_domains
+}
+
+
+def _domain_matches(host: str, domains: tuple[str, ...] | set[str]) -> bool:
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+
+def classify_research_profile(query: str) -> ResearchProfile | None:
+    normalized = _normalized(query)
+    best: ResearchProfile | None = None
+    best_score = 0
+    for profile in RESEARCH_PROFILES:
+        score = sum(1 for keyword in profile.keywords if keyword in normalized)
+        if score > best_score:
+            best = profile
+            best_score = score
+    return best
+
+
+def should_auto_research(query: str) -> bool:
+    """Automatically research factual platform/domain questions even without the web toggle."""
+    return bool(classify_research_profile(query) and _looks_factual(query))
+
+
 # In-memory cache avoids spending 28 search requests every time the same all-state list is asked.
 _STATE_CACHE: dict[str, tuple[float, list[dict]]] = {}
 _STATE_CACHE_TTL_SECONDS = 12 * 60 * 60
@@ -148,12 +345,16 @@ def _source_kind(url: str) -> str:
         "india.gov.in", "pmindia.gov.in", "pib.gov.in"
     }:
         return "official"
-    if any(host == item or host.endswith("." + item) for item in REPUTABLE_NEWS_HOSTS):
-        return "reputable_news"
     if host.endswith(".gov") or host.endswith(".go.uk") or host.endswith(".europa.eu"):
         return "official"
+    if _domain_matches(host, PRIMARY_PLATFORM_DOMAINS):
+        return "primary_platform"
     if host.endswith(".edu") or host.endswith(".ac.in"):
         return "academic"
+    if _domain_matches(host, TRUSTED_REFERENCE_DOMAINS):
+        return "trusted_reference"
+    if any(host == item or host.endswith("." + item) for item in REPUTABLE_NEWS_HOSTS):
+        return "reputable_news"
     return "other"
 
 
@@ -175,10 +376,16 @@ def _parse_date(value: str | None) -> float:
 
 def _trust_rank(item: dict) -> tuple[int, float, float]:
     kind = item.get("source_type") or _source_kind(item.get("url", ""))
-    kind_rank = {"official": 0, "reputable_news": 1, "academic": 2, "other": 3}.get(kind, 3)
+    kind_rank = {
+        "official": 0,
+        "primary_platform": 1,
+        "academic": 1,
+        "trusted_reference": 2,
+        "reputable_news": 3,
+        "other": 4,
+    }.get(kind, 4)
     published = _parse_date(item.get("published_date"))
     score = float(item.get("score") or 0.0)
-    # Lower tuple is better; recent dates and higher relevance are preferred inside a trust tier.
     return kind_rank, -published, -score
 
 
@@ -189,6 +396,7 @@ def _clean_result(item: dict, *, entity: str | None = None, content_limit: int =
     return {
         "title": item.get("title") or "Source",
         "url": url,
+        "domain": _host(url),
         "content": content,
         "score": item.get("score"),
         "published_date": item.get("published_date") or item.get("publishedDate"),
@@ -368,46 +576,84 @@ async def search_web(
     require_current: bool = False,
     as_of: str | None = None,
 ) -> tuple[list[dict], str]:
-    """Search current evidence with official-source preference and a recent-source cross-check."""
+    """Run topic-aware research and return ranked, deduplicated evidence."""
     as_of = as_of or date.today().isoformat()
 
     if is_all_india_state_cm_query(query):
         return await search_all_india_state_cms(settings, as_of)
 
+    profile = classify_research_profile(query)
+    profile_instruction = ""
+    if profile:
+        primary = ", ".join(profile.primary_domains)
+        reference = ", ".join(profile.reference_domains)
+        profile_instruction = (
+            f" This is a {profile.label} question. First check official/primary platforms: "
+            f"{primary}. Then cross-check with trusted specialist sources: {reference}."
+        )
+
     base_query = (
         f"As of {as_of}, verify the newest currently valid answer to this question: {query}. "
-        "Use primary sources where possible. Treat resignations, appointments, election results, oath ceremonies, "
-        "official corrections, and newer dated reports as overriding older pages."
+        "Use primary sources where possible. Treat newer official updates, corrections, releases, "
+        "rankings, subscriber counts, availability changes, appointments and dated reports as "
+        "overriding older pages."
         if require_current
-        else query
-    )
+        else (
+            f"Research this question carefully: {query}. Prefer primary/official sources, then "
+            "cross-check important claims with trusted specialist sources."
+        )
+    ) + profile_instruction
 
     jobs: list = [
         tavily_search(
             base_query,
             settings,
-            max_results=min(max_results, 8),
+            max_results=min(max_results, 7),
             topic="general",
             search_depth="basic",
-            content_limit=1600,
+            content_limit=1800,
         )
     ]
 
-    # Current queries get an independent recent-news pass. This is crucial when an old official bio remains indexed.
+    if profile:
+        if profile.primary_domains:
+            jobs.append(
+                tavily_search(
+                    base_query,
+                    settings,
+                    max_results=min(max_results, 7),
+                    topic="general",
+                    include_domains=profile.primary_domains[:14],
+                    search_depth="basic",
+                    content_limit=1800,
+                )
+            )
+        if profile.reference_domains:
+            jobs.append(
+                tavily_search(
+                    base_query,
+                    settings,
+                    max_results=min(max_results, 7),
+                    topic="general",
+                    include_domains=profile.reference_domains[:14],
+                    search_depth="basic",
+                    content_limit=1700,
+                )
+            )
+
     if require_current:
         jobs.append(
             tavily_search(
                 base_query,
                 settings,
-                max_results=min(max_results, 8),
+                max_results=min(max_results, 7),
                 topic="news",
                 time_range="year",
                 search_depth="basic",
-                content_limit=1400,
+                content_limit=1500,
             )
         )
 
-    # Indian office holders get a primary-source-only pass in addition to the open web.
     if _is_india_query(query) and _is_officeholder_query(query):
         jobs.append(
             tavily_search(
@@ -417,7 +663,7 @@ async def search_web(
                 topic="general",
                 include_domains=OFFICIAL_INDIA_DOMAINS,
                 search_depth="basic",
-                content_limit=1600,
+                content_limit=1700,
             )
         )
 
@@ -434,13 +680,21 @@ async def search_web(
     if len(ranked) < min(4, max_results):
         try:
             ranked = _dedupe_and_rank(
-                ranked + await exa_search(base_query, settings, max_results=max_results, content_limit=1600),
+                ranked
+                + await exa_search(
+                    base_query,
+                    settings,
+                    max_results=max_results,
+                    content_limit=1800,
+                ),
                 max_results,
             )
         except Exception as exc:
             errors.append(f"exa: {exc}")
 
     if ranked:
-        return ranked, "tavily+exa" if settings.exa_api else "tavily"
+        profile_name = profile.key if profile else "general"
+        providers = "tavily+exa" if settings.exa_api else "tavily"
+        return ranked, f"domain-router:{profile_name}:{providers}"
     return [], "; ".join(errors) if errors else "No research API configured"
 

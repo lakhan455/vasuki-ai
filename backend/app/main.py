@@ -25,6 +25,7 @@ from app.services.research import (
     is_all_india_state_cm_query,
     needs_live_web,
     search_web,
+    should_auto_research,
 )
 
 settings = get_settings()
@@ -187,14 +188,15 @@ async def chat(
         )
 
     require_current = needs_live_web(query)
-    should_search = request.use_web or require_current
+    auto_research = should_auto_research(query)
+    should_search = request.use_web or require_current or auto_research
 
     sources: list[dict] = []
     memory_pack = knowledge_context(strong_memory_hits)
     web_context = memory_pack
 
     if should_search:
-        max_results = 6 if require_current else 4
+        max_results = 8 if (require_current or auto_research) else 4
         sources, search_provider = await search_web(
             query,
             settings,

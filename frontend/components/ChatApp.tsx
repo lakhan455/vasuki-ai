@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   FormEvent,
@@ -17,10 +17,19 @@ import { supabase } from "@/lib/supabase";
 const VASUKI_LOGO_URL =
   "https://images.jdmagicbox.com/v2/comp/jaipur/a2/0141px141.x141.260404193718.t6a2/catalogue/vasuki-nfc-luniawas-jaipur-printing-services-604tb4s28a.jpg";
 
+type SourceInfo = {
+  title?: string;
+  url?: string;
+  domain?: string;
+  published_date?: string;
+  source_type?: string;
+};
+
 type UiMessage = ChatMessage & {
   id: string;
   imageUrl?: string;
   provider?: string;
+  sources?: SourceInfo[];
 };
 
 type StoredMessage = {
@@ -28,6 +37,7 @@ type StoredMessage = {
   content: string;
   imageUrl?: string;
   provider?: string;
+  sources?: SourceInfo[];
 };
 
 type ChatRecord = {
@@ -41,7 +51,7 @@ type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
 
 type ChatResponse = {
   answer?: string;
-  sources?: Array<{ title?: string; url?: string }>;
+  sources?: SourceInfo[];
 };
 
 type ImageResponse = {
@@ -85,8 +95,59 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+
+function normaliseSources(value: unknown): SourceInfo[] {
+  if (!Array.isArray(value)) return [];
+
+  const unique = new Map<string, SourceInfo>();
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const candidate = item as SourceInfo;
+    const url = typeof candidate.url === "string" ? candidate.url.trim() : "";
+    if (!/^https?:\/\//i.test(url) || unique.has(url)) continue;
+
+    unique.set(url, {
+      title:
+        typeof candidate.title === "string" && candidate.title.trim()
+          ? candidate.title.trim()
+          : undefined,
+      url,
+      domain:
+        typeof candidate.domain === "string" && candidate.domain.trim()
+          ? candidate.domain.trim()
+          : undefined,
+      published_date:
+        typeof candidate.published_date === "string"
+          ? candidate.published_date
+          : undefined,
+      source_type:
+        typeof candidate.source_type === "string"
+          ? candidate.source_type
+          : undefined,
+    });
+  }
+
+  return Array.from(unique.values()).slice(0, 12);
+}
+
+function sourceDomain(source: SourceInfo) {
+  if (source.domain?.trim()) return source.domain.trim().replace(/^www\./, "");
+  try {
+    return new URL(source.url || "").hostname.replace(/^www\./, "");
+  } catch {
+    return "Source";
+  }
+}
+
+function sourceFavicon(source: SourceInfo) {
+  const domain = sourceDomain(source);
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+    domain,
+  )}&sz=64`;
+}
+
 function storedMessages(messages: UiMessage[]): StoredMessage[] {
-  return messages.map(({ role, content, imageUrl, provider }) => ({
+  return messages.map(({ role, content, imageUrl, provider, sources }) => ({
     role,
     content,
     // Base64 images can be several megabytes. Keep hosted URLs, but avoid
@@ -94,6 +155,7 @@ function storedMessages(messages: UiMessage[]): StoredMessage[] {
     imageUrl:
       imageUrl && !imageUrl.startsWith("data:") ? imageUrl : undefined,
     provider,
+    sources: normaliseSources(sources),
   }));
 }
 
@@ -128,6 +190,7 @@ function restoreMessages(value: unknown): UiMessage[] {
           typeof candidate.provider === "string"
             ? candidate.provider
             : undefined,
+        sources: normaliseSources(candidate.sources),
       },
     ];
   });
@@ -407,34 +470,14 @@ export default function ChatApp() {
           webEnabled || mode === "web",
         )) as ChatResponse;
 
-        let answer =
+        const answer =
           typeof data.answer === "string" ? data.answer.trim() : "";
 
         if (!answer) {
           throw new Error("The AI returned an empty response.");
         }
 
-        const validSources = Array.isArray(data.sources)
-          ? data.sources.filter(
-              (source) =>
-                typeof source?.url === "string" &&
-                source.url.trim().length > 0,
-            )
-          : [];
-
-        if (validSources.length > 0) {
-          answer +=
-            "\n\n### Sources\n" +
-            validSources
-              .map((source, index) => {
-                const title =
-                  typeof source.title === "string" && source.title.trim()
-                    ? source.title.trim()
-                    : `Source ${index + 1}`;
-                return `${index + 1}. [${title}](${source.url})`;
-              })
-              .join("\n");
-        }
+        const validSources = normaliseSources(data.sources);
 
         finalMessages = [
           ...nextMessages,
@@ -442,6 +485,7 @@ export default function ChatApp() {
             id: makeId(),
             role: "assistant",
             content: answer,
+            sources: validSources,
           },
         ];
       }
@@ -735,6 +779,8 @@ export default function ChatApp() {
                             <ReactMarkdown>{message.content}</ReactMarkdown>
                           </div>
 
+                          <SourceStrip sources={message.sources} />
+
                           {message.imageUrl && (
                             <img
                               className="pv-generated-image"
@@ -903,6 +949,80 @@ function Composer({
         </button>
       </div>
     </form>
+  );
+}
+
+
+function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
+  const items = normaliseSources(sources);
+  if (items.length === 0) return null;
+
+  const preview = items.slice(0, 3);
+
+  return (
+    <div className="pv-source-strip">
+      <div className="pv-source-chip-row" aria-label="Answer sources">
+        {preview.map((source, index) => (
+          <a
+            className="pv-source-chip"
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            key={source.url}
+            title={source.title || sourceDomain(source)}
+          >
+            <span className="pv-source-number">{index + 1}</span>
+            <img
+              src={sourceFavicon(source)}
+              alt=""
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+              }}
+            />
+            <span>{sourceDomain(source)}</span>
+          </a>
+        ))}
+        {items.length > preview.length && (
+          <span className="pv-source-more">+{items.length - preview.length}</span>
+        )}
+      </div>
+
+      <details className="pv-sources-details">
+        <summary>
+          <span className="pv-source-stack" aria-hidden="true">
+            {preview.slice(0, 2).map((source) => (
+              <img key={source.url} src={sourceFavicon(source)} alt="" />
+            ))}
+          </span>
+          <strong>Sources</strong>
+          <span>{items.length}</span>
+        </summary>
+
+        <div className="pv-source-list">
+          {items.map((source, index) => (
+            <a
+              className="pv-source-card"
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              key={source.url}
+            >
+              <span className="pv-source-card-number">{index + 1}</span>
+              <img src={sourceFavicon(source)} alt="" loading="lazy" />
+              <span className="pv-source-card-copy">
+                <strong>{source.title || sourceDomain(source)}</strong>
+                <small>
+                  {sourceDomain(source)}
+                  {source.published_date ? ` · ${source.published_date}` : ""}
+                </small>
+              </span>
+              <span className="pv-source-open" aria-hidden="true">↗</span>
+            </a>
+          ))}
+        </div>
+      </details>
+    </div>
   );
 }
 

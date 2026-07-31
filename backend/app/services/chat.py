@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
@@ -19,7 +19,9 @@ TRUTH-GUARD RULES:
 4. A newer oath, appointment, election result, resignation, removal, death, merger, court order, official correction, or updated release overrides an older profile/list.
 5. Search-result ranking is not proof. Read the source title, date, content, and role carefully.
 6. Never call a former office holder current merely because an older page appears in the evidence.
-7. Every time-sensitive claim must use a real evidence number such as [1]. Never invent a citation.
+7. Whenever an EVIDENCE PACK is supplied, cite factual claims inline with real evidence numbers such as [1] or [2]. Never invent a citation.
+7A. Put each citation immediately after the sentence or fact it supports. For important claims, prefer two independent sources when available.
+7B. Do not write a duplicate Sources list inside the answer; the user interface renders source cards separately.
 8. For complete lists, verify every row separately. Do not fill missing rows from memory. Clearly report any unverified item.
 9. If the evidence is missing, conflicting without a clear newer authoritative source, or insufficient, say that the current answer could not be verified instead of guessing.
 10. Check spelling, dates, requested counts, state/entity names, and whether the person actually holds the requested role today.
