@@ -1,4 +1,4 @@
-﻿from functools import lru_cache
+from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,21 +29,23 @@ class Settings(BaseSettings):
     cloudflare_image_model: str = "@cf/black-forest-labs/flux-1-schnell"
     ocr_space_api: str | None = None
 
-    # General network timeout used by research, image and OCR providers.
+    # Backend-only Supabase credentials for verified shared knowledge.
+    # Never put SUPABASE_SERVICE_ROLE_KEY in the frontend or Vercel.
+    supabase_url: str | None = None
+    supabase_secret_key: str | None = None
+    supabase_service_role_key: str | None = None
+    global_learning_enabled: bool = True
+    global_memory_direct_answer_score: float = 0.58
+    global_memory_max_results: int = 3
+    global_memory_dynamic_ttl_days: int = 7
+    global_memory_stable_ttl_days: int = 365
+
     request_timeout_seconds: int = 20
-
-    # Long text/code generations need a separate, larger timeout.
     chat_timeout_seconds: int = 60
-
-    # Legacy setting retained so old .env files remain compatible.
     max_prompt_chars: int = 20000
-
-    # Smart-context settings. These are character budgets, not token counts.
     max_context_chars: int = 45000
     max_single_message_chars: int = 35000
     context_reserve_chars: int = 7000
-
-    # Large response settings.
     max_output_tokens: int = 6000
     max_continuations: int = 1
 
@@ -61,8 +63,15 @@ class Settings(BaseSettings):
             if item.strip()
         ]
 
+    @property
+    def global_learning_configured(self) -> bool:
+        return bool(
+            self.global_learning_enabled
+            and self.supabase_url
+            and (self.supabase_secret_key or self.supabase_service_role_key)
+        )
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

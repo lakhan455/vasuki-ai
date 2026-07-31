@@ -1,8 +1,8 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -11,6 +11,14 @@ from app.services.chat import route_chat
 from app.services.context import compact_messages
 from app.services.image import route_image
 from app.services.identity import fixed_identity_reply
+from app.services.knowledge import (
+    extract_correction,
+    find_verified_knowledge,
+    hit_sources,
+    is_direct_fact_question,
+    knowledge_context,
+    learn_from_correction,
+)
 from app.services.ocr import extract_text
 from app.services.research import (
     INDIA_STATES,
@@ -20,7 +28,7 @@ from app.services.research import (
 )
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="2.1.0")
+app = FastAPI(title=settings.app_name, version="2.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -41,10 +49,15 @@ async def root() -> dict:
         "name": settings.app_name,
         "status": "online",
         "docs": "/docs",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "truth_guard": "enabled",
         "smart_context": "enabled",
         "large_code": "enabled",
+        "global_learning": (
+            "configured"
+            if settings.global_learning_configured
+            else "not_configured"
+        ),
     }
 
 
@@ -56,16 +69,27 @@ async def health() -> dict:
         "truth_guard": True,
         "smart_context": True,
         "large_code": True,
+        "global_learning_enabled": settings.global_learning_enabled,
+        "global_learning_configured": settings.global_learning_configured,
         "max_context_chars": settings.max_context_chars,
         "max_output_tokens": settings.max_output_tokens,
         "max_continuations": settings.max_continuations,
     }
 
 
+@app.get("/api/knowledge/status")
+async def knowledge_status() -> dict:
+    return {
+        "enabled": settings.global_learning_enabled,
+        "configured": settings.global_learning_configured,
+        "mode": "verified-shared-memory",
+        "private_data_learning": False,
+    }
+
+
 @app.post("/api/research")
 async def research(request: ResearchRequest) -> dict:
     current_date = _current_date()
-
 
     require_current = needs_live_web(request.query)
     results, provider = await search_web(
@@ -84,7 +108,10 @@ async def research(request: ResearchRequest) -> dict:
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(
+    request: ChatRequest,
+    background_tasks: BackgroundTasks,
+) -> ChatResponse:
     raw_messages = [item.model_dump() for item in request.messages]
 
     query = next(
@@ -110,13 +137,61 @@ async def chat(request: ChatRequest) -> ChatResponse:
             used_context_chars=len(query),
         )
 
-    # Accuracy-first: factual/current questions always use live evidence,
-    # even if the UI web toggle is off.
+    correction = extract_correction(raw_messages)
+    if correction and settings.global_learning_configured:
+        background_tasks.add_task(
+            learn_from_correction,
+            raw_messages,
+            settings,
+            current_date,
+        )
+        return ChatResponse(
+            answer=(
+                "धन्यवाद। मैंने आपकी correction receive कर ली है। "
+                "इसे live sources से verify करके shared Vasuki knowledge में "
+                "save किया जाएगा। केवल verified जानकारी ही सभी users को दिखाई जाएगी।"
+            ),
+            provider="vasuki-learning",
+            sources=[],
+            context_trimmed=False,
+            original_context_chars=sum(
+                len(item["content"]) for item in raw_messages
+            ),
+            used_context_chars=len(query),
+        )
+
+    memory_hits = await find_verified_knowledge(query, settings)
+    strong_memory_hits = [
+        hit
+        for hit in memory_hits
+        if hit.score >= settings.global_memory_direct_answer_score
+        and hit.confidence >= 0.72
+    ]
+    memory_source_items = hit_sources(strong_memory_hits)
+
+    if (
+        strong_memory_hits
+        and is_direct_fact_question(query)
+        and not request.use_web
+    ):
+        best = strong_memory_hits[0]
+        return ChatResponse(
+            answer=best.answer,
+            provider="vasuki-global-memory",
+            sources=memory_source_items,
+            context_trimmed=False,
+            original_context_chars=sum(
+                len(item["content"]) for item in raw_messages
+            ),
+            used_context_chars=len(query),
+        )
+
     require_current = needs_live_web(query)
     should_search = request.use_web or require_current
 
     sources: list[dict] = []
-    web_context = ""
+    memory_pack = knowledge_context(strong_memory_hits)
+    web_context = memory_pack
 
     if should_search:
         max_results = 6 if require_current else 4
@@ -128,7 +203,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             as_of=current_date,
         )
 
-        if require_current and not sources:
+        if require_current and not sources and not strong_memory_hits:
             return ChatResponse(
                 answer=(
                     "Live verification service is temporarily unavailable. "
@@ -177,10 +252,13 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     f"PUBLISHED/UPDATED: {published}\n"
                     f"CONTENT:\n{source.get('content', '')}"
                 )
-            web_context = "\n\n".join(context_parts)
+            live_pack = "\n\n".join(context_parts)
+            web_context = (
+                f"{memory_pack}\n\n{live_pack}"
+                if memory_pack
+                else live_pack
+            )
 
-    # Never reject a long chat. Keep recent turns automatically and reserve
-    # room for the system prompt, live evidence and the model response.
     available_message_chars = max(
         8000,
         settings.max_context_chars
@@ -205,7 +283,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         return ChatResponse(
             answer=answer,
             provider=provider,
-            sources=sources,
+            sources=memory_source_items + sources,
             context_trimmed=context_stats.trimmed,
             original_context_chars=context_stats.original_chars,
             used_context_chars=context_stats.used_chars,
@@ -233,4 +311,3 @@ async def ocr(file: UploadFile = File(...)) -> dict:
         return await extract_text(file, settings)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
