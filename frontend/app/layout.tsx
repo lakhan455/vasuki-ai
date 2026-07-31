@@ -1,0 +1,20 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Vasuki AI",
+  description:
+    "Vasuki AI — chat, live research, coding and image generation.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="hi" translate="no" suppressHydrationWarning>
+      <body>{children}</body>
+    </html>
+  );
+}
