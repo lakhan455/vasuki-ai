@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
@@ -29,7 +30,7 @@ from app.services.research import (
 )
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="2.2.0")
+app = FastAPI(title=settings.app_name, version="2.3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -50,10 +51,11 @@ async def root() -> dict:
         "name": settings.app_name,
         "status": "online",
         "docs": "/docs",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "truth_guard": "enabled",
         "smart_context": "enabled",
         "large_code": "enabled",
+        "speed_guard": "enabled",
         "global_learning": (
             "configured"
             if settings.global_learning_configured
@@ -70,11 +72,15 @@ async def health() -> dict:
         "truth_guard": True,
         "smart_context": True,
         "large_code": True,
+        "speed_guard": True,
         "global_learning_enabled": settings.global_learning_enabled,
         "global_learning_configured": settings.global_learning_configured,
         "max_context_chars": settings.max_context_chars,
         "max_output_tokens": settings.max_output_tokens,
         "max_continuations": settings.max_continuations,
+        "chat_timeout_seconds": settings.chat_timeout_seconds,
+        "total_chat_timeout_seconds": settings.total_chat_timeout_seconds,
+        "web_search_timeout_seconds": settings.web_search_timeout_seconds,
     }
 
 
@@ -91,15 +97,24 @@ async def knowledge_status() -> dict:
 @app.post("/api/research")
 async def research(request: ResearchRequest) -> dict:
     current_date = _current_date()
-
     require_current = needs_live_web(request.query)
-    results, provider = await search_web(
-        request.query,
-        settings,
-        request.max_results,
-        require_current=require_current,
-        as_of=current_date,
-    )
+
+    try:
+        results, provider = await asyncio.wait_for(
+            search_web(
+                request.query,
+                settings,
+                request.max_results,
+                require_current=require_current,
+                as_of=current_date,
+            ),
+            timeout=min(float(settings.web_search_timeout_seconds), 18.0),
+        )
+    except asyncio.TimeoutError:
+        results, provider = [], "search-timeout"
+    except Exception:
+        results, provider = [], "search-unavailable"
+
     return {
         "results": results,
         "provider": provider,
@@ -161,7 +176,14 @@ async def chat(
             used_context_chars=len(query),
         )
 
-    memory_hits = await find_verified_knowledge(query, settings)
+    try:
+        memory_hits = await asyncio.wait_for(
+            find_verified_knowledge(query, settings),
+            timeout=3.5,
+        )
+    except Exception:
+        memory_hits = []
+
     strong_memory_hits = [
         hit
         for hit in memory_hits
@@ -188,7 +210,9 @@ async def chat(
         )
 
     require_current = needs_live_web(query)
-    auto_research = should_auto_research(query)
+    # Avoid unnecessary web calls for very large writing/coding prompts. The web
+    # toggle and genuinely current questions still use live research.
+    auto_research = len(query) <= 500 and should_auto_research(query)
     should_search = request.use_web or require_current or auto_research
 
     sources: list[dict] = []
@@ -197,13 +221,21 @@ async def chat(
 
     if should_search:
         max_results = 8 if (require_current or auto_research) else 4
-        sources, search_provider = await search_web(
-            query,
-            settings,
-            max_results,
-            require_current=require_current,
-            as_of=current_date,
-        )
+        try:
+            sources, _search_provider = await asyncio.wait_for(
+                search_web(
+                    query,
+                    settings,
+                    max_results,
+                    require_current=require_current,
+                    as_of=current_date,
+                ),
+                timeout=min(float(settings.web_search_timeout_seconds), 18.0),
+            )
+        except asyncio.TimeoutError:
+            sources = []
+        except Exception:
+            sources = []
 
         if require_current and not sources and not strong_memory_hits:
             return ChatResponse(
@@ -274,13 +306,16 @@ async def chat(
     )
 
     try:
-        answer, provider = await route_chat(
-            request.provider,
-            messages,
-            settings,
-            web_context,
-            require_current=require_current,
-            as_of=current_date,
+        answer, provider = await asyncio.wait_for(
+            route_chat(
+                request.provider,
+                messages,
+                settings,
+                web_context,
+                require_current=require_current,
+                as_of=current_date,
+            ),
+            timeout=min(float(settings.total_chat_timeout_seconds), 55.0),
         )
         return ChatResponse(
             answer=answer,
@@ -290,10 +325,24 @@ async def chat(
             original_context_chars=context_stats.original_chars,
             used_context_chars=context_stats.used_chars,
         )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "The AI provider took too long to respond. "
+                "Please retry; the app will automatically use another provider."
+            ),
+        ) from exc
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "All configured AI providers are temporarily busy or unavailable. "
+                "Please retry in a few seconds."
+            ),
+        ) from exc
 
 
 @app.post("/api/image")
@@ -301,7 +350,10 @@ async def generate_image(request: ImageRequest) -> dict:
     try:
         return await route_image(request.provider, request.prompt, settings)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail="Image providers are temporarily busy or unavailable.",
+        ) from exc
 
 
 @app.post("/api/ocr")
@@ -312,4 +364,7 @@ async def ocr(file: UploadFile = File(...)) -> dict:
     try:
         return await extract_text(file, settings)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=502,
+            detail="OCR service is temporarily unavailable.",
+        ) from exc

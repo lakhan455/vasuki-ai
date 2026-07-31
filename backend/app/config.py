@@ -40,14 +40,19 @@ class Settings(BaseSettings):
     global_memory_dynamic_ttl_days: int = 7
     global_memory_stable_ttl_days: int = 365
 
-    request_timeout_seconds: int = 20
-    chat_timeout_seconds: int = 60
+    # Keep individual upstream calls short so one slow free provider does not
+    # block the whole request. Large answers are still supported, but the app
+    # fails over instead of waiting for minutes.
+    request_timeout_seconds: int = 12
+    chat_timeout_seconds: int = 25
+    web_search_timeout_seconds: int = 14
+    total_chat_timeout_seconds: int = 55
     max_prompt_chars: int = 20000
     max_context_chars: int = 45000
     max_single_message_chars: int = 35000
     context_reserve_chars: int = 7000
-    max_output_tokens: int = 6000
-    max_continuations: int = 1
+    max_output_tokens: int = 5000
+    max_continuations: int = 0
 
     model_config = SettingsConfigDict(
         env_file=".env",
