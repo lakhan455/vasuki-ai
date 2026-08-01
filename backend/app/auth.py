@@ -15,6 +15,7 @@ from app.config import get_settings
 class AuthUser:
     id: str
     email: str | None = None
+    access_token: str = ""
 
 
 _CACHE: dict[str, tuple[float, AuthUser]] = {}
@@ -102,6 +103,7 @@ async def get_current_user(
             if payload.get("email")
             else None
         ),
+        access_token=token,
     )
 
     async with _CACHE_LOCK:

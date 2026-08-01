@@ -38,13 +38,20 @@ def _server_key(settings: Settings) -> str:
     )
 
 
-def _headers(settings: Settings, *, representation: bool = False) -> dict[str, str]:
+def _headers(
+    settings: Settings,
+    *,
+    representation: bool = False,
+    user_jwt: str | None = None,
+) -> dict[str, str]:
     key = _server_key(settings)
     headers = {
         "apikey": key,
         "Content-Type": "application/json",
     }
-    if key and not key.startswith("sb_secret_"):
+    if user_jwt:
+        headers["Authorization"] = f"Bearer {user_jwt}"
+    elif key and not key.startswith("sb_secret_"):
         headers["Authorization"] = f"Bearer {key}"
     if representation:
         headers["Prefer"] = "return=representation"
@@ -94,7 +101,12 @@ def extract_explicit_memory(query: str) -> str | None:
     return None
 
 
-async def get_memory_enabled(user_id: str, settings: Settings) -> bool:
+async def get_memory_enabled(
+    user_id: str,
+    settings: Settings,
+    *,
+    user_jwt: str | None = None,
+) -> bool:
     if not _configured(settings):
         return False
 
@@ -104,7 +116,7 @@ async def get_memory_enabled(user_id: str, settings: Settings) -> bool:
     )
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:
-            response = await client.get(url, headers=_headers(settings))
+            response = await client.get(url, headers=_headers(settings, user_jwt=user_jwt))
         if response.is_error:
             return True
         rows = response.json()
@@ -119,6 +131,8 @@ async def set_memory_enabled(
     user_id: str,
     enabled: bool,
     settings: Settings,
+    *,
+    user_jwt: str | None = None,
 ) -> bool:
     if not _configured(settings):
         raise RuntimeError("Supabase server credentials are not configured.")
@@ -144,6 +158,7 @@ async def list_user_memories(
     settings: Settings,
     *,
     limit: int = 50,
+    user_jwt: str | None = None,
 ) -> list[dict[str, Any]]:
     if not _configured(settings):
         return []
@@ -159,7 +174,7 @@ async def list_user_memories(
 
     try:
         async with httpx.AsyncClient(timeout=7.0) as client:
-            response = await client.get(url, headers=_headers(settings))
+            response = await client.get(url, headers=_headers(settings, user_jwt=user_jwt))
         response.raise_for_status()
         rows = response.json()
         return rows if isinstance(rows, list) else []
@@ -173,6 +188,7 @@ async def create_user_memory(
     settings: Settings,
     *,
     category: str = "preference",
+    user_jwt: str | None = None,
 ) -> dict[str, Any]:
     if not _configured(settings):
         raise RuntimeError("Supabase server credentials are not configured.")
@@ -196,12 +212,20 @@ async def create_user_memory(
     async with httpx.AsyncClient(timeout=8.0) as client:
         response = await client.post(
             url,
-            headers=_headers(settings, representation=True),
+            headers=_headers(
+                settings,
+                representation=True,
+                user_jwt=user_jwt,
+            ),
             json=payload,
         )
 
     if response.status_code == 409:
-        rows = await list_user_memories(user_id, settings)
+        rows = await list_user_memories(
+            user_id,
+            settings,
+            user_jwt=user_jwt,
+        )
         for row in rows:
             if str(row.get("memory_text") or "").casefold() == cleaned.casefold():
                 return row
@@ -218,6 +242,8 @@ async def delete_user_memory(
     user_id: str,
     memory_id: str,
     settings: Settings,
+    *,
+    user_jwt: str | None = None,
 ) -> None:
     if not _configured(settings):
         raise RuntimeError("Supabase server credentials are not configured.")
@@ -227,19 +253,30 @@ async def delete_user_memory(
         f"?id=eq.{quote(memory_id)}&user_id=eq.{quote(user_id)}"
     )
     async with httpx.AsyncClient(timeout=8.0) as client:
-        response = await client.delete(url, headers=_headers(settings))
+        response = await client.delete(url, headers=_headers(settings, user_jwt=user_jwt))
     response.raise_for_status()
 
 
 async def personal_memory_context(
     user_id: str,
     settings: Settings,
+    *,
+    user_jwt: str | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
-    enabled = await get_memory_enabled(user_id, settings)
+    enabled = await get_memory_enabled(
+        user_id,
+        settings,
+        user_jwt=user_jwt,
+    )
     if not enabled:
         return "", []
 
-    rows = await list_user_memories(user_id, settings, limit=30)
+    rows = await list_user_memories(
+        user_id,
+        settings,
+        limit=30,
+        user_jwt=user_jwt,
+    )
     if not rows:
         return "", []
 

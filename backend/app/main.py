@@ -122,6 +122,7 @@ def _direct_stream(
 async def _private_context(
     *,
     user_id: str,
+    access_token: str,
     query: str,
     request: ChatRequest,
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -132,7 +133,11 @@ async def _private_context(
     if request.use_memory:
         try:
             personal_pack, _memory_rows = await asyncio.wait_for(
-                personal_memory_context(user_id, settings),
+                personal_memory_context(
+                    user_id,
+                    settings,
+                    user_jwt=access_token,
+                ),
                 timeout=4.0,
             )
         except Exception:
@@ -316,8 +321,16 @@ async def memory_list(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict:
     enabled, memories = await asyncio.gather(
-        get_memory_enabled(current_user.id, settings),
-        list_user_memories(current_user.id, settings),
+        get_memory_enabled(
+            current_user.id,
+            settings,
+            user_jwt=current_user.access_token,
+        ),
+        list_user_memories(
+            current_user.id,
+            settings,
+            user_jwt=current_user.access_token,
+        ),
     )
     return {"enabled": enabled, "memories": memories}
 
@@ -333,6 +346,7 @@ async def memory_create(
             request.memory_text,
             settings,
             category=request.category,
+            user_jwt=current_user.access_token,
         )
         return {"ok": True, "memory": memory}
     except ValueError as exc:
@@ -340,7 +354,7 @@ async def memory_create(
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="Memory could not be saved.",
+            detail=f"Memory could not be saved: {str(exc)[:300]}",
         ) from exc
 
 
@@ -354,6 +368,7 @@ async def memory_settings(
             current_user.id,
             request.enabled,
             settings,
+            user_jwt=current_user.access_token,
         )
         return {"ok": True, "enabled": enabled}
     except Exception as exc:
@@ -369,7 +384,12 @@ async def memory_delete(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict:
     try:
-        await delete_user_memory(current_user.id, memory_id, settings)
+        await delete_user_memory(
+            current_user.id,
+            memory_id,
+            settings,
+            user_jwt=current_user.access_token,
+        )
         return {"ok": True}
     except Exception as exc:
         raise HTTPException(
@@ -507,11 +527,13 @@ async def chat(
                 current_user.id,
                 explicit_memory,
                 settings,
+                user_jwt=current_user.access_token,
             )
             answer = f"Yaad rakh liya: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
-        except Exception:
+        except Exception as exc:
+            print("[memory] save failed:", type(exc).__name__, str(exc)[:500])
             answer = "Memory save nahi ho paayi. Thodi der baad dobara try karein."
 
         return ChatResponse(
@@ -564,6 +586,7 @@ async def chat(
 
     private_pack, document_sources = await _private_context(
         user_id=current_user.id,
+        access_token=current_user.access_token,
         query=query,
         request=request,
     )
@@ -682,11 +705,13 @@ async def chat_stream(
                 current_user.id,
                 explicit_memory,
                 settings,
+                user_jwt=current_user.access_token,
             )
             answer = f"Yaad rakh liya: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
-        except Exception:
+        except Exception as exc:
+            print("[memory] save failed:", type(exc).__name__, str(exc)[:500])
             answer = "Memory save nahi ho paayi. Thodi der baad dobara try karein."
         return _direct_stream(
             answer,
@@ -709,6 +734,7 @@ async def chat_stream(
 
     private_pack, document_sources = await _private_context(
         user_id=current_user.id,
+        access_token=current_user.access_token,
         query=query,
         request=chat_request,
     )
