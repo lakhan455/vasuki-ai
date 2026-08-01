@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -139,6 +142,7 @@ async def _openai_compatible(
     *,
     temperature: float = 0.0,
     token_field: str = "max_tokens",
+    max_output_tokens: int | None = None,
 ) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -149,13 +153,14 @@ async def _openai_compatible(
 
     conversation = [dict(item) for item in messages]
     complete = ""
+    output_limit = max_output_tokens or settings.max_output_tokens
 
     for continuation_index in range(settings.max_continuations + 1):
         payload = {
             "model": model,
             "messages": conversation,
             "temperature": temperature,
-            token_field: settings.max_output_tokens,
+            token_field: output_limit,
         }
 
         async with httpx.AsyncClient(timeout=settings.chat_timeout_seconds) as client:
@@ -192,6 +197,87 @@ async def _openai_compatible(
     return complete.strip()
 
 
+
+_PROVIDER_COOLDOWN_UNTIL: dict[str, float] = {}
+
+_LARGE_REQUEST_HINTS = (
+    "complete code",
+    "full code",
+    "production-ready",
+    "research paper",
+    "detailed report",
+    "step by step",
+    "all countries",
+    "all states",
+    "all chief ministers",
+    "all presidents",
+    "long answer",
+    "bada jawab",
+    "bade jawab",
+    "poori list",
+    "puri list",
+    "saare",
+    "sabhi",
+)
+
+
+def _is_large_request(messages: list[dict]) -> bool:
+    query = next(
+        (
+            str(item.get("content") or "")
+            for item in reversed(messages)
+            if item.get("role") == "user"
+        ),
+        "",
+    )
+    normalized = query.casefold()
+
+    if len(query) > 1400 or len(query.split()) > 220:
+        return True
+
+    if any(hint in normalized for hint in _LARGE_REQUEST_HINTS):
+        return True
+
+    has_large_count = bool(re.search(r"\b(?:[5-9]\d|[1-9]\d{2,})\b", normalized))
+    asks_for_list = any(
+        term in normalized
+        for term in ("list", "names", "naam", "countries", "states", "items")
+    )
+    return has_large_count and asks_for_list
+
+
+def _provider_is_available(name: str) -> bool:
+    return time.monotonic() >= _PROVIDER_COOLDOWN_UNTIL.get(name, 0.0)
+
+
+def _clear_provider_failure(name: str) -> None:
+    _PROVIDER_COOLDOWN_UNTIL.pop(name, None)
+
+
+def _mark_provider_failure(name: str, error: Exception, settings: Settings) -> None:
+    message = str(error).casefold()
+    cooldown = 20
+
+    if isinstance(error, asyncio.TimeoutError) or "timed out" in message:
+        cooldown = 45
+    elif any(
+        marker in message
+        for marker in (
+            "401",
+            "402",
+            "403",
+            "429",
+            "quota",
+            "rate limit",
+            "payment required",
+            "not configured",
+        )
+    ):
+        cooldown = int(settings.provider_cooldown_seconds)
+
+    _PROVIDER_COOLDOWN_UNTIL[name] = time.monotonic() + max(5, cooldown)
+
+
 async def chat_groq(
     messages: list[dict],
     settings: Settings,
@@ -220,6 +306,38 @@ async def chat_groq(
     )
 
 
+
+
+async def chat_groq_fast(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str = "",
+    *,
+    require_current: bool = False,
+    as_of: str | None = None,
+    temperature: float = 0.0,
+) -> str:
+    if not settings.groq_api_key:
+        raise RuntimeError("GROQ_API_KEY is not configured")
+
+    return await _openai_compatible(
+        "https://api.groq.com/openai/v1/chat/completions",
+        settings.groq_api_key,
+        settings.groq_fast_model,
+        _openai_messages(
+            messages,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        ),
+        settings,
+        temperature=temperature,
+        token_field="max_completion_tokens",
+        max_output_tokens=min(
+            settings.max_fast_output_tokens,
+            settings.max_output_tokens,
+        ),
+    )
 
 async def chat_sambanova(
     messages: list[dict],
@@ -426,6 +544,7 @@ async def chat_gemini(
 
 
 PROVIDERS = {
+    "groq_fast": chat_groq_fast,
     "groq": chat_groq,
     "sambanova": chat_sambanova,
     "cerebras": chat_cerebras,
@@ -525,7 +644,7 @@ async def _verify_current_answer(
 
     order = [
         name
-        for name in ("gemini", "groq", "cerebras", "sambanova", "openrouter", "mistral")
+        for name in ("gemini", "groq", "sambanova", "openrouter", "mistral", "cerebras")
         if name != draft_provider
     ]
     order.append(draft_provider)
@@ -561,30 +680,67 @@ async def route_chat(
     require_current: bool = False,
     as_of: str | None = None,
 ) -> tuple[str, str]:
-    order = (
-        [provider]
-        if provider != "auto"
-        else ["groq", "cerebras", "sambanova", "gemini", "openrouter", "mistral"]
-    )
+    if provider != "auto":
+        order = [provider]
+    elif _is_large_request(messages):
+        order = [
+            "groq",
+            "sambanova",
+            "gemini",
+            "openrouter",
+            "mistral",
+            "cerebras",
+            "groq_fast",
+        ]
+    else:
+        order = [
+            "groq_fast",
+            "groq",
+            "gemini",
+            "sambanova",
+            "openrouter",
+            "mistral",
+            "cerebras",
+        ]
 
     errors: list[str] = []
     draft = ""
     draft_provider = ""
 
     for name in order:
+        if not _provider_is_available(name):
+            errors.append(f"{name}: temporarily skipped after a recent failure")
+            continue
+
+        timeout_seconds = (
+            float(settings.fast_provider_timeout_seconds)
+            if name == "groq_fast"
+            else float(settings.provider_timeout_seconds)
+        )
+
         try:
-            draft = await _call_provider(
-                name,
-                messages,
-                settings,
-                web_context,
-                require_current=require_current,
-                as_of=as_of,
-                temperature=0.0 if require_current else 0.2,
+            candidate = await asyncio.wait_for(
+                _call_provider(
+                    name,
+                    messages,
+                    settings,
+                    web_context,
+                    require_current=require_current,
+                    as_of=as_of,
+                    temperature=0.0 if require_current else 0.2,
+                ),
+                timeout=timeout_seconds,
             )
+
+            if not candidate.strip():
+                raise RuntimeError("Provider returned an empty answer")
+
+            draft = candidate.strip()
             draft_provider = name
+            _clear_provider_failure(name)
             break
         except Exception as exc:
+            _mark_provider_failure(name, exc, settings)
             errors.append(f"{name}: {exc}")
 
     if not draft:
@@ -599,15 +755,17 @@ async def route_chat(
                 "Current facts require evidence, but the evidence pack is empty"
             )
 
-        verified, verification_provider = await _verify_current_answer(
-            draft,
-            draft_provider,
-            messages,
-            settings,
-            web_context,
-            as_of or datetime.now(timezone.utc).date().isoformat(),
-        )
-        return verified, verification_provider
+        try:
+            verified, verification_provider = await _verify_current_answer(
+                draft,
+                draft_provider,
+                messages,
+                settings,
+                web_context,
+                as_of or datetime.now(timezone.utc).date().isoformat(),
+            )
+            return verified, verification_provider
+        except Exception:
+            return draft, f"{draft_provider}+verification-fallback"
 
     return draft, draft_provider
-

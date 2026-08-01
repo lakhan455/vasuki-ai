@@ -194,17 +194,36 @@ export async function warmBackend() {
 }
 
 export async function sendChat(messages: ChatMessage[], useWeb: boolean) {
-  return postJsonAt(
-    PROXY_API_URL,
-    "/api/chat",
-    {
-      messages,
-      provider: "auto",
-      use_web: useWeb,
-    },
-    65000,
-    2,
-  );
+  const body = {
+    messages,
+    provider: "auto",
+    use_web: useWeb,
+  };
+
+  try {
+    return await postJsonAt(
+      DIRECT_MEDIA_API_URL,
+      "/api/chat",
+      body,
+      65000,
+      1,
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "AI service connection failed.";
+
+    if (/failed to fetch|network|connection/i.test(message)) {
+      return postJsonAt(
+        PROXY_API_URL,
+        "/api/chat",
+        body,
+        65000,
+        1,
+      );
+    }
+
+    throw error;
+  }
 }
 
 export async function analyzeAttachment(file: File, prompt: string) {

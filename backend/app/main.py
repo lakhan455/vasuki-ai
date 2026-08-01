@@ -187,7 +187,7 @@ async def chat(
     try:
         memory_hits = await asyncio.wait_for(
             find_verified_knowledge(query, settings),
-            timeout=3.5,
+            timeout=1.2,
         )
     except Exception:
         memory_hits = []
@@ -220,8 +220,10 @@ async def chat(
     require_current = needs_live_web(query)
     # Avoid unnecessary web calls for very large writing/coding prompts. The web
     # toggle and genuinely current questions still use live research.
-    auto_research = len(query) <= 500 and should_auto_research(query)
-    should_search = request.use_web or require_current or auto_research
+    # Static questions should not wait for web search. Live/current questions
+    # and the explicit Web toggle still use verified online research.
+    auto_research = False
+    should_search = request.use_web or require_current
 
     sources: list[dict] = []
     memory_pack = knowledge_context(strong_memory_hits)

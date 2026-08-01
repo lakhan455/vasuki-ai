@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    # Fast model for normal questions; the large model remains for complex work.
+    groq_fast_model: str = "llama-3.1-8b-instant"
     sambanova_api_key: str | None = None
     sambanova_model: str = "gpt-oss-120b"
     sambanova_base_url: str = "https://api.sambanova.ai/v1"
@@ -55,6 +57,9 @@ class Settings(BaseSettings):
     # fails over instead of waiting for minutes.
     request_timeout_seconds: int = 12
     chat_timeout_seconds: int = 25
+    fast_provider_timeout_seconds: int = 9
+    provider_timeout_seconds: int = 18
+    provider_cooldown_seconds: int = 120
     web_search_timeout_seconds: int = 14
     total_chat_timeout_seconds: int = 55
     image_timeout_seconds: int = 95
@@ -67,6 +72,7 @@ class Settings(BaseSettings):
     max_single_message_chars: int = 35000
     context_reserve_chars: int = 7000
     max_output_tokens: int = 5000
+    max_fast_output_tokens: int = 1600
     max_continuations: int = 0
 
     model_config = SettingsConfigDict(
