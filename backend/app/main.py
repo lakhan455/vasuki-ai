@@ -1,21 +1,34 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from fastapi import (
     BackgroundTasks,
+    Depends,
     FastAPI,
     File,
     Form,
     HTTPException,
+    Request,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
+from app.auth import AuthUser, get_current_user
 from app.config import get_settings
-from app.schemas import ChatRequest, ChatResponse, ImageRequest, ResearchRequest
-from app.services.chat import route_chat
+from app.schemas import (
+    ChatRequest,
+    ChatResponse,
+    ImageRequest,
+    MemoryCreateRequest,
+    MemorySettingsRequest,
+    ResearchRequest,
+)
+from app.services.chat import route_chat, route_chat_stream
 from app.services.context import compact_messages
 from app.services.image import route_image
 from app.services.identity import fixed_identity_reply
@@ -28,17 +41,33 @@ from app.services.knowledge import (
     learn_from_correction,
 )
 from app.services.ocr import extract_text
-from app.services.vision import process_vision_request
+from app.services.personal_memory import (
+    create_user_memory,
+    delete_user_memory,
+    extract_explicit_memory,
+    get_memory_enabled,
+    list_user_memories,
+    personal_memory_context,
+    set_memory_enabled,
+)
+from app.services.rag import (
+    delete_user_document,
+    document_context,
+    ingest_user_document,
+    list_user_documents,
+    search_user_documents,
+)
 from app.services.research import (
     INDIA_STATES,
     is_all_india_state_cm_query,
     needs_live_web,
     search_web,
-    should_auto_research,
 )
+from app.services.vision import process_vision_request
+
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="2.4.0")
+app = FastAPI(title=settings.app_name, version="3.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -53,17 +82,183 @@ def _current_date() -> str:
     return datetime.now(india_timezone).date().isoformat()
 
 
+def _join_context(*parts: str) -> str:
+    return "\n\n".join(part.strip() for part in parts if part and part.strip())
+
+
+def _sse(event: str, payload: dict[str, Any]) -> str:
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return f"event: {event}\ndata: {encoded}\n\n"
+
+
+def _direct_stream(
+    answer: str,
+    *,
+    provider: str,
+    sources: list[dict[str, Any]] | None = None,
+) -> StreamingResponse:
+    async def generate():
+        yield _sse("token", {"token": answer})
+        yield _sse(
+            "meta",
+            {
+                "provider": provider,
+                "sources": sources or [],
+                "done": True,
+            },
+        )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+async def _private_context(
+    *,
+    user_id: str,
+    query: str,
+    request: ChatRequest,
+) -> tuple[str, list[dict[str, Any]]]:
+    personal_pack = ""
+    document_pack = ""
+    document_sources: list[dict[str, Any]] = []
+
+    if request.use_memory:
+        try:
+            personal_pack, _memory_rows = await asyncio.wait_for(
+                personal_memory_context(user_id, settings),
+                timeout=4.0,
+            )
+        except Exception:
+            personal_pack = ""
+
+    if request.use_documents:
+        try:
+            hits = await asyncio.wait_for(
+                search_user_documents(
+                    user_id=user_id,
+                    query=query,
+                    document_ids=request.document_ids,
+                    settings=settings,
+                    match_count=settings.document_match_count,
+                ),
+                timeout=18.0,
+            )
+            document_pack, document_sources = document_context(hits)
+        except Exception:
+            document_pack, document_sources = "", []
+
+    return _join_context(personal_pack, document_pack), document_sources
+
+
+async def _shared_knowledge(
+    query: str,
+) -> tuple[list, list, str]:
+    try:
+        memory_hits = await asyncio.wait_for(
+            find_verified_knowledge(query, settings),
+            timeout=1.2,
+        )
+    except Exception:
+        memory_hits = []
+
+    strong_memory_hits = [
+        hit
+        for hit in memory_hits
+        if hit.score >= settings.global_memory_direct_answer_score
+        and hit.confidence >= 0.72
+    ]
+    return (
+        strong_memory_hits,
+        hit_sources(strong_memory_hits),
+        knowledge_context(strong_memory_hits),
+    )
+
+
+async def _web_context(
+    *,
+    query: str,
+    current_date: str,
+    request: ChatRequest,
+) -> tuple[bool, list[dict[str, Any]], str]:
+    require_current = needs_live_web(query)
+    should_search = request.use_web or require_current
+
+    if not should_search:
+        return require_current, [], ""
+
+    max_results = 8 if require_current else 4
+    try:
+        sources, _provider = await asyncio.wait_for(
+            search_web(
+                query,
+                settings,
+                max_results,
+                require_current=require_current,
+                as_of=current_date,
+            ),
+            timeout=min(float(settings.web_search_timeout_seconds), 18.0),
+        )
+    except Exception:
+        sources = []
+
+    if not sources:
+        return require_current, [], ""
+
+    parts: list[str] = []
+    for index, source in enumerate(sources, 1):
+        parts.append(
+            f"[{index}] ENTITY: {source.get('entity') or 'general'}\n"
+            f"SOURCE TYPE: {source.get('source_type') or 'other'}\n"
+            f"TITLE: {source.get('title', 'Source')}\n"
+            f"URL: {source.get('url', '')}\n"
+            f"PUBLISHED/UPDATED: "
+            f"{source.get('published_date') or 'not provided'}\n"
+            f"CONTENT:\n{source.get('content', '')}"
+        )
+
+    return require_current, sources, "\n\n".join(parts)
+
+
+def _missing_state_evidence(
+    query: str,
+    sources: list[dict[str, Any]],
+) -> list[str]:
+    if not is_all_india_state_cm_query(query):
+        return []
+
+    found_entities = {
+        str(item.get("entity") or "").casefold()
+        for item in sources
+    }
+    return [
+        state
+        for state in INDIA_STATES
+        if state.casefold() not in found_entities
+    ]
+
+
 @app.get("/")
 async def root() -> dict:
     return {
         "name": settings.app_name,
         "status": "online",
         "docs": "/docs",
-        "version": "2.4.0",
+        "version": "3.0.0",
         "truth_guard": "enabled",
         "smart_context": "enabled",
         "large_code": "enabled",
         "speed_guard": "enabled",
+        "streaming": "enabled",
+        "backend_auth": "enabled",
+        "personal_memory": "enabled",
+        "document_rag": "enabled",
         "global_learning": (
             "configured"
             if settings.global_learning_configured
@@ -81,11 +276,25 @@ async def health() -> dict:
         "smart_context": True,
         "large_code": True,
         "speed_guard": True,
+        "streaming": True,
+        "backend_auth": bool(
+            settings.supabase_url
+            and (
+                settings.supabase_secret_key
+                or settings.supabase_service_role_key
+            )
+        ),
+        "personal_memory": True,
+        "document_rag": bool(
+            settings.google_gemini_api
+            and settings.supabase_url
+        ),
+        "embedding_model": settings.gemini_embedding_model,
+        "embedding_dimensions": settings.embedding_dimensions,
         "global_learning_enabled": settings.global_learning_enabled,
         "global_learning_configured": settings.global_learning_configured,
         "max_context_chars": settings.max_context_chars,
         "max_output_tokens": settings.max_output_tokens,
-        "max_continuations": settings.max_continuations,
         "chat_timeout_seconds": settings.chat_timeout_seconds,
         "total_chat_timeout_seconds": settings.total_chat_timeout_seconds,
         "web_search_timeout_seconds": settings.web_search_timeout_seconds,
@@ -102,8 +311,135 @@ async def knowledge_status() -> dict:
     }
 
 
+@app.get("/api/memory")
+async def memory_list(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    enabled, memories = await asyncio.gather(
+        get_memory_enabled(current_user.id, settings),
+        list_user_memories(current_user.id, settings),
+    )
+    return {"enabled": enabled, "memories": memories}
+
+
+@app.post("/api/memory")
+async def memory_create(
+    request: MemoryCreateRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    try:
+        memory = await create_user_memory(
+            current_user.id,
+            request.memory_text,
+            settings,
+            category=request.category,
+        )
+        return {"ok": True, "memory": memory}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Memory could not be saved.",
+        ) from exc
+
+
+@app.patch("/api/memory/settings")
+async def memory_settings(
+    request: MemorySettingsRequest,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    try:
+        enabled = await set_memory_enabled(
+            current_user.id,
+            request.enabled,
+            settings,
+        )
+        return {"ok": True, "enabled": enabled}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Memory settings could not be updated.",
+        ) from exc
+
+
+@app.delete("/api/memory/{memory_id}")
+async def memory_delete(
+    memory_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    try:
+        await delete_user_memory(current_user.id, memory_id, settings)
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Memory could not be deleted.",
+        ) from exc
+
+
+@app.get("/api/documents")
+async def documents_list(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    documents = await list_user_documents(current_user.id, settings)
+    return {"documents": documents}
+
+
+@app.post("/api/documents")
+async def documents_upload(
+    file: UploadFile = File(...),
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded document is empty.")
+
+    try:
+        document = await ingest_user_document(
+            user_id=current_user.id,
+            filename=file.filename or "document.txt",
+            mime_type=file.content_type or "application/octet-stream",
+            content=content,
+            settings=settings,
+        )
+        return {"ok": True, "document": document}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        detail = str(exc)[:1000]
+        raise HTTPException(
+            status_code=503,
+            detail=detail or "Document processing failed.",
+        ) from exc
+
+
+@app.delete("/api/documents/{document_id}")
+async def documents_delete(
+    document_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict:
+    try:
+        await delete_user_document(
+            current_user.id,
+            document_id,
+            settings,
+        )
+        return {"ok": True}
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid document ID.") from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Document could not be deleted.",
+        ) from exc
+
+
 @app.post("/api/research")
-async def research(request: ResearchRequest) -> dict:
+async def research(
+    request: ResearchRequest,
+    _current_user: AuthUser = Depends(get_current_user),
+) -> dict:
     current_date = _current_date()
     require_current = needs_live_web(request.query)
 
@@ -135,9 +471,9 @@ async def research(request: ResearchRequest) -> dict:
 async def chat(
     request: ChatRequest,
     background_tasks: BackgroundTasks,
+    current_user: AuthUser = Depends(get_current_user),
 ) -> ChatResponse:
     raw_messages = [item.model_dump() for item in request.messages]
-
     query = next(
         (
             item["content"]
@@ -147,6 +483,7 @@ async def chat(
         "",
     )
     current_date = _current_date()
+    original_chars = sum(len(item["content"]) for item in raw_messages)
 
     identity_answer = fixed_identity_reply(query)
     if identity_answer:
@@ -155,9 +492,34 @@ async def chat(
             provider="vasuki-identity",
             sources=[],
             context_trimmed=False,
-            original_context_chars=sum(
-                len(item["content"]) for item in raw_messages
-            ),
+            original_context_chars=original_chars,
+            used_context_chars=len(query),
+        )
+
+    explicit_memory = (
+        extract_explicit_memory(query)
+        if request.use_memory
+        else None
+    )
+    if explicit_memory:
+        try:
+            await create_user_memory(
+                current_user.id,
+                explicit_memory,
+                settings,
+            )
+            answer = f"Yaad rakh liya: {explicit_memory}"
+        except ValueError as exc:
+            answer = str(exc)
+        except Exception:
+            answer = "Memory save nahi ho paayi. Thodi der baad dobara try karein."
+
+        return ChatResponse(
+            answer=answer,
+            provider="vasuki-personal-memory",
+            sources=[],
+            context_trimmed=False,
+            original_context_chars=original_chars,
             used_context_chars=len(query),
         )
 
@@ -178,131 +540,64 @@ async def chat(
             provider="vasuki-learning",
             sources=[],
             context_trimmed=False,
-            original_context_chars=sum(
-                len(item["content"]) for item in raw_messages
-            ),
+            original_context_chars=original_chars,
             used_context_chars=len(query),
         )
 
-    try:
-        memory_hits = await asyncio.wait_for(
-            find_verified_knowledge(query, settings),
-            timeout=1.2,
-        )
-    except Exception:
-        memory_hits = []
-
-    strong_memory_hits = [
-        hit
-        for hit in memory_hits
-        if hit.score >= settings.global_memory_direct_answer_score
-        and hit.confidence >= 0.72
-    ]
-    memory_source_items = hit_sources(strong_memory_hits)
+    strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
 
     if (
-        strong_memory_hits
+        strong_hits
         and is_direct_fact_question(query)
         and not request.use_web
+        and not request.use_documents
     ):
-        best = strong_memory_hits[0]
+        best = strong_hits[0]
         return ChatResponse(
             answer=best.answer,
             provider="vasuki-global-memory",
-            sources=memory_source_items,
+            sources=shared_sources,
             context_trimmed=False,
-            original_context_chars=sum(
-                len(item["content"]) for item in raw_messages
-            ),
+            original_context_chars=original_chars,
             used_context_chars=len(query),
         )
 
-    require_current = needs_live_web(query)
-    # Avoid unnecessary web calls for very large writing/coding prompts. The web
-    # toggle and genuinely current questions still use live research.
-    # Static questions should not wait for web search. Live/current questions
-    # and the explicit Web toggle still use verified online research.
-    auto_research = False
-    should_search = request.use_web or require_current
+    private_pack, document_sources = await _private_context(
+        user_id=current_user.id,
+        query=query,
+        request=request,
+    )
+    require_current, web_sources, live_pack = await _web_context(
+        query=query,
+        current_date=current_date,
+        request=request,
+    )
 
-    sources: list[dict] = []
-    memory_pack = knowledge_context(strong_memory_hits)
-    web_context = memory_pack
+    if require_current and not web_sources and not strong_hits:
+        return ChatResponse(
+            answer=(
+                "Live verification service is temporarily unavailable. "
+                "Please retry in a few seconds so I do not guess from old information."
+            ),
+            provider="truth-guard",
+            sources=document_sources,
+            context_trimmed=False,
+            original_context_chars=original_chars,
+            used_context_chars=len(query),
+        )
 
-    if should_search:
-        max_results = 8 if (require_current or auto_research) else 4
-        try:
-            sources, _search_provider = await asyncio.wait_for(
-                search_web(
-                    query,
-                    settings,
-                    max_results,
-                    require_current=require_current,
-                    as_of=current_date,
-                ),
-                timeout=min(float(settings.web_search_timeout_seconds), 18.0),
-            )
-        except asyncio.TimeoutError:
-            sources = []
-        except Exception:
-            sources = []
+    missing = _missing_state_evidence(query, web_sources)
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The complete Chief Minister list could not be safely "
+                "verified because evidence was missing for: "
+                + ", ".join(missing)
+            ),
+        )
 
-        if require_current and not sources and not strong_memory_hits:
-            return ChatResponse(
-                answer=(
-                    "Live verification service is temporarily unavailable. "
-                    "Please retry in a few seconds so I do not guess from old information."
-                ),
-                provider="truth-guard",
-                sources=[],
-                context_trimmed=False,
-                original_context_chars=sum(
-                    len(item["content"]) for item in raw_messages
-                ),
-                used_context_chars=len(query),
-            )
-
-        if is_all_india_state_cm_query(query):
-            found_entities = {
-                str(item.get("entity") or "").casefold()
-                for item in sources
-            }
-            missing = [
-                state
-                for state in INDIA_STATES
-                if state.casefold() not in found_entities
-            ]
-            if missing:
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        "The complete Chief Minister list could not be safely "
-                        "verified because live evidence was missing for: "
-                        + ", ".join(missing)
-                    ),
-                )
-
-        if sources:
-            context_parts: list[str] = []
-            for index, source in enumerate(sources, 1):
-                published = source.get("published_date") or "not provided"
-                entity = source.get("entity") or "general"
-                source_type = source.get("source_type") or "other"
-                context_parts.append(
-                    f"[{index}] ENTITY: {entity}\n"
-                    f"SOURCE TYPE: {source_type}\n"
-                    f"TITLE: {source.get('title', 'Source')}\n"
-                    f"URL: {source.get('url', '')}\n"
-                    f"PUBLISHED/UPDATED: {published}\n"
-                    f"CONTENT:\n{source.get('content', '')}"
-                )
-            live_pack = "\n\n".join(context_parts)
-            web_context = (
-                f"{memory_pack}\n\n{live_pack}"
-                if memory_pack
-                else live_pack
-            )
-
+    web_context = _join_context(shared_pack, private_pack, live_pack)
     available_message_chars = max(
         8000,
         settings.max_context_chars
@@ -330,7 +625,7 @@ async def chat(
         return ChatResponse(
             answer=answer,
             provider=provider,
-            sources=memory_source_items + sources,
+            sources=shared_sources + document_sources + web_sources,
             context_trimmed=context_stats.trimmed,
             original_context_chars=context_stats.original_chars,
             used_context_chars=context_stats.used_chars,
@@ -338,10 +633,7 @@ async def chat(
     except asyncio.TimeoutError as exc:
         raise HTTPException(
             status_code=504,
-            detail=(
-                "The AI provider took too long to respond. "
-                "Please retry; the app will automatically use another provider."
-            ),
+            detail="The AI provider took too long to respond. Please retry.",
         ) from exc
     except HTTPException:
         raise
@@ -354,6 +646,183 @@ async def chat(
             ),
         ) from exc
 
+
+@app.post("/api/chat/stream")
+async def chat_stream(
+    chat_request: ChatRequest,
+    http_request: Request,
+    current_user: AuthUser = Depends(get_current_user),
+) -> StreamingResponse:
+    raw_messages = [item.model_dump() for item in chat_request.messages]
+    query = next(
+        (
+            item["content"]
+            for item in reversed(raw_messages)
+            if item["role"] == "user"
+        ),
+        "",
+    )
+    current_date = _current_date()
+
+    identity_answer = fixed_identity_reply(query)
+    if identity_answer:
+        return _direct_stream(
+            identity_answer,
+            provider="vasuki-identity",
+        )
+
+    explicit_memory = (
+        extract_explicit_memory(query)
+        if chat_request.use_memory
+        else None
+    )
+    if explicit_memory:
+        try:
+            await create_user_memory(
+                current_user.id,
+                explicit_memory,
+                settings,
+            )
+            answer = f"Yaad rakh liya: {explicit_memory}"
+        except ValueError as exc:
+            answer = str(exc)
+        except Exception:
+            answer = "Memory save nahi ho paayi. Thodi der baad dobara try karein."
+        return _direct_stream(
+            answer,
+            provider="vasuki-personal-memory",
+        )
+
+    strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
+
+    if (
+        strong_hits
+        and is_direct_fact_question(query)
+        and not chat_request.use_web
+        and not chat_request.use_documents
+    ):
+        return _direct_stream(
+            strong_hits[0].answer,
+            provider="vasuki-global-memory",
+            sources=shared_sources,
+        )
+
+    private_pack, document_sources = await _private_context(
+        user_id=current_user.id,
+        query=query,
+        request=chat_request,
+    )
+    require_current, web_sources, live_pack = await _web_context(
+        query=query,
+        current_date=current_date,
+        request=chat_request,
+    )
+
+    if require_current and not web_sources and not strong_hits:
+        return _direct_stream(
+            (
+                "Live verification service is temporarily unavailable. "
+                "Please retry in a few seconds so I do not guess from old information."
+            ),
+            provider="truth-guard",
+            sources=document_sources,
+        )
+
+    missing = _missing_state_evidence(query, web_sources)
+    if missing:
+        return _direct_stream(
+            (
+                "The complete list could not be safely verified because live "
+                "evidence was missing for: " + ", ".join(missing)
+            ),
+            provider="truth-guard",
+            sources=web_sources,
+        )
+
+    web_context = _join_context(shared_pack, private_pack, live_pack)
+    available_message_chars = max(
+        8000,
+        settings.max_context_chars
+        - len(web_context)
+        - settings.context_reserve_chars,
+    )
+    messages, context_stats = compact_messages(
+        raw_messages,
+        max_chars=available_message_chars,
+        max_single_message_chars=settings.max_single_message_chars,
+    )
+    all_sources = shared_sources + document_sources + web_sources
+
+    async def generate():
+        provider_name = ""
+        try:
+            yield _sse(
+                "ready",
+                {
+                    "context_trimmed": context_stats.trimmed,
+                    "original_context_chars": context_stats.original_chars,
+                    "used_context_chars": context_stats.used_chars,
+                },
+            )
+
+            async for event in route_chat_stream(
+                chat_request.provider,
+                messages,
+                settings,
+                web_context,
+                require_current=require_current,
+                as_of=current_date,
+            ):
+                if await http_request.is_disconnected():
+                    return
+
+                if event.get("type") == "provider":
+                    provider_name = event.get("provider", "")
+                    yield _sse(
+                        "provider",
+                        {"provider": provider_name},
+                    )
+                elif event.get("type") == "token":
+                    yield _sse(
+                        "token",
+                        {"token": event.get("token", "")},
+                    )
+
+            yield _sse(
+                "meta",
+                {
+                    "provider": provider_name or "auto",
+                    "sources": all_sources,
+                    "context_trimmed": context_stats.trimmed,
+                    "original_context_chars": context_stats.original_chars,
+                    "used_context_chars": context_stats.used_chars,
+                    "done": True,
+                },
+            )
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            yield _sse(
+                "error",
+                {
+                    "detail": (
+                        "AI streaming temporarily failed. Please retry once."
+                    ),
+                    "debug": str(exc)[:300]
+                    if settings.app_env != "production"
+                    else "",
+                },
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @app.get("/api/vision/status")
@@ -379,6 +848,7 @@ async def vision(
     file: UploadFile = File(...),
     prompt: str = Form(""),
     operation: str = Form("auto"),
+    _current_user: AuthUser = Depends(get_current_user),
 ) -> dict:
     content = await file.read()
     if not content:
@@ -435,7 +905,10 @@ async def image_status() -> dict:
 
 
 @app.post("/api/image")
-async def generate_image(request: ImageRequest) -> dict:
+async def generate_image(
+    request: ImageRequest,
+    _current_user: AuthUser = Depends(get_current_user),
+) -> dict:
     try:
         return await asyncio.wait_for(
             route_image(request.provider, request.prompt, settings),
@@ -444,9 +917,7 @@ async def generate_image(request: ImageRequest) -> dict:
     except asyncio.TimeoutError as exc:
         raise HTTPException(
             status_code=504,
-            detail=(
-                "Image generation timed out after automatic provider retries."
-            ),
+            detail="Image generation timed out after automatic provider retries.",
         ) from exc
     except Exception as exc:
         detail = str(exc)[:1200]
@@ -457,7 +928,10 @@ async def generate_image(request: ImageRequest) -> dict:
 
 
 @app.post("/api/ocr")
-async def ocr(file: UploadFile = File(...)) -> dict:
+async def ocr(
+    file: UploadFile = File(...),
+    _current_user: AuthUser = Depends(get_current_user),
+) -> dict:
     if file.size and file.size > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="File must be under 10 MB")
 

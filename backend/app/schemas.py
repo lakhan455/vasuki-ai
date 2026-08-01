@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field
 
 class Message(BaseModel):
     role: Literal["user", "assistant", "system"]
-    # Large pasted code and generated files are allowed. The backend will
-    # compact the total conversation safely before sending it to a provider.
     content: str = Field(min_length=1, max_length=120000)
 
 
@@ -22,6 +20,9 @@ class ChatRequest(BaseModel):
         "mistral",
     ] = "auto"
     use_web: bool = False
+    use_memory: bool = True
+    use_documents: bool = False
+    document_ids: list[str] = Field(default_factory=list, max_length=50)
 
 
 class ChatResponse(BaseModel):
@@ -41,3 +42,12 @@ class ResearchRequest(BaseModel):
 class ImageRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=5000)
     provider: Literal["auto", "deepai", "huggingface", "cloudflare"] = "auto"
+
+
+class MemoryCreateRequest(BaseModel):
+    memory_text: str = Field(min_length=3, max_length=600)
+    category: str = Field(default="preference", min_length=1, max_length=40)
+
+
+class MemorySettingsRequest(BaseModel):
+    enabled: bool

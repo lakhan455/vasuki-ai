@@ -13,10 +13,11 @@ import {
 import type { User } from "@supabase/supabase-js";
 import ReactMarkdown from "react-markdown";
 
+import MemoryKnowledgePanel from "@/components/MemoryKnowledgePanel";
 import {
   analyzeAttachment,
   generateImage,
-  sendChat,
+  streamChat,
   warmBackend,
   type ChatMessage,
 } from "@/lib/api";
@@ -40,6 +41,8 @@ type SourceInfo = {
   domain?: string;
   published_date?: string;
   source_type?: string;
+  document_id?: string;
+  page_number?: number;
 };
 
 type UiMessage = ChatMessage & {
@@ -151,18 +154,33 @@ function normaliseSources(value: unknown): SourceInfo[] {
     if (!item || typeof item !== "object") continue;
     const candidate = item as SourceInfo;
     const url = typeof candidate.url === "string" ? candidate.url.trim() : "";
-    if (!/^https?:\/\//i.test(url) || unique.has(url)) continue;
+    const isDocument = candidate.source_type === "document";
 
-    unique.set(url, {
+    if (url && !/^https?:\/\//i.test(url)) continue;
+    if (!url && !isDocument) continue;
+
+    const key =
+      url ||
+      [
+        candidate.document_id || "",
+        String(candidate.page_number || ""),
+        candidate.title || "document",
+      ].join(":");
+
+    if (unique.has(key)) continue;
+
+    unique.set(key, {
       title:
         typeof candidate.title === "string" && candidate.title.trim()
           ? candidate.title.trim()
           : undefined,
-      url,
+      url: url || undefined,
       domain:
         typeof candidate.domain === "string" && candidate.domain.trim()
           ? candidate.domain.trim()
-          : undefined,
+          : isDocument
+            ? "Your document"
+            : undefined,
       published_date:
         typeof candidate.published_date === "string"
           ? candidate.published_date
@@ -171,6 +189,14 @@ function normaliseSources(value: unknown): SourceInfo[] {
         typeof candidate.source_type === "string"
           ? candidate.source_type
           : undefined,
+      document_id:
+        typeof candidate.document_id === "string"
+          ? candidate.document_id
+          : undefined,
+      page_number:
+        typeof candidate.page_number === "number"
+          ? candidate.page_number
+          : undefined,
     });
   }
 
@@ -178,9 +204,12 @@ function normaliseSources(value: unknown): SourceInfo[] {
 }
 
 function sourceDomain(source: SourceInfo) {
+  if (source.source_type === "document" || !source.url) {
+    return source.domain?.trim() || "Your document";
+  }
   if (source.domain?.trim()) return source.domain.trim().replace(/^www\./, "");
   try {
-    return new URL(source.url || "").hostname.replace(/^www\./, "");
+    return new URL(source.url).hostname.replace(/^www\./, "");
   } catch {
     return "Source";
   }
@@ -290,9 +319,15 @@ export default function ChatApp() {
   const [webEnabled, setWebEnabled] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [documentsEnabled, setDocumentsEnabled] = useState(false);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [streamingStarted, setStreamingStarted] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     void warmBackend();
@@ -571,14 +606,25 @@ export default function ChatApp() {
     setInput("");
     setError("");
     setBusy(true);
+    setStreamingStarted(false);
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error("Login session expired. Please sign in again.");
+      }
+
       let finalMessages: UiMessage[];
 
       if (selectedAttachment) {
         const data = (await analyzeAttachment(
           selectedAttachment.file,
           effectiveText,
+          accessToken,
         )) as VisionResponse;
 
         const answer =
@@ -602,7 +648,10 @@ export default function ChatApp() {
           },
         ];
       } else if (mode === "image") {
-        const data = (await generateImage(effectiveText)) as ImageResponse;
+        const data = (await generateImage(
+          effectiveText,
+          accessToken,
+        )) as ImageResponse;
         const imageUrl =
           typeof data.url === "string" ? data.url.trim() : "";
 
@@ -626,28 +675,57 @@ export default function ChatApp() {
         const requestMessages: ChatMessage[] = nextMessages.map(
           ({ role, content }) => ({ role, content }),
         );
+        const assistantId = makeId();
+        let streamedAnswer = "";
 
-        const data = (await sendChat(
+        setMessages([
+          ...nextMessages,
+          {
+            id: assistantId,
+            role: "assistant",
+            content: "",
+          },
+        ]);
+
+        const controller = new AbortController();
+        streamAbortRef.current = controller;
+
+        const meta = await streamChat(
           requestMessages,
-          webEnabled || mode === "web",
-        )) as ChatResponse;
+          {
+            accessToken,
+            useWeb: webEnabled || mode === "web",
+            useMemory: memoryEnabled,
+            useDocuments: documentsEnabled,
+            documentIds: selectedDocumentIds,
+            signal: controller.signal,
+          },
+          (token) => {
+            streamedAnswer += token;
+            setStreamingStarted(true);
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantId
+                  ? { ...message, content: streamedAnswer }
+                  : message,
+              ),
+            );
+          },
+        );
 
-        const answer =
-          typeof data.answer === "string" ? data.answer.trim() : "";
-
+        const answer = streamedAnswer.trim();
         if (!answer) {
           throw new Error("The AI returned an empty response.");
         }
 
-        const validSources = normaliseSources(data.sources);
-
         finalMessages = [
           ...nextMessages,
           {
-            id: makeId(),
+            id: assistantId,
             role: "assistant",
             content: answer,
-            sources: validSources,
+            provider: meta.provider,
+            sources: normaliseSources(meta.sources),
           },
         ];
       }
@@ -657,15 +735,30 @@ export default function ChatApp() {
       setMode("chat");
       await persistChat(finalMessages, currentChatId);
     } catch (caughtError) {
+      const stopped =
+        streamAbortRef.current?.signal.aborted ||
+        (
+          caughtError instanceof DOMException &&
+          caughtError.name === "AbortError"
+        );
+
       setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Something went wrong. Please try again.",
+        stopped
+          ? "Generation stopped."
+          : caughtError instanceof Error
+            ? caughtError.message
+            : "Something went wrong. Please try again.",
       );
     } finally {
+      streamAbortRef.current = null;
+      setStreamingStarted(false);
       setBusy(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
+  }
+
+  function stopStreaming() {
+    streamAbortRef.current?.abort();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -786,6 +879,15 @@ export default function ChatApp() {
           >
             <Icon name="plus" />
             <span>New chat</span>
+          </button>
+
+          <button
+            type="button"
+            className="pv-nav-button"
+            onClick={() => setKnowledgePanelOpen(true)}
+          >
+            <span className="pv-nav-symbol" aria-hidden="true">🧠</span>
+            <span>Memory & documents</span>
           </button>
         </nav>
 
@@ -921,6 +1023,7 @@ export default function ChatApp() {
                 onAttachmentSelected={chooseAttachment}
                 onAttachmentRemoved={() => setAttachment(null)}
                 onSubmit={submit}
+                onStop={stopStreaming}
                 onKeyDown={handleKeyDown}
                 welcome
               />
@@ -1029,7 +1132,7 @@ export default function ChatApp() {
                   </article>
                 ))}
 
-                {busy && (
+                {busy && !streamingStarted && (
                   <article className="pv-message pv-message--assistant">
                     <Logo className="pv-assistant-logo" />
                     <div className="pv-typing" aria-label="Thinking">
@@ -1067,6 +1170,17 @@ export default function ChatApp() {
           </>
         )}
       </section>
+
+      <MemoryKnowledgePanel
+        open={knowledgePanelOpen}
+        onClose={() => setKnowledgePanelOpen(false)}
+        memoryEnabled={memoryEnabled}
+        onMemoryEnabledChange={setMemoryEnabled}
+        documentsEnabled={documentsEnabled}
+        onDocumentsEnabledChange={setDocumentsEnabled}
+        selectedDocumentIds={selectedDocumentIds}
+        onSelectedDocumentIdsChange={setSelectedDocumentIds}
+      />
     </main>
   );
 }
@@ -1099,6 +1213,7 @@ function Composer({
   onAttachmentSelected,
   onAttachmentRemoved,
   onSubmit,
+  onStop,
   onKeyDown,
   welcome = false,
 }: {
@@ -1111,6 +1226,7 @@ function Composer({
   onAttachmentSelected: (file: File) => Promise<void>;
   onAttachmentRemoved: () => void;
   onSubmit: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
+  onStop: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   welcome?: boolean;
 }) {
@@ -1208,10 +1324,11 @@ function Composer({
         </div>
 
         <button
-          type="submit"
+          type={busy ? "button" : "submit"}
           className="pv-send-button"
-          disabled={busy || (!input.trim() && !attachment)}
-          aria-label="Send message"
+          disabled={!busy && !input.trim() && !attachment}
+          aria-label={busy ? "Stop generation" : "Send message"}
+          onClick={busy ? onStop : undefined}
         >
           {busy ? <Icon name="stop" /> : <Icon name="arrowUp" />}
         </button>
@@ -1225,31 +1342,46 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
   if (items.length === 0) return null;
 
   const preview = items.slice(0, 3);
+  const keyFor = (source: SourceInfo, index: number) =>
+    source.url ||
+    `${source.document_id || "document"}-${source.page_number || index}`;
 
   return (
     <div className="pv-source-strip">
       <div className="pv-source-chip-row" aria-label="Answer sources">
-        {preview.map((source, index) => (
-          <a
-            className="pv-source-chip"
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            key={source.url}
-            title={source.title || sourceDomain(source)}
-          >
-            <span className="pv-source-number">{index + 1}</span>
-            <img
-              src={sourceFavicon(source)}
-              alt=""
-              loading="lazy"
-              onError={(event) => {
-                event.currentTarget.style.display = "none";
-              }}
-            />
-            <span>{sourceDomain(source)}</span>
-          </a>
-        ))}
+        {preview.map((source, index) =>
+          source.url ? (
+            <a
+              className="pv-source-chip"
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              key={keyFor(source, index)}
+              title={source.title || sourceDomain(source)}
+            >
+              <span className="pv-source-number">{index + 1}</span>
+              <img
+                src={sourceFavicon(source)}
+                alt=""
+                loading="lazy"
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                }}
+              />
+              <span>{sourceDomain(source)}</span>
+            </a>
+          ) : (
+            <span
+              className="pv-source-chip pv-source-chip--document"
+              key={keyFor(source, index)}
+              title={source.title || "Your document"}
+            >
+              <span className="pv-source-number">{index + 1}</span>
+              <span aria-hidden="true">📄</span>
+              <span>{source.title || "Your document"}</span>
+            </span>
+          ),
+        )}
         {items.length > preview.length && (
           <span className="pv-source-more">+{items.length - preview.length}</span>
         )}
@@ -1257,36 +1389,49 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
 
       <details className="pv-sources-details">
         <summary>
-          <span className="pv-source-stack" aria-hidden="true">
-            {preview.slice(0, 2).map((source) => (
-              <img key={source.url} src={sourceFavicon(source)} alt="" />
-            ))}
-          </span>
           <strong>Sources</strong>
           <span>{items.length}</span>
         </summary>
 
         <div className="pv-source-list">
-          {items.map((source, index) => (
-            <a
-              className="pv-source-card"
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              key={source.url}
-            >
-              <span className="pv-source-card-number">{index + 1}</span>
-              <img src={sourceFavicon(source)} alt="" loading="lazy" />
-              <span className="pv-source-card-copy">
-                <strong>{source.title || sourceDomain(source)}</strong>
-                <small>
-                  {sourceDomain(source)}
-                  {source.published_date ? ` · ${source.published_date}` : ""}
-                </small>
-              </span>
-              <span className="pv-source-open" aria-hidden="true">↗</span>
-            </a>
-          ))}
+          {items.map((source, index) =>
+            source.url ? (
+              <a
+                className="pv-source-card"
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                key={keyFor(source, index)}
+              >
+                <span className="pv-source-card-number">{index + 1}</span>
+                <img src={sourceFavicon(source)} alt="" loading="lazy" />
+                <span className="pv-source-card-copy">
+                  <strong>{source.title || sourceDomain(source)}</strong>
+                  <small>
+                    {sourceDomain(source)}
+                    {source.published_date
+                      ? ` · ${source.published_date}`
+                      : ""}
+                  </small>
+                </span>
+                <span className="pv-source-open" aria-hidden="true">↗</span>
+              </a>
+            ) : (
+              <div
+                className="pv-source-card pv-source-card--document"
+                key={keyFor(source, index)}
+              >
+                <span className="pv-source-card-number">{index + 1}</span>
+                <span className="pv-document-source-icon" aria-hidden="true">
+                  📄
+                </span>
+                <span className="pv-source-card-copy">
+                  <strong>{source.title || "Your document"}</strong>
+                  <small>{sourceDomain(source)}</small>
+                </span>
+              </div>
+            ),
+          )}
         </div>
       </details>
     </div>
