@@ -1160,6 +1160,7 @@ export default function ChatApp() {
                   onAttachmentSelected={chooseAttachment}
                   onAttachmentRemoved={() => setAttachment(null)}
                   onSubmit={submit}
+                  onStop={stopStreaming}
                   onKeyDown={handleKeyDown}
                 />
                 <p className="pv-disclaimer">
