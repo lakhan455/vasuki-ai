@@ -345,14 +345,43 @@ async def chat(
         ) from exc
 
 
+@app.get("/api/image/status")
+async def image_status() -> dict:
+    return {
+        "ok": True,
+        "cloudflare_configured": bool(
+            settings.cloudflare_account_id
+            and settings.cloudflare_workers_ai
+        ),
+        "huggingface_configured": bool(
+            settings.hugging_face_inference_api
+        ),
+        "deepai_configured": bool(settings.deepai_api),
+        "image_retry_attempts": settings.image_retry_attempts,
+        "image_timeout_seconds": settings.image_timeout_seconds,
+        "total_image_timeout_seconds": settings.total_image_timeout_seconds,
+    }
+
+
 @app.post("/api/image")
 async def generate_image(request: ImageRequest) -> dict:
     try:
-        return await route_image(request.provider, request.prompt, settings)
+        return await asyncio.wait_for(
+            route_image(request.provider, request.prompt, settings),
+            timeout=float(settings.total_image_timeout_seconds),
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Image generation timed out after automatic provider retries."
+            ),
+        ) from exc
     except Exception as exc:
+        detail = str(exc)[:1200]
         raise HTTPException(
             status_code=503,
-            detail="Image providers are temporarily busy or unavailable.",
+            detail=detail or "All image providers failed.",
         ) from exc
 
 

@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     chat_timeout_seconds: int = 25
     web_search_timeout_seconds: int = 14
     total_chat_timeout_seconds: int = 55
+    image_timeout_seconds: int = 95
+    total_image_timeout_seconds: int = 150
+    image_retry_attempts: int = 3
     max_prompt_chars: int = 20000
     max_context_chars: int = 45000
     max_single_message_chars: int = 35000
