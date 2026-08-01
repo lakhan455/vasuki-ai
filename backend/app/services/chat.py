@@ -382,7 +382,6 @@ async def chat_gemini(
         payload = {
             "contents": [{"parts": [{"text": working_prompt}]}],
             "generationConfig": {
-                "temperature": temperature,
                 "maxOutputTokens": settings.max_output_tokens,
             },
         }

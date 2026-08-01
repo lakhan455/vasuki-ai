@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     cerebras_model: str = "gpt-oss-120b"
     cerebras_base_url: str = "https://api.cerebras.ai/v1"
     google_gemini_api: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_vision_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
+    gemini_vision_model: str = "gemini-3.6-flash"
     gemini_image_edit_model: str = "gemini-3.1-flash-image"
     openrouter_api: str | None = None
     openrouter_model: str = "openai/gpt-4.1-mini"

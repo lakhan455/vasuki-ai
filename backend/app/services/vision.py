@@ -171,7 +171,6 @@ async def _gemini_analyze(
             }
         ],
         "generationConfig": {
-            "temperature": 0.1,
             "maxOutputTokens": min(settings.max_output_tokens, 8192),
         },
     }
@@ -201,6 +200,129 @@ async def _gemini_analyze(
     }
 
 
+
+def _extract_cloudflare_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+
+    if isinstance(value, dict):
+        for key in (
+            "answer",
+            "response",
+            "text",
+            "caption",
+            "description",
+            "output_text",
+            "content",
+        ):
+            candidate = value.get(key)
+            extracted = _extract_cloudflare_text(candidate)
+            if extracted:
+                return extracted
+
+        choices = value.get("choices")
+        if isinstance(choices, list):
+            for choice in choices:
+                extracted = _extract_cloudflare_text(choice)
+                if extracted:
+                    return extracted
+
+        message = value.get("message")
+        extracted = _extract_cloudflare_text(message)
+        if extracted:
+            return extracted
+
+    if isinstance(value, list):
+        parts = [_extract_cloudflare_text(item) for item in value]
+        return "\n".join(part for part in parts if part).strip()
+
+    return ""
+
+
+def _prepare_analysis_image(content: bytes) -> tuple[bytes, str]:
+    try:
+        with Image.open(BytesIO(content)) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
+
+            best = b""
+            for quality in (92, 86, 80, 74, 68, 60):
+                buffer = BytesIO()
+                image.save(
+                    buffer,
+                    format="JPEG",
+                    quality=quality,
+                    optimize=True,
+                )
+                encoded = buffer.getvalue()
+                best = encoded
+                if len(encoded) <= 1_300_000:
+                    break
+
+            return best, "image/jpeg"
+    except Exception:
+        return content, "image/jpeg"
+
+
+def _prepare_ocr_upload(
+    content: bytes,
+    mime_type: str,
+) -> tuple[bytes, str, str]:
+    free_limit = 1_400_000
+
+    if len(content) <= free_limit:
+        return content, mime_type, "upload"
+
+    if mime_type not in IMAGE_MIME_TYPES:
+        raise RuntimeError(
+            "OCR.Space free plan accepts files up to about 1.5 MB. "
+            "This PDF is larger, so Gemini Vision must handle it."
+        )
+
+    try:
+        with Image.open(BytesIO(content)) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
+
+            smallest = b""
+            while True:
+                for quality in (90, 84, 78, 72, 66, 58, 50):
+                    buffer = BytesIO()
+                    image.save(
+                        buffer,
+                        format="JPEG",
+                        quality=quality,
+                        optimize=True,
+                    )
+                    encoded = buffer.getvalue()
+                    smallest = encoded
+                    if len(encoded) <= free_limit:
+                        return encoded, "image/jpeg", "compressed-ocr.jpg"
+
+                width, height = image.size
+                if max(width, height) <= 1200:
+                    break
+                image = image.resize(
+                    (
+                        max(800, int(width * 0.82)),
+                        max(800, int(height * 0.82)),
+                    ),
+                    Image.Resampling.LANCZOS,
+                )
+
+            if smallest and len(smallest) <= 1_500_000:
+                return smallest, "image/jpeg", "compressed-ocr.jpg"
+    except Exception as exc:
+        raise RuntimeError(
+            "The image could not be compressed for OCR.Space."
+        ) from exc
+
+    raise RuntimeError(
+        "The image is still too large for OCR.Space free plan after "
+        "safe compression."
+    )
+
+
 async def _cloudflare_analyze(
     content: bytes,
     mime_type: str,
@@ -220,9 +342,10 @@ async def _cloudflare_analyze(
         "https://api.cloudflare.com/client/v4/accounts/"
         f"{settings.cloudflare_account_id}/ai/run/{model}"
     )
+    prepared_content, prepared_mime = _prepare_analysis_image(content)
     image_data = (
-        f"data:{mime_type};base64,"
-        + base64.b64encode(content).decode("ascii")
+        f"data:{prepared_mime};base64,"
+        + base64.b64encode(prepared_content).decode("ascii")
     )
     payload = {
         "task": "query",
@@ -250,12 +373,50 @@ async def _cloudflare_analyze(
 
     payload = response.json()
     result = payload.get("result") or payload
-    answer = result.get("answer") if isinstance(result, dict) else None
-    if not isinstance(answer, str) or not answer.strip():
-        raise RuntimeError("Cloudflare vision returned an empty answer")
+    answer = _extract_cloudflare_text(result)
+
+    if not answer:
+        retry_payload = {
+            "task": "query",
+            "image": image_data,
+            "question": (
+                "Read this image carefully. Answer the user's request in the "
+                "same language. Do not skip readable questions. USER REQUEST: "
+                + (prompt.strip() or "Describe and analyze this image.")
+            ),
+            "reasoning": True,
+            "temperature": 0.0,
+            "max_tokens": min(settings.max_output_tokens, 4096),
+            "stream": False,
+        }
+        async with httpx.AsyncClient(
+            timeout=float(settings.vision_timeout_seconds)
+        ) as client:
+            retry_response = await client.post(
+                url,
+                headers=headers,
+                json=retry_payload,
+            )
+
+        if retry_response.is_error:
+            raise RuntimeError(
+                "Cloudflare vision retry HTTP "
+                f"{retry_response.status_code}: {_safe_error(retry_response)}"
+            )
+
+        retry_json = retry_response.json()
+        retry_result = retry_json.get("result") or retry_json
+        answer = _extract_cloudflare_text(retry_result)
+
+    if not answer:
+        compact_payload = str(payload)[:900]
+        raise RuntimeError(
+            "Cloudflare vision returned an empty answer. "
+            f"Response preview: {compact_payload}"
+        )
 
     return {
-        "answer": answer.strip(),
+        "answer": answer,
         "provider": f"cloudflare-vision:{model}",
         "operation": "analyze",
     }
@@ -270,11 +431,15 @@ async def _ocr_space_text(
     if not settings.ocr_space_api:
         raise RuntimeError("OCR.Space is not configured")
 
+    upload_content, upload_mime, upload_name = _prepare_ocr_upload(
+        content,
+        mime_type,
+    )
     files = {
         "file": (
-            filename or "upload",
-            content,
-            mime_type or "application/octet-stream",
+            upload_name if upload_name != "upload" else (filename or "upload"),
+            upload_content,
+            upload_mime or "application/octet-stream",
         )
     }
     data = {
