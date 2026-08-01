@@ -8,6 +8,9 @@ A secure multi-provider AI web app with a **Next.js 16 frontend** and **FastAPI 
 - Optional live web research: Tavily → Exa fallback
 - Image generation: DeepAI → Hugging Face → Cloudflare Workers AI fallback
 - OCR.Space upload endpoint
+- Image/PDF upload with visual question answering
+- Uploaded-image editing with Cloudflare/Gemini fallback
+- Per-user complete chat deletion
 - Responsive ChatGPT-style interface
 - API keys stay only in backend environment variables
 - Render deployment config included

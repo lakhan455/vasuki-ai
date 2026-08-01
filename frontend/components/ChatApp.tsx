@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  ChangeEvent,
   FormEvent,
   KeyboardEvent,
   ReactNode,
+  RefObject,
   useEffect,
   useRef,
   useState,
@@ -11,11 +13,26 @@ import {
 import type { User } from "@supabase/supabase-js";
 import ReactMarkdown from "react-markdown";
 
-import { generateImage, sendChat, warmBackend, type ChatMessage } from "@/lib/api";
+import {
+  analyzeAttachment,
+  generateImage,
+  sendChat,
+  warmBackend,
+  type ChatMessage,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 const VASUKI_LOGO_URL =
   "https://images.jdmagicbox.com/v2/comp/jaipur/a2/0141px141.x141.260404193718.t6a2/catalogue/vasuki-nfc-luniawas-jaipur-printing-services-604tb4s28a.jpg";
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+]);
 
 type SourceInfo = {
   title?: string;
@@ -28,6 +45,7 @@ type SourceInfo = {
 type UiMessage = ChatMessage & {
   id: string;
   imageUrl?: string;
+  fileName?: string;
   provider?: string;
   sources?: SourceInfo[];
 };
@@ -36,6 +54,7 @@ type StoredMessage = {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
+  fileName?: string;
   provider?: string;
   sources?: SourceInfo[];
 };
@@ -45,6 +64,12 @@ type ChatRecord = {
   title: string;
   messages: unknown;
   updated_at: string;
+};
+
+type PendingAttachment = {
+  file: File;
+  previewUrl?: string;
+  kind: "image" | "pdf";
 };
 
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
@@ -57,6 +82,13 @@ type ChatResponse = {
 type ImageResponse = {
   url?: string;
   provider?: string;
+};
+
+type VisionResponse = {
+  answer?: string;
+  url?: string;
+  provider?: string;
+  operation?: "analyze" | "edit";
 };
 
 const actionItems: Array<{
@@ -85,8 +117,8 @@ const actionItems: Array<{
   },
   {
     mode: "analyze",
-    label: "Analyze data",
-    prompt: "Analyze this data: ",
+    label: "Analyze image/file",
+    prompt: "",
     icon: "analyze",
   },
 ];
@@ -95,6 +127,21 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function fileSizeLabel(bytes: number) {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Image preview could not be loaded."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function normaliseSources(value: unknown): SourceInfo[] {
   if (!Array.isArray(value)) return [];
@@ -147,16 +194,19 @@ function sourceFavicon(source: SourceInfo) {
 }
 
 function storedMessages(messages: UiMessage[]): StoredMessage[] {
-  return messages.map(({ role, content, imageUrl, provider, sources }) => ({
-    role,
-    content,
-    // Base64 images can be several megabytes. Keep hosted URLs, but avoid
-    // filling the database with large data URLs.
-    imageUrl:
-      imageUrl && !imageUrl.startsWith("data:") ? imageUrl : undefined,
-    provider,
-    sources: normaliseSources(sources),
-  }));
+  return messages.map(
+    ({ role, content, imageUrl, fileName, provider, sources }) => ({
+      role,
+      content,
+      // Large uploaded/generated data URLs are intentionally not stored inside
+      // the Supabase JSON row. The answer and file name remain in chat history.
+      imageUrl:
+        imageUrl && !imageUrl.startsWith("data:") ? imageUrl : undefined,
+      fileName,
+      provider,
+      sources: normaliseSources(sources),
+    }),
+  );
 }
 
 function restoreMessages(value: unknown): UiMessage[] {
@@ -185,6 +235,10 @@ function restoreMessages(value: unknown): UiMessage[] {
         imageUrl:
           typeof candidate.imageUrl === "string"
             ? candidate.imageUrl
+            : undefined,
+        fileName:
+          typeof candidate.fileName === "string"
+            ? candidate.fileName
             : undefined,
         provider:
           typeof candidate.provider === "string"
@@ -228,6 +282,7 @@ export default function ChatApp() {
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
   const [busy, setBusy] = useState(false);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [error, setError] = useState("");
@@ -273,6 +328,7 @@ export default function ChatApp() {
 
       if (!session?.user) {
         setMessages([]);
+        setAttachment(null);
         setChatRecords([]);
         setCurrentChatId(null);
       }
@@ -346,6 +402,7 @@ export default function ChatApp() {
   function openChat(record: ChatRecord) {
     setCurrentChatId(record.id);
     setMessages(restoreMessages(record.messages));
+    setAttachment(null);
     setInput("");
     setError("");
     setMode("chat");
@@ -402,11 +459,80 @@ export default function ChatApp() {
   function startNewChat() {
     setCurrentChatId(null);
     setMessages([]);
+    setAttachment(null);
     setInput("");
     setError("");
     setMode("chat");
     setWebEnabled(false);
     setMobileSidebarOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  async function deleteChatById(chatId: string, title: string) {
+    if (!user || historyBusy) return;
+
+    const confirmed = window.confirm(
+      `Delete \"${title || "this chat"}\" permanently?`,
+    );
+    if (!confirmed) return;
+
+    setHistoryBusy(true);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("user_chats")
+      .delete()
+      .eq("id", chatId)
+      .eq("user_id", user.id);
+
+    setHistoryBusy(false);
+
+    if (deleteError) {
+      setError(`Chat delete failed: ${deleteError.message}`);
+      return;
+    }
+
+    setChatRecords((current) => current.filter((chat) => chat.id !== chatId));
+    if (currentChatId === chatId) {
+      startNewChat();
+    }
+  }
+
+  async function deleteCurrentChat() {
+    if (currentChatId) {
+      const current = chatRecords.find((chat) => chat.id === currentChatId);
+      await deleteChatById(currentChatId, current?.title || "this chat");
+      return;
+    }
+
+    if (messages.length > 0 && window.confirm("Clear this unsaved chat?")) {
+      startNewChat();
+    }
+  }
+
+  async function chooseAttachment(file: File) {
+    setError("");
+
+    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+      setError("Only JPG, PNG, WEBP, GIF images and PDF files are supported.");
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setError("File must be 15 MB or smaller.");
+      return;
+    }
+
+    const isImage = file.type.startsWith("image/");
+    const previewUrl = isImage ? await fileToDataUrl(file) : undefined;
+
+    setAttachment({
+      file,
+      previewUrl,
+      kind: isImage ? "image" : "pdf",
+    });
+    setMode("analyze");
+    setWebEnabled(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
@@ -421,12 +547,22 @@ export default function ChatApp() {
     event?.preventDefault();
 
     const text = input.trim();
-    if (!text || busy || !user) return;
+    const selectedAttachment = attachment;
+
+    if ((!text && !selectedAttachment) || busy || !user) return;
+
+    const effectiveText =
+      text ||
+      (selectedAttachment?.kind === "pdf"
+        ? "Is document ko detail me analyze karo. Agar question paper hai to saare questions ke sahi answers order me do."
+        : "Is image ko detail me samjhao aur jo bhi important information hai woh batao.");
 
     const userMessage: UiMessage = {
       id: makeId(),
       role: "user",
-      content: text,
+      content: effectiveText,
+      imageUrl: selectedAttachment?.previewUrl,
+      fileName: selectedAttachment?.file.name,
     };
 
     const nextMessages = [...messages, userMessage];
@@ -439,8 +575,34 @@ export default function ChatApp() {
     try {
       let finalMessages: UiMessage[];
 
-      if (mode === "image") {
-        const data = (await generateImage(text)) as ImageResponse;
+      if (selectedAttachment) {
+        const data = (await analyzeAttachment(
+          selectedAttachment.file,
+          effectiveText,
+        )) as VisionResponse;
+
+        const answer =
+          typeof data.answer === "string" && data.answer.trim()
+            ? data.answer.trim()
+            : data.url
+              ? "Edited image ready."
+              : "The image/file could not be analyzed.";
+
+        const outputUrl =
+          typeof data.url === "string" ? data.url.trim() : "";
+
+        finalMessages = [
+          ...nextMessages,
+          {
+            id: makeId(),
+            role: "assistant",
+            content: answer,
+            imageUrl: outputUrl || undefined,
+            provider: data.provider,
+          },
+        ];
+      } else if (mode === "image") {
+        const data = (await generateImage(effectiveText)) as ImageResponse;
         const imageUrl =
           typeof data.url === "string" ? data.url.trim() : "";
 
@@ -491,6 +653,8 @@ export default function ChatApp() {
       }
 
       setMessages(finalMessages);
+      setAttachment(null);
+      setMode("chat");
       await persistChat(finalMessages, currentChatId);
     } catch (caughtError) {
       setError(
@@ -517,7 +681,7 @@ export default function ChatApp() {
         <div className="pv-auth-card">
           <Logo className="pv-auth-logo" />
           <h1>Vasuki AI</h1>
-          <p>Securely loading your accountâ€¦</p>
+          <p>Securely loading your account…</p>
           <div className="pv-auth-spinner" />
         </div>
       </main>
@@ -627,29 +791,39 @@ export default function ChatApp() {
 
         <div className="pv-recent">
           <p className="pv-section-label">
-            Recent {historyBusy ? "Â· loadingâ€¦" : ""}
+            Recent {historyBusy ? "· loading…" : ""}
           </p>
 
           {chatRecords.length === 0 && !historyBusy ? (
             <p className="pv-empty-history">Abhi koi saved chat nahi hai.</p>
           ) : (
             chatRecords.map((chat) => (
-              <button
-                type="button"
-                className={[
-                  "pv-recent-button",
-                  currentChatId === chat.id
-                    ? "pv-recent-button--active"
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                key={chat.id}
-                onClick={() => openChat(chat)}
-                title={chat.title}
-              >
-                {chat.title}
-              </button>
+              <div className="pv-recent-row" key={chat.id}>
+                <button
+                  type="button"
+                  className={[
+                    "pv-recent-button",
+                    currentChatId === chat.id
+                      ? "pv-recent-button--active"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => openChat(chat)}
+                  title={chat.title}
+                >
+                  {chat.title}
+                </button>
+                <button
+                  type="button"
+                  className="pv-recent-delete"
+                  aria-label={`Delete ${chat.title}`}
+                  title="Delete chat"
+                  onClick={() => void deleteChatById(chat.id, chat.title)}
+                >
+                  <Icon name="trash" />
+                </button>
+              </div>
             ))
           )}
         </div>
@@ -713,9 +887,22 @@ export default function ChatApp() {
             </button>
           </div>
 
-          <span className="pv-saved-indicator">
-            {currentChatId ? "Saved" : "New chat"}
-          </span>
+          <div className="pv-header-right">
+            <span className="pv-saved-indicator">
+              {currentChatId ? "Saved" : "New chat"}
+            </span>
+            {hasMessages && (
+              <button
+                type="button"
+                className="pv-delete-chat-button"
+                aria-label="Delete current chat"
+                title="Delete current chat"
+                onClick={() => void deleteCurrentChat()}
+              >
+                <Icon name="trash" />
+              </button>
+            )}
+          </div>
         </header>
 
         {!hasMessages ? (
@@ -727,9 +914,12 @@ export default function ChatApp() {
               <Composer
                 input={input}
                 setInput={setInput}
+                attachment={attachment}
                 busy={busy}
                 mode={mode}
                 textareaRef={textareaRef}
+                onAttachmentSelected={chooseAttachment}
+                onAttachmentRemoved={() => setAttachment(null)}
                 onSubmit={submit}
                 onKeyDown={handleKeyDown}
                 welcome
@@ -785,7 +975,7 @@ export default function ChatApp() {
                             <img
                               className="pv-generated-image"
                               src={message.imageUrl}
-                              alt="Generated by Vasuki AI"
+                              alt="Generated or edited by Vasuki AI"
                             />
                           )}
 
@@ -816,8 +1006,23 @@ export default function ChatApp() {
                           </div>
                         </>
                       ) : (
-                        <div className="pv-user-bubble">
-                          {message.content}
+                        <div className="pv-user-message-stack">
+                          {message.imageUrl && (
+                            <img
+                              className="pv-user-upload-image"
+                              src={message.imageUrl}
+                              alt={message.fileName || "Uploaded image"}
+                            />
+                          )}
+                          {message.fileName && !message.imageUrl && (
+                            <div className="pv-user-file-chip">
+                              <Icon name="file" />
+                              <span>{message.fileName}</span>
+                            </div>
+                          )}
+                          <div className="pv-user-bubble">
+                            {message.content}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -845,9 +1050,12 @@ export default function ChatApp() {
                 <Composer
                   input={input}
                   setInput={setInput}
+                  attachment={attachment}
                   busy={busy}
                   mode={mode}
                   textareaRef={textareaRef}
+                  onAttachmentSelected={chooseAttachment}
+                  onAttachmentRemoved={() => setAttachment(null)}
                   onSubmit={submit}
                   onKeyDown={handleKeyDown}
                 />
@@ -884,22 +1092,38 @@ function Logo({ className }: { className: string }) {
 function Composer({
   input,
   setInput,
+  attachment,
   busy,
   mode,
   textareaRef,
+  onAttachmentSelected,
+  onAttachmentRemoved,
   onSubmit,
   onKeyDown,
   welcome = false,
 }: {
   input: string;
   setInput: (value: string) => void;
+  attachment: PendingAttachment | null;
   busy: boolean;
   mode: ActionMode;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+  onAttachmentSelected: (file: File) => Promise<void>;
+  onAttachmentRemoved: () => void;
   onSubmit: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   welcome?: boolean;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) {
+      void onAttachmentSelected(file);
+    }
+  }
+
   return (
     <form
       className={`pv-composer ${
@@ -907,6 +1131,41 @@ function Composer({
       }`}
       onSubmit={(event) => void onSubmit(event)}
     >
+      <input
+        ref={fileInputRef}
+        className="pv-file-input"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+        onChange={handleFileChange}
+      />
+
+      {attachment && (
+        <div className="pv-attachment-preview">
+          {attachment.previewUrl ? (
+            <img src={attachment.previewUrl} alt={attachment.file.name} />
+          ) : (
+            <span className="pv-attachment-file-icon">
+              <Icon name="file" />
+            </span>
+          )}
+          <span className="pv-attachment-copy">
+            <strong>{attachment.file.name}</strong>
+            <small>
+              {attachment.kind === "image" ? "Image" : "PDF"} ·{" "}
+              {fileSizeLabel(attachment.file.size)}
+            </small>
+          </span>
+          <button
+            type="button"
+            className="pv-attachment-remove"
+            aria-label="Remove attachment"
+            onClick={onAttachmentRemoved}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         rows={2}
@@ -914,19 +1173,28 @@ function Composer({
         onChange={(event) => setInput(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder={
-          mode === "image"
-            ? "Describe the image you want to create"
-            : "Ask Vasuki AI"
+          attachment
+            ? "Image/file ke baare me poochho ya edit instruction likho"
+            : mode === "image"
+              ? "Describe the image you want to create"
+              : "Ask Vasuki AI"
         }
       />
 
       <div className="pv-composer-toolbar">
         <div className="pv-composer-tools">
-          <button type="button" aria-label="Attach file">
+          <button
+            type="button"
+            aria-label="Attach image or PDF"
+            title="Upload image or PDF"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <Icon name="plus" />
           </button>
 
-          {mode !== "chat" && (
+          {attachment ? (
+            <span className="pv-active-tool">Image/file attached</span>
+          ) : mode !== "chat" ? (
             <span className="pv-active-tool">
               {mode === "image"
                 ? "Create image"
@@ -936,13 +1204,13 @@ function Composer({
                     ? "Search web"
                     : "Analyze"}
             </span>
-          )}
+          ) : null}
         </div>
 
         <button
           type="submit"
           className="pv-send-button"
-          disabled={busy || !input.trim()}
+          disabled={busy || (!input.trim() && !attachment)}
           aria-label="Send message"
         >
           {busy ? <Icon name="stop" /> : <Icon name="arrowUp" />}
@@ -951,7 +1219,6 @@ function Composer({
     </form>
   );
 }
-
 
 function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
   const items = normaliseSources(sources);
@@ -1067,6 +1334,8 @@ function Icon({
     | "copy"
     | "thumbUp"
     | "thumbDown"
+    | "trash"
+    | "file"
     | "logout";
 }) {
   const common = {
@@ -1136,6 +1405,21 @@ function Icon({
     thumbDown: (
       <path d="M7 14V4H4v10h3Zm0-9h9.1A2 2 0 0 1 18 6.4l1.5 5a2 2 0 0 1-1.9 2.6H14l.8 3.2a2.3 2.3 0 0 1-2.2 2.8L7 14Z" />
     ),
+    trash: (
+      <>
+        <path d="M4 7h16" />
+        <path d="M9 7V4h6v3" />
+        <path d="m7 7 1 13h8l1-13" />
+        <path d="M10 11v5M14 11v5" />
+      </>
+    ),
+    file: (
+      <>
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v5h5" />
+        <path d="M9 13h6M9 17h6" />
+      </>
+    ),
     logout: (
       <>
         <path d="M10 17l5-5-5-5" />
@@ -1147,4 +1431,3 @@ function Icon({
 
   return <svg {...common}>{paths[name]}</svg>;
 }
-

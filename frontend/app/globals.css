@@ -1344,3 +1344,204 @@ button {
   }
 }
 
+/* ===== Vasuki Vision upload/edit/delete additions ===== */
+/* ===== Vasuki AI image upload, vision and chat deletion v1 ===== */
+.pv-header-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pv-delete-chat-button,
+.pv-recent-delete,
+.pv-attachment-remove {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #9f9f9f;
+  cursor: pointer;
+}
+
+.pv-delete-chat-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.pv-delete-chat-button:hover,
+.pv-recent-delete:hover,
+.pv-attachment-remove:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ff9b9b;
+}
+
+.pv-delete-chat-button svg,
+.pv-recent-delete svg,
+.pv-attachment-remove svg {
+  width: 17px;
+  height: 17px;
+}
+
+.pv-recent-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  border-radius: 9px;
+}
+
+.pv-recent-row .pv-recent-button {
+  min-width: 0;
+  flex: 1;
+}
+
+.pv-recent-delete {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.pv-recent-row:hover .pv-recent-delete,
+.pv-recent-row:focus-within .pv-recent-delete {
+  opacity: 1;
+}
+
+.pv-file-input {
+  display: none;
+}
+
+.pv-attachment-preview {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 12px 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.pv-attachment-preview > img {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #151515;
+}
+
+.pv-attachment-file-icon {
+  display: grid;
+  width: 46px;
+  height: 56px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(79, 134, 247, 0.16);
+  color: #a9c5ff;
+}
+
+.pv-attachment-copy {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+
+.pv-attachment-copy strong,
+.pv-attachment-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-attachment-copy strong {
+  color: #f1f1f1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pv-attachment-copy small {
+  margin-top: 4px;
+  color: #999;
+  font-size: 10px;
+}
+
+.pv-attachment-remove {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+
+.pv-user-message-stack {
+  display: flex;
+  max-width: min(560px, 82vw);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.pv-user-upload-image {
+  display: block;
+  width: min(420px, 78vw);
+  max-height: 460px;
+  border-radius: 17px;
+  background: #111;
+  object-fit: contain;
+}
+
+.pv-user-file-chip {
+  display: flex;
+  max-width: min(420px, 78vw);
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 13px;
+  background: var(--pv-surface);
+  color: #e8e8e8;
+  font-size: 12px;
+}
+
+.pv-user-file-chip svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  color: #a9c5ff;
+}
+
+.pv-user-file-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .pv-recent-delete {
+    opacity: 1;
+  }
+
+  .pv-saved-indicator {
+    display: none;
+  }
+
+  .pv-user-message-stack {
+    max-width: 86vw;
+  }
+
+  .pv-user-upload-image {
+    width: min(390px, 84vw);
+    max-height: 420px;
+  }
+
+  .pv-attachment-preview {
+    margin-right: 9px;
+    margin-left: 9px;
+  }
+}

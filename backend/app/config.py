@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     cerebras_base_url: str = "https://api.cerebras.ai/v1"
     google_gemini_api: str | None = None
     gemini_model: str = "gemini-2.5-flash"
+    gemini_vision_model: str = "gemini-2.5-flash"
+    gemini_image_edit_model: str = "gemini-3.1-flash-image"
     openrouter_api: str | None = None
     openrouter_model: str = "openai/gpt-4.1-mini"
     mistral_ai_api: str | None = None
@@ -33,6 +35,8 @@ class Settings(BaseSettings):
     cloudflare_account_id: str | None = None
     cloudflare_workers_ai: str | None = None
     cloudflare_image_model: str = "@cf/black-forest-labs/flux-1-schnell"
+    cloudflare_vision_model: str = "@cf/moondream/moondream3.1-9B-A2B"
+    cloudflare_edit_model: str = "@cf/black-forest-labs/flux-2-klein-4b"
     ocr_space_api: str | None = None
 
     # Backend-only Supabase credentials for verified shared knowledge.
@@ -55,6 +59,8 @@ class Settings(BaseSettings):
     total_chat_timeout_seconds: int = 55
     image_timeout_seconds: int = 95
     total_image_timeout_seconds: int = 150
+    vision_timeout_seconds: int = 120
+    vision_max_file_mb: int = 15
     image_retry_attempts: int = 3
     max_prompt_chars: int = 20000
     max_context_chars: int = 45000

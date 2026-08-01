@@ -3,7 +3,14 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -21,6 +28,7 @@ from app.services.knowledge import (
     learn_from_correction,
 )
 from app.services.ocr import extract_text
+from app.services.vision import process_vision_request
 from app.services.research import (
     INDIA_STATES,
     is_all_india_state_cm_query,
@@ -30,7 +38,7 @@ from app.services.research import (
 )
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="2.3.0")
+app = FastAPI(title=settings.app_name, version="2.4.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -51,7 +59,7 @@ async def root() -> dict:
         "name": settings.app_name,
         "status": "online",
         "docs": "/docs",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "truth_guard": "enabled",
         "smart_context": "enabled",
         "large_code": "enabled",
@@ -342,6 +350,67 @@ async def chat(
                 "All configured AI providers are temporarily busy or unavailable. "
                 "Please retry in a few seconds."
             ),
+        ) from exc
+
+
+
+@app.get("/api/vision/status")
+async def vision_status() -> dict:
+    return {
+        "ok": True,
+        "gemini_vision_configured": bool(settings.google_gemini_api),
+        "cloudflare_vision_configured": bool(
+            settings.cloudflare_account_id
+            and settings.cloudflare_workers_ai
+        ),
+        "ocr_configured": bool(settings.ocr_space_api),
+        "gemini_vision_model": settings.gemini_vision_model,
+        "gemini_image_edit_model": settings.gemini_image_edit_model,
+        "cloudflare_vision_model": settings.cloudflare_vision_model,
+        "cloudflare_edit_model": settings.cloudflare_edit_model,
+        "max_file_mb": settings.vision_max_file_mb,
+    }
+
+
+@app.post("/api/vision")
+async def vision(
+    file: UploadFile = File(...),
+    prompt: str = Form(""),
+    operation: str = Form("auto"),
+) -> dict:
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    max_bytes = int(settings.vision_max_file_mb) * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File must be {settings.vision_max_file_mb} MB or smaller.",
+        )
+
+    try:
+        return await asyncio.wait_for(
+            process_vision_request(
+                content=content,
+                filename=file.filename or "upload",
+                mime_type=file.content_type or "application/octet-stream",
+                prompt=prompt,
+                operation=operation,
+                settings=settings,
+            ),
+            timeout=float(settings.vision_timeout_seconds) + 15.0,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="Image/file analysis timed out. Retry with a smaller or clearer file.",
+        ) from exc
+    except Exception as exc:
+        detail = str(exc)[:1600]
+        raise HTTPException(
+            status_code=503,
+            detail=detail or "Image/file analysis failed.",
         ) from exc
 
 
