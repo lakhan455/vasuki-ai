@@ -12,7 +12,14 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[Message] = Field(min_length=1, max_length=100)
-    provider: Literal["auto", "groq", "gemini", "openrouter", "mistral"] = "auto"
+    provider: Literal[
+        "auto",
+        "groq",
+        "sambanova",
+        "gemini",
+        "openrouter",
+        "mistral",
+    ] = "auto"
     use_web: bool = False
 
 

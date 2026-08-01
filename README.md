@@ -4,7 +4,7 @@ A secure multi-provider AI web app with a **Next.js 16 frontend** and **FastAPI 
 
 ## Features
 
-- Chat provider fallback: Groq → Gemini → OpenRouter → Mistral
+- Chat provider fallback: Groq → SambaNova → Gemini → OpenRouter → Mistral
 - Optional live web research: Tavily → Exa fallback
 - Image generation: DeepAI → Hugging Face → Cloudflare Workers AI fallback
 - OCR.Space upload endpoint

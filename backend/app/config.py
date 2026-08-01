@@ -10,6 +10,9 @@ class Settings(BaseSettings):
 
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    sambanova_api_key: str | None = None
+    sambanova_model: str = "gpt-oss-120b"
+    sambanova_base_url: str = "https://api.sambanova.ai/v1"
     google_gemini_api: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     openrouter_api: str | None = None
