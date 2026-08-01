@@ -16,6 +16,7 @@ class ChatRequest(BaseModel):
         "auto",
         "groq",
         "sambanova",
+        "cerebras",
         "gemini",
         "openrouter",
         "mistral",

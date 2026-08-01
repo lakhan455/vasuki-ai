@@ -251,6 +251,37 @@ async def chat_sambanova(
     )
 
 
+
+async def chat_cerebras(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str = "",
+    *,
+    require_current: bool = False,
+    as_of: str | None = None,
+    temperature: float = 0.0,
+) -> str:
+    if not settings.cerebras_api_key:
+        raise RuntimeError("CEREBRAS_API_KEY is not configured")
+
+    base_url = settings.cerebras_base_url.rstrip("/")
+
+    return await _openai_compatible(
+        f"{base_url}/chat/completions",
+        settings.cerebras_api_key,
+        settings.cerebras_model,
+        _openai_messages(
+            messages,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        ),
+        settings,
+        temperature=temperature,
+        token_field="max_completion_tokens",
+    )
+
+
 async def chat_openrouter(
     messages: list[dict],
     settings: Settings,
@@ -398,6 +429,7 @@ async def chat_gemini(
 PROVIDERS = {
     "groq": chat_groq,
     "sambanova": chat_sambanova,
+    "cerebras": chat_cerebras,
     "gemini": chat_gemini,
     "openrouter": chat_openrouter,
     "mistral": chat_mistral,
@@ -494,7 +526,7 @@ async def _verify_current_answer(
 
     order = [
         name
-        for name in ("gemini", "groq", "sambanova", "openrouter", "mistral")
+        for name in ("gemini", "groq", "cerebras", "sambanova", "openrouter", "mistral")
         if name != draft_provider
     ]
     order.append(draft_provider)
@@ -533,7 +565,7 @@ async def route_chat(
     order = (
         [provider]
         if provider != "auto"
-        else ["groq", "sambanova", "gemini", "openrouter", "mistral"]
+        else ["groq", "cerebras", "sambanova", "gemini", "openrouter", "mistral"]
     )
 
     errors: list[str] = []
