@@ -24,6 +24,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import {
   consumePuterImageQuota,
+  releasePuterImageQuota,
   fetchAccountPlan,
   fetchPuterContext,
   type AccountPlan,
@@ -871,9 +872,54 @@ export default function ChatApp() {
           imageQuotaText =
             ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
 
-          const result = await generatePuterImage4K(effectiveText);
-          imageUrl = result.url;
-          imageProvider = result.provider;
+          try {
+            const result = await generatePuterImage4K(effectiveText);
+            imageUrl = result.url;
+            imageProvider = result.provider;
+          } catch (puterImageError) {
+            try {
+              const fallback = (await generateImage(
+                effectiveText,
+                accessToken,
+              )) as ImageResponse;
+
+              imageUrl =
+                typeof fallback.url === "string"
+                  ? fallback.url.trim()
+                  : "";
+              imageProvider = fallback.provider
+                ? `Vasuki fallback · ${fallback.provider}`
+                : "Vasuki fallback";
+
+              if (!imageUrl) {
+                throw new Error(
+                  "Vasuki fallback returned an empty image.",
+                );
+              }
+            } catch (fallbackError) {
+              try {
+                const restored =
+                  await releasePuterImageQuota(accessToken);
+                setPuterImageQuota(restored);
+              } catch {
+                // The backend will still reset the quota on the next day.
+              }
+
+              const puterMessage =
+                puterImageError instanceof Error
+                  ? puterImageError.message
+                  : "Puter image credits unavailable.";
+              const fallbackMessage =
+                fallbackError instanceof Error
+                  ? fallbackError.message
+                  : "Vasuki fallback unavailable.";
+
+              throw new Error(
+                `${puterMessage} Vasuki fallback bhi fail hua: ` +
+                  fallbackMessage,
+              );
+            }
+          }
         } else {
           const data = (await generateImage(
             effectiveText,

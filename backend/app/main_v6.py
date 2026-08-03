@@ -9,7 +9,10 @@ from pydantic import BaseModel, Field
 import app.main_v5 as v5
 from app.auth import AuthUser, get_current_user
 from app.services.personal_memory import personal_memory_context
-from app.services.puter_usage_v1 import consume_puter_image_quota
+from app.services.puter_usage_v2 import (
+    consume_puter_image_quota,
+    release_puter_image_quota,
+)
 from app.services.plans_v2 import (
     create_razorpay_order,
     get_plan_status,
@@ -84,6 +87,18 @@ async def puter_image_quota(
             ),
         )
 
+    return quota.to_dict()
+
+
+@app.post("/api/puter/image-quota/release")
+async def puter_image_quota_release(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    await require_puter_access(current_user, settings)
+    quota = await release_puter_image_quota(
+        current_user.id,
+        settings,
+    )
     return quota.to_dict()
 
 

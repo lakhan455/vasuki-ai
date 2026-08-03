@@ -116,6 +116,21 @@ export async function consumePuterImageQuota(
   return (await readJson(response)) as unknown as PuterImageQuota;
 }
 
+export async function releasePuterImageQuota(
+  accessToken: string,
+) {
+  const response = await fetch(
+    `${API_URL}/api/puter/image-quota/release`,
+    {
+      method: "POST",
+      headers: headers(accessToken),
+      cache: "no-store",
+    },
+  );
+
+  return (await readJson(response)) as unknown as PuterImageQuota;
+}
+
 async function createOrder(accessToken: string) {
   const response = await fetch(`${API_URL}/api/billing/create-order`, {
     method: "POST",
