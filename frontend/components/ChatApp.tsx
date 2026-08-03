@@ -23,10 +23,11 @@ import {
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
-  buyVasukiPro,
+  consumePuterImageQuota,
   fetchAccountPlan,
   fetchPuterContext,
   type AccountPlan,
+  type PuterImageQuota,
 } from "@/lib/plans";
 import {
   connectPuter,
@@ -390,7 +391,7 @@ export default function ChatApp() {
   const [quotaStatus, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
   const [accountPlan, setAccountPlan] = useState<AccountPlan | null>(null);
   const [aiEngine, setAiEngine] = useState<AiEngine>("vasuki");
-  const [puterModel, setPuterModel] = useState("gpt-5.5");
+  const [puterImageQuota, setPuterImageQuota] = useState<PuterImageQuota | null>(null);
   const [puterAccount, setPuterAccount] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
@@ -489,58 +490,29 @@ export default function ChatApp() {
     }
   }
 
-  async function selectPuterEngine(model: string) {
+  async function selectPuterEngine() {
     if (!accountPlan?.puter_access) {
-      setError("Puter Pro locked hai. â‚¹99 / 30 days plan activate karein.");
+      setError("Vasuki Pro abhi locked hai.");
       setModelMenuOpen(false);
       return;
     }
 
     setPlanBusy(true);
     setError("");
+
     try {
       const account = await connectPuter();
-      setPuterAccount(account.username || account.email || "Connected");
-      setPuterModel(model);
+      setPuterAccount(
+        account.username || account.email || "Connected",
+      );
       setAiEngine("puter");
       setModelMenuOpen(false);
     } catch (puterError) {
       setError(
         puterError instanceof Error
           ? puterError.message
-          : "Puter account connect nahi hua.",
+          : "Vasuki Pro account connect nahi hua.",
       );
-    } finally {
-      setPlanBusy(false);
-    }
-  }
-
-  async function purchasePro() {
-    if (!user || planBusy) return;
-
-    setPlanBusy(true);
-    setError("");
-    try {
-      const accessToken = await currentAccessToken();
-      await buyVasukiPro(accessToken, {
-        name:
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          "",
-        email: user.email || "",
-      });
-      await refreshAccountPlan();
-      window.alert(
-        "Vasuki Pro activate ho gaya. Ab model menu se Puter Pro connect karein.",
-      );
-    } catch (paymentError) {
-      const message =
-        paymentError instanceof Error
-          ? paymentError.message
-          : "Payment complete nahi hua.";
-      if (!/window close|dismiss/i.test(message)) {
-        setError(message);
-      }
     } finally {
       setPlanBusy(false);
     }
@@ -887,11 +859,18 @@ export default function ChatApp() {
       } else if (mode === "image") {
         let imageUrl = "";
         let imageProvider = "";
+        let imageQuotaText = "";
 
         if (aiEngine === "puter") {
           if (!accountPlan?.puter_access) {
-            throw new Error("Puter Pro access required.");
+            throw new Error("Vasuki Pro access required.");
           }
+
+          const quota = await consumePuterImageQuota(accessToken);
+          setPuterImageQuota(quota);
+          imageQuotaText =
+            ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
+
           const result = await generatePuterImage4K(effectiveText);
           imageUrl = result.url;
           imageProvider = result.provider;
@@ -916,7 +895,7 @@ export default function ChatApp() {
             role: "assistant",
             content: `Image generated${
               imageProvider ? ` with ${imageProvider}` : ""
-            }.`,
+            }.${imageQuotaText}`,
             imageUrl,
             provider: imageProvider,
           },
@@ -956,22 +935,22 @@ export default function ChatApp() {
 
         if (aiEngine === "puter") {
           if (!accountPlan?.puter_access) {
-            throw new Error("Puter Pro access required.");
+            throw new Error("Vasuki Pro access required.");
           }
+
           const puterContext = await fetchPuterContext(
             accessToken,
             memoryEnabled,
           );
-          await streamPuterChat(
+          const usedModel = await streamPuterChat(
             requestMessages,
             {
-              model: puterModel,
               systemContext: puterContext.system_prompt,
               signal: controller.signal,
             },
             onStreamToken,
           );
-          providerName = `puter:${puterModel}`;
+          providerName = `vasuki-pro:${usedModel}`;
         } else {
           const meta = await streamChat(
             requestMessages,
@@ -1117,7 +1096,6 @@ export default function ChatApp() {
       ? user.user_metadata.avatar_url
       : "";
 
-  const canUsePuter = accountPlan?.puter_access === true;
   const planLabel =
     accountPlan?.plan === "owner"
       ? "OWNER"
@@ -1294,7 +1272,9 @@ export default function ChatApp() {
               >
                 <Logo className="pv-header-logo" />
                 <span>
-                  {aiEngine === "puter" ? "Puter Pro" : "Vasuki AI"}
+                  {aiEngine === "puter"
+                    ? "Vasuki Pro"
+                    : "Vasuki AI"}
                 </span>
                 <Icon name="chevron" />
               </button>
@@ -1303,67 +1283,37 @@ export default function ChatApp() {
                 <div className="pv-model-menu">
                   <button
                     type="button"
-                    className={aiEngine === "vasuki" ? "is-active" : ""}
+                    className={
+                      aiEngine === "vasuki" ? "is-active" : ""
+                    }
                     onClick={() => {
                       setAiEngine("vasuki");
                       setModelMenuOpen(false);
                     }}
                   >
                     <strong>Vasuki AI</strong>
-                    <small>Normal Â· Web Â· Memory Â· Documents</small>
+                    <small>
+                      Normal · Web · Memory · Documents
+                    </small>
                   </button>
 
                   <button
                     type="button"
                     className={
-                      aiEngine === "puter" && puterModel === "gpt-5.5"
-                        ? "is-active"
-                        : ""
+                      aiEngine === "puter" ? "is-active" : ""
                     }
-                    onClick={() => void selectPuterEngine("gpt-5.5")}
+                    disabled={planBusy}
+                    onClick={() => void selectPuterEngine()}
                   >
-                    <strong>Puter Smart {!canUsePuter ? "ðŸ”’" : ""}</strong>
-                    <small>Advanced reasoning and coding</small>
+                    <strong>Vasuki Pro</strong>
+                    <small>
+                      Smart answers · Complete coding · 100 images/day
+                    </small>
                   </button>
-
-                  {canUsePuter && (
-                    <>
-                      <button
-                        type="button"
-                        className={
-                          aiEngine === "puter" &&
-                          puterModel === "gemini-3.1-flash-lite"
-                            ? "is-active"
-                            : ""
-                        }
-                        onClick={() =>
-                          void selectPuterEngine("gemini-3.1-flash-lite")
-                        }
-                      >
-                        <strong>Puter Fast</strong>
-                        <small>Fast everyday answers</small>
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          aiEngine === "puter" &&
-                          puterModel === "claude-sonnet-4-6"
-                            ? "is-active"
-                            : ""
-                        }
-                        onClick={() =>
-                          void selectPuterEngine("claude-sonnet-4-6")
-                        }
-                      >
-                        <strong>Puter Coding</strong>
-                        <small>Advanced code and analysis</small>
-                      </button>
-                    </>
-                  )}
 
                   {puterAccount && (
                     <p className="pv-puter-account">
-                      Puter: {puterAccount}
+                      Connected: {puterAccount}
                     </p>
                   )}
                 </div>
@@ -1384,15 +1334,14 @@ export default function ChatApp() {
             >
               {planLabel}
             </span>
-            {accountPlan?.plan === "free" && !accountPlan?.puter_access && (
-              <button
-                type="button"
-                className="pv-upgrade-button"
-                disabled={planBusy}
-                onClick={() => void purchasePro()}
+            {aiEngine === "puter" && puterImageQuota && (
+              <span
+                className="pv-quota-indicator"
+                title="Vasuki Pro image quota resets daily"
               >
-                {planBusy ? "Please waitâ€¦" : "Upgrade â‚¹99"}
-              </button>
+                Images: {puterImageQuota.daily_remaining}/
+                {puterImageQuota.daily_limit}
+              </span>
             )}
             {quotaStatus && (
               <span

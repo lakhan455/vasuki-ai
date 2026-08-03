@@ -12,6 +12,14 @@ export type AccountPlan = {
   plan_days: number;
 };
 
+export type PuterImageQuota = {
+  allowed: boolean;
+  image_count: number;
+  daily_limit: number;
+  daily_remaining: number;
+  persistent: boolean;
+};
+
 type RazorpayOrder = {
   key_id: string;
   order_id: string;
@@ -90,6 +98,22 @@ export async function fetchPuterContext(
     plan: string;
     system_prompt: string;
   };
+}
+
+
+export async function consumePuterImageQuota(
+  accessToken: string,
+) {
+  const response = await fetch(
+    `${API_URL}/api/puter/image-quota`,
+    {
+      method: "POST",
+      headers: headers(accessToken),
+      cache: "no-store",
+    },
+  );
+
+  return (await readJson(response)) as unknown as PuterImageQuota;
 }
 
 async function createOrder(accessToken: string) {

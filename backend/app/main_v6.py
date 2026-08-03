@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import Depends, Header, Request
+from fastapi import Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import app.main_v5 as v5
 from app.auth import AuthUser, get_current_user
 from app.services.personal_memory import personal_memory_context
+from app.services.puter_usage_v1 import consume_puter_image_quota
 from app.services.plans_v2 import (
     create_razorpay_order,
     get_plan_status,
@@ -63,6 +64,29 @@ async def billing_webhook(
     return await process_razorpay_webhook(await request.body(), x_razorpay_signature, settings)
 
 
+
+@app.post("/api/puter/image-quota")
+async def puter_image_quota(
+    current_user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    await require_puter_access(current_user, settings)
+    quota = await consume_puter_image_quota(
+        current_user.id,
+        settings,
+    )
+
+    if not quota.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Aaj ki {quota.daily_limit} Vasuki Pro images "
+                "complete ho gayi hain. Kal dobara generate karein."
+            ),
+        )
+
+    return quota.to_dict()
+
+
 @app.post("/api/puter/context")
 async def puter_context(
     payload: PuterContextRequest,
@@ -80,7 +104,10 @@ async def puter_context(
     system_prompt = f"""You are Vasuki AI, a helpful and accurate assistant.
 Current date: {current_date}.
 Reply in the user's language unless they request another language.
-For coding, provide complete usable code with safe defaults.
+Answer every safe and legitimate question as completely as possible.
+For coding, provide complete runnable code, file structure, setup commands,
+error handling, and clear steps. Do not stop merely because the answer is long;
+continue in organized parts when needed.
 Never invent live facts. Say when verification is required.
 When asked who created you, reply exactly:
 मुझे लखन प्रजापत (Lakhan Prajapat) जी ने बनाया है।

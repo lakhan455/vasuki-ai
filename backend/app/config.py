@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     # Vasuki Pro / owner access. Secrets stay only on Render.
     vasuki_owner_emails: str = ""
     puter_free_for_all: bool = True
+    puter_image_daily_limit: int = 100
     razorpay_key_id: str | None = None
     razorpay_key_secret: str | None = None
     razorpay_webhook_secret: str | None = None
