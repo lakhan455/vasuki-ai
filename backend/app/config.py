@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_secret_key: str | None = None
     supabase_service_role_key: str | None = None
+
+    # Vasuki Pro / owner access. Secrets stay only on Render.
+    vasuki_owner_emails: str = ""
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    razorpay_webhook_secret: str | None = None
+    razorpay_plan_amount_paise: int = 9900
+    razorpay_plan_days: int = 30
+
     global_learning_enabled: bool = True
     global_memory_direct_answer_score: float = 0.58
     global_memory_max_results: int = 3

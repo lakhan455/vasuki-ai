@@ -22,6 +22,17 @@ import {
   type ChatMessage,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
+import {
+  buyVasukiPro,
+  fetchAccountPlan,
+  fetchPuterContext,
+  type AccountPlan,
+} from "@/lib/plans";
+import {
+  connectPuter,
+  generatePuterImage4K,
+  streamPuterChat,
+} from "@/lib/puter";
 
 const VASUKI_LOGO_URL =
   "https://images.jdmagicbox.com/v2/comp/jaipur/a2/0141px141.x141.260404193718.t6a2/catalogue/vasuki-nfc-luniawas-jaipur-printing-services-604tb4s28a.jpg";
@@ -93,6 +104,7 @@ type PendingAttachment = {
 };
 
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
+type AiEngine = "vasuki" | "puter";
 
 type ChatResponse = {
   answer?: string;
@@ -376,6 +388,12 @@ export default function ChatApp() {
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [streamingStarted, setStreamingStarted] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
+  const [accountPlan, setAccountPlan] = useState<AccountPlan | null>(null);
+  const [aiEngine, setAiEngine] = useState<AiEngine>("vasuki");
+  const [puterModel, setPuterModel] = useState("gpt-5.5");
+  const [puterAccount, setPuterAccount] = useState("");
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [planBusy, setPlanBusy] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -435,8 +453,98 @@ export default function ChatApp() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user) return;
+    void refreshAccountPlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
+
+  async function currentAccessToken() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      throw new Error("Login session expired. Please sign in again.");
+    }
+    return accessToken;
+  }
+
+  async function refreshAccountPlan() {
+    try {
+      const accessToken = await currentAccessToken();
+      const nextPlan = await fetchAccountPlan(accessToken);
+      setAccountPlan(nextPlan);
+      if (!nextPlan.puter_access) {
+        setAiEngine("vasuki");
+        setPuterAccount("");
+      }
+    } catch (planError) {
+      setAccountPlan(null);
+      setAiEngine("vasuki");
+      console.error(planError);
+    }
+  }
+
+  async function selectPuterEngine(model: string) {
+    if (!accountPlan?.puter_access) {
+      setError("Puter Pro locked hai. â‚¹99 / 30 days plan activate karein.");
+      setModelMenuOpen(false);
+      return;
+    }
+
+    setPlanBusy(true);
+    setError("");
+    try {
+      const account = await connectPuter();
+      setPuterAccount(account.username || account.email || "Connected");
+      setPuterModel(model);
+      setAiEngine("puter");
+      setModelMenuOpen(false);
+    } catch (puterError) {
+      setError(
+        puterError instanceof Error
+          ? puterError.message
+          : "Puter account connect nahi hua.",
+      );
+    } finally {
+      setPlanBusy(false);
+    }
+  }
+
+  async function purchasePro() {
+    if (!user || planBusy) return;
+
+    setPlanBusy(true);
+    setError("");
+    try {
+      const accessToken = await currentAccessToken();
+      await buyVasukiPro(accessToken, {
+        name:
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          "",
+        email: user.email || "",
+      });
+      await refreshAccountPlan();
+      window.alert(
+        "Vasuki Pro activate ho gaya. Ab model menu se Puter Pro connect karein.",
+      );
+    } catch (paymentError) {
+      const message =
+        paymentError instanceof Error
+          ? paymentError.message
+          : "Payment complete nahi hua.";
+      if (!/window close|dismiss/i.test(message)) {
+        setError(message);
+      }
+    } finally {
+      setPlanBusy(false);
+    }
+  }
 
   async function signInWithGoogle() {
     setError("");
@@ -777,12 +885,25 @@ export default function ChatApp() {
           },
         ];
       } else if (mode === "image") {
-        const data = (await generateImage(
-          effectiveText,
-          accessToken,
-        )) as ImageResponse;
-        const imageUrl =
-          typeof data.url === "string" ? data.url.trim() : "";
+        let imageUrl = "";
+        let imageProvider = "";
+
+        if (aiEngine === "puter") {
+          if (!accountPlan?.puter_access) {
+            throw new Error("Puter Pro access required.");
+          }
+          const result = await generatePuterImage4K(effectiveText);
+          imageUrl = result.url;
+          imageProvider = result.provider;
+        } else {
+          const data = (await generateImage(
+            effectiveText,
+            accessToken,
+          )) as ImageResponse;
+          imageUrl =
+            typeof data.url === "string" ? data.url.trim() : "";
+          imageProvider = data.provider || "";
+        }
 
         if (!imageUrl) {
           throw new Error("Image provider returned an empty image.");
@@ -794,10 +915,10 @@ export default function ChatApp() {
             id: makeId(),
             role: "assistant",
             content: `Image generated${
-              data.provider ? ` with ${data.provider}` : ""
+              imageProvider ? ` with ${imageProvider}` : ""
             }.`,
             imageUrl,
-            provider: data.provider,
+            provider: imageProvider,
           },
         ];
       } else {
@@ -806,6 +927,8 @@ export default function ChatApp() {
         );
         const assistantId = makeId();
         let streamedAnswer = "";
+        let providerName = "";
+        let answerSources: SourceInfo[] = [];
 
         setMessages([
           ...nextMessages,
@@ -819,41 +942,70 @@ export default function ChatApp() {
         const controller = new AbortController();
         streamAbortRef.current = controller;
 
-        const meta = await streamChat(
-          requestMessages,
-          {
-            accessToken,
-            useWeb: webEnabled || mode === "web",
-            useMemory: memoryEnabled,
-            useDocuments: documentsEnabled,
-            documentIds: selectedDocumentIds,
-            signal: controller.signal,
-          },
-          (token) => {
-            streamedAnswer += token;
-            setStreamingStarted(true);
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === assistantId
-                  ? { ...message, content: streamedAnswer }
-                  : message,
-              ),
-            );
-          },
-        );
+        const onStreamToken = (token: string) => {
+          streamedAnswer += token;
+          setStreamingStarted(true);
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, content: streamedAnswer }
+                : message,
+            ),
+          );
+        };
 
-        if (typeof meta.daily_remaining === "number") {
-          setQuotaStatus({
-            minuteLimit:
-              typeof meta.minute_limit === "number" ? meta.minute_limit : 15,
-            minuteRemaining:
-              typeof meta.minute_remaining === "number"
-                ? meta.minute_remaining
-                : 0,
-            dailyLimit:
-              typeof meta.daily_limit === "number" ? meta.daily_limit : 250,
-            dailyRemaining: meta.daily_remaining,
-          });
+        if (aiEngine === "puter") {
+          if (!accountPlan?.puter_access) {
+            throw new Error("Puter Pro access required.");
+          }
+          const puterContext = await fetchPuterContext(
+            accessToken,
+            memoryEnabled,
+          );
+          await streamPuterChat(
+            requestMessages,
+            {
+              model: puterModel,
+              systemContext: puterContext.system_prompt,
+              signal: controller.signal,
+            },
+            onStreamToken,
+          );
+          providerName = `puter:${puterModel}`;
+        } else {
+          const meta = await streamChat(
+            requestMessages,
+            {
+              accessToken,
+              useWeb: webEnabled || mode === "web",
+              useMemory: memoryEnabled,
+              useDocuments: documentsEnabled,
+              documentIds: selectedDocumentIds,
+              signal: controller.signal,
+            },
+            onStreamToken,
+          );
+
+          providerName = meta.provider || "";
+          answerSources = normaliseSources(meta.sources);
+
+          if (typeof meta.daily_remaining === "number") {
+            setQuotaStatus({
+              minuteLimit:
+                typeof meta.minute_limit === "number"
+                  ? meta.minute_limit
+                  : 15,
+              minuteRemaining:
+                typeof meta.minute_remaining === "number"
+                  ? meta.minute_remaining
+                  : 0,
+              dailyLimit:
+                typeof meta.daily_limit === "number"
+                  ? meta.daily_limit
+                  : 250,
+              dailyRemaining: meta.daily_remaining,
+            });
+          }
         }
 
         const answer = streamedAnswer.trim();
@@ -867,8 +1019,8 @@ export default function ChatApp() {
             id: assistantId,
             role: "assistant",
             content: answer,
-            provider: meta.provider,
-            sources: normaliseSources(meta.sources),
+            provider: providerName,
+            sources: answerSources,
           },
         ];
       }
@@ -964,6 +1116,14 @@ export default function ChatApp() {
     typeof user.user_metadata?.avatar_url === "string"
       ? user.user_metadata.avatar_url
       : "";
+
+  const canUsePuter = accountPlan?.puter_access === true;
+  const planLabel =
+    accountPlan?.plan === "owner"
+      ? "OWNER"
+      : accountPlan?.plan === "pro"
+        ? "PRO"
+        : "FREE";
 
   return (
     <main className="pv-app">
@@ -1125,14 +1285,115 @@ export default function ChatApp() {
               </button>
             )}
 
-            <button type="button" className="pv-model-button">
-              <Logo className="pv-header-logo" />
-              <span>Vasuki AI</span>
-              <Icon name="chevron" />
-            </button>
+            <div className="pv-model-switcher">
+              <button
+                type="button"
+                className="pv-model-button"
+                onClick={() => setModelMenuOpen((open) => !open)}
+                aria-expanded={modelMenuOpen}
+              >
+                <Logo className="pv-header-logo" />
+                <span>
+                  {aiEngine === "puter" ? "Puter Pro" : "Vasuki AI"}
+                </span>
+                <Icon name="chevron" />
+              </button>
+
+              {modelMenuOpen && (
+                <div className="pv-model-menu">
+                  <button
+                    type="button"
+                    className={aiEngine === "vasuki" ? "is-active" : ""}
+                    onClick={() => {
+                      setAiEngine("vasuki");
+                      setModelMenuOpen(false);
+                    }}
+                  >
+                    <strong>Vasuki AI</strong>
+                    <small>Normal Â· Web Â· Memory Â· Documents</small>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      aiEngine === "puter" && puterModel === "gpt-5.5"
+                        ? "is-active"
+                        : ""
+                    }
+                    onClick={() => void selectPuterEngine("gpt-5.5")}
+                  >
+                    <strong>Puter Smart {!canUsePuter ? "ðŸ”’" : ""}</strong>
+                    <small>Advanced reasoning and coding</small>
+                  </button>
+
+                  {canUsePuter && (
+                    <>
+                      <button
+                        type="button"
+                        className={
+                          aiEngine === "puter" &&
+                          puterModel === "gemini-3.1-flash-lite"
+                            ? "is-active"
+                            : ""
+                        }
+                        onClick={() =>
+                          void selectPuterEngine("gemini-3.1-flash-lite")
+                        }
+                      >
+                        <strong>Puter Fast</strong>
+                        <small>Fast everyday answers</small>
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          aiEngine === "puter" &&
+                          puterModel === "claude-sonnet-4-6"
+                            ? "is-active"
+                            : ""
+                        }
+                        onClick={() =>
+                          void selectPuterEngine("claude-sonnet-4-6")
+                        }
+                      >
+                        <strong>Puter Coding</strong>
+                        <small>Advanced code and analysis</small>
+                      </button>
+                    </>
+                  )}
+
+                  {puterAccount && (
+                    <p className="pv-puter-account">
+                      Puter: {puterAccount}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="pv-header-right">
+            <span
+              className={`pv-plan-badge pv-plan-badge--${planLabel.toLowerCase()}`}
+              title={
+                accountPlan?.pro_expires_at
+                  ? `Pro until ${new Date(
+                      accountPlan.pro_expires_at,
+                    ).toLocaleDateString()}`
+                  : planLabel
+              }
+            >
+              {planLabel}
+            </span>
+            {accountPlan?.plan === "free" && (
+              <button
+                type="button"
+                className="pv-upgrade-button"
+                disabled={planBusy}
+                onClick={() => void purchasePro()}
+              >
+                {planBusy ? "Please waitâ€¦" : "Upgrade â‚¹99"}
+              </button>
+            )}
             {quotaStatus && (
               <span
                 className="pv-quota-indicator"

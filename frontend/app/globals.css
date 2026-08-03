@@ -1935,3 +1935,101 @@ button {
     text-overflow: ellipsis;
   }
 }
+
+/* Vasuki Pro + Puter */
+.pv-model-switcher { position: relative; }
+
+.pv-model-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 120;
+  display: grid;
+  width: min(340px, calc(100vw - 24px));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--pv-border);
+  border-radius: 16px;
+  background: #2b2b2b;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.pv-model-menu button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--pv-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pv-model-menu button:hover,
+.pv-model-menu button.is-active {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.pv-model-menu small,
+.pv-puter-account { color: var(--pv-muted); font-size: 12px; }
+
+.pv-puter-account {
+  margin: 4px 10px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-plan-badge {
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--pv-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.pv-plan-badge--free { color: var(--pv-muted); }
+.pv-plan-badge--pro {
+  border-color: rgba(79, 134, 247, 0.6);
+  background: rgba(79, 134, 247, 0.13);
+  color: #a9c4ff;
+}
+.pv-plan-badge--owner {
+  border-color: rgba(245, 193, 69, 0.55);
+  background: rgba(245, 193, 69, 0.12);
+  color: #f6d77e;
+}
+
+.pv-upgrade-button {
+  min-height: 31px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pv-blue);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pv-upgrade-button:disabled { cursor: wait; opacity: 0.65; }
+
+@media (max-width: 720px) {
+  .pv-plan-badge { display: none; }
+  .pv-upgrade-button { padding: 0 9px; font-size: 11px; }
+  .pv-model-menu {
+    position: fixed;
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+
