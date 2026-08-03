@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 import app.main_v5 as v5
 from app.auth import AuthUser, get_current_user
 from app.services.personal_memory import personal_memory_context
-from app.services.plans_v1 import (
+from app.services.plans_v2 import (
     create_razorpay_order,
     get_plan_status,
     process_razorpay_webhook,

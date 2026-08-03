@@ -1384,7 +1384,7 @@ export default function ChatApp() {
             >
               {planLabel}
             </span>
-            {accountPlan?.plan === "free" && (
+            {accountPlan?.plan === "free" && !accountPlan?.puter_access && (
               <button
                 type="button"
                 className="pv-upgrade-button"
