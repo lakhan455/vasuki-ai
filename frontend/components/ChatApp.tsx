@@ -69,6 +69,23 @@ type ChatRecord = {
   updated_at: string;
 };
 
+type QuotaUiStatus = {
+  minuteLimit: number;
+  minuteRemaining: number;
+  dailyLimit: number;
+  dailyRemaining: number;
+};
+
+type ChatMessageRow = {
+  client_id?: string;
+  role?: "user" | "assistant";
+  content?: string;
+  image_url?: string;
+  file_name?: string;
+  provider?: string;
+  sources?: unknown;
+};
+
 type PendingAttachment = {
   file: File;
   previewUrl?: string;
@@ -279,6 +296,40 @@ function restoreMessages(value: unknown): UiMessage[] {
   });
 }
 
+function restoreMessageRows(value: unknown): UiMessage[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as ChatMessageRow;
+
+    if (
+      (row.role !== "user" && row.role !== "assistant") ||
+      typeof row.content !== "string"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        id:
+          typeof row.client_id === "string" && row.client_id
+            ? row.client_id
+            : makeId(),
+        role: row.role,
+        content: row.content,
+        imageUrl:
+          typeof row.image_url === "string" ? row.image_url : undefined,
+        fileName:
+          typeof row.file_name === "string" ? row.file_name : undefined,
+        provider:
+          typeof row.provider === "string" ? row.provider : undefined,
+        sources: normaliseSources(row.sources),
+      },
+    ];
+  });
+}
+
 function chatTitle(messages: UiMessage[]) {
   const firstUserMessage = messages.find(
     (message) => message.role === "user",
@@ -324,10 +375,12 @@ export default function ChatApp() {
   const [documentsEnabled, setDocumentsEnabled] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [streamingStarted, setStreamingStarted] = useState(false);
+  const [quotaStatus, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
+  const chatLoadTokenRef = useRef("");
 
   useEffect(() => {
     void warmBackend();
@@ -417,7 +470,8 @@ export default function ChatApp() {
       .from("user_chats")
       .select("id,title,messages,updated_at")
       .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
+      .order("updated_at", { ascending: false })
+      .limit(100);
 
     setHistoryBusy(false);
 
@@ -435,6 +489,9 @@ export default function ChatApp() {
   }
 
   function openChat(record: ChatRecord) {
+    const loadToken = makeId();
+    chatLoadTokenRef.current = loadToken;
+
     setCurrentChatId(record.id);
     setMessages(restoreMessages(record.messages));
     setAttachment(null);
@@ -443,7 +500,59 @@ export default function ChatApp() {
     setMode("chat");
     setWebEnabled(false);
     setMobileSidebarOpen(false);
+
+    void (async () => {
+      const { data, error: messageError } = await supabase
+        .from("user_chat_messages")
+        .select(
+          "client_id,role,content,image_url,file_name,provider,sources,position",
+        )
+        .eq("chat_id", record.id)
+        .eq("user_id", user?.id ?? "")
+        .order("position", { ascending: true });
+
+      if (
+        chatLoadTokenRef.current === loadToken &&
+        !messageError &&
+        Array.isArray(data) &&
+        data.length > 0
+      ) {
+        setMessages(restoreMessageRows(data));
+      }
+    })();
+
     requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  async function persistMessageRows(
+    chatId: string,
+    nextMessages: UiMessage[],
+  ) {
+    if (!user) return false;
+
+    const now = new Date().toISOString();
+    const rows = nextMessages.map((message, position) => ({
+      chat_id: chatId,
+      user_id: user.id,
+      client_id: message.id,
+      position,
+      role: message.role,
+      content: message.content,
+      image_url:
+        message.imageUrl && !message.imageUrl.startsWith("data:")
+          ? message.imageUrl
+          : null,
+      file_name: message.fileName ?? null,
+      provider: message.provider ?? null,
+      sources: normaliseSources(message.sources),
+      updated_at: now,
+    }));
+
+    const { error: rowError } = await supabase
+      .from("user_chat_messages")
+      .upsert(rows, { onConflict: "chat_id,client_id" });
+
+    return !rowError;
   }
 
   async function persistChat(
@@ -454,41 +563,61 @@ export default function ChatApp() {
       return targetChatId;
     }
 
+    const now = new Date().toISOString();
+    const boundedFallback = storedMessages(nextMessages.slice(-20));
     const payload = {
       user_id: user.id,
       title: chatTitle(nextMessages),
-      messages: storedMessages(nextMessages),
+      messages: boundedFallback,
+      updated_at: now,
     };
 
-    if (targetChatId) {
+    let chatId = targetChatId;
+
+    if (chatId) {
       const { error: updateError } = await supabase
         .from("user_chats")
         .update(payload)
-        .eq("id", targetChatId)
+        .eq("id", chatId)
         .eq("user_id", user.id);
 
       if (updateError) {
         throw new Error(`Chat save failed: ${updateError.message}`);
       }
+    } else {
+      const { data, error: insertError } = await supabase
+        .from("user_chats")
+        .insert(payload)
+        .select("id")
+        .single();
 
-      await loadChatHistory(false);
-      return targetChatId;
+      if (insertError) {
+        throw new Error(`Chat save failed: ${insertError.message}`);
+      }
+
+      chatId = String(data.id);
+      setCurrentChatId(chatId);
     }
 
-    const { data, error: insertError } = await supabase
-      .from("user_chats")
-      .insert(payload)
-      .select("id")
-      .single();
+    const rowsSaved = await persistMessageRows(chatId, nextMessages);
 
-    if (insertError) {
-      throw new Error(`Chat save failed: ${insertError.message}`);
+    if (!rowsSaved) {
+      const { error: fallbackError } = await supabase
+        .from("user_chats")
+        .update({
+          messages: storedMessages(nextMessages),
+          updated_at: now,
+        })
+        .eq("id", chatId)
+        .eq("user_id", user.id);
+
+      if (fallbackError) {
+        throw new Error(`Chat save failed: ${fallbackError.message}`);
+      }
     }
 
-    const newId = String(data.id);
-    setCurrentChatId(newId);
     await loadChatHistory(false);
-    return newId;
+    return chatId;
   }
 
   function startNewChat() {
@@ -712,6 +841,20 @@ export default function ChatApp() {
             );
           },
         );
+
+        if (typeof meta.daily_remaining === "number") {
+          setQuotaStatus({
+            minuteLimit:
+              typeof meta.minute_limit === "number" ? meta.minute_limit : 15,
+            minuteRemaining:
+              typeof meta.minute_remaining === "number"
+                ? meta.minute_remaining
+                : 0,
+            dailyLimit:
+              typeof meta.daily_limit === "number" ? meta.daily_limit : 250,
+            dailyRemaining: meta.daily_remaining,
+          });
+        }
 
         const answer = streamedAnswer.trim();
         if (!answer) {
@@ -990,6 +1133,14 @@ export default function ChatApp() {
           </div>
 
           <div className="pv-header-right">
+            {quotaStatus && (
+              <span
+                className="pv-quota-indicator"
+                title={`${quotaStatus.minuteRemaining}/${quotaStatus.minuteLimit} requests available this minute`}
+              >
+                Today: {quotaStatus.dailyRemaining}/{quotaStatus.dailyLimit}
+              </span>
+            )}
             <span className="pv-saved-indicator">
               {currentChatId ? "Saved" : "New chat"}
             </span>

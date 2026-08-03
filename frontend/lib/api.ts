@@ -16,9 +16,14 @@ export type ChatMessage = {
 export type StreamChatMeta = {
   provider?: string;
   sources?: unknown[];
+  request_id?: string;
   context_trimmed?: boolean;
   original_context_chars?: number;
   used_context_chars?: number;
+  minute_limit?: number;
+  minute_remaining?: number;
+  daily_limit?: number;
+  daily_remaining?: number;
 };
 
 export type MemoryItem = {
@@ -351,7 +356,12 @@ async function streamAt(
       buffer = buffer.slice(boundary + 2);
       const parsed = parseEventBlock(block);
 
-      if (parsed.event === "token") {
+      if (parsed.event === "ready") {
+        meta = {
+          ...meta,
+          ...(parsed.data as StreamChatMeta),
+        };
+      } else if (parsed.event === "token") {
         const token =
           typeof parsed.data.token === "string"
             ? parsed.data.token

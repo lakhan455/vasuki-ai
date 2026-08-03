@@ -1907,3 +1907,31 @@ button {
     align-items: flex-start;
   }
 }
+
+
+/* Vasuki quota status v2 */
+.pv-header-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pv-quota-indicator {
+  padding: 6px 10px;
+  border: 1px solid rgba(79, 134, 247, 0.28);
+  border-radius: 999px;
+  background: rgba(79, 134, 247, 0.1);
+  color: #bed3ff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .pv-quota-indicator {
+    max-width: 92px;
+    overflow: hidden;
+    padding-right: 8px;
+    padding-left: 8px;
+    text-overflow: ellipsis;
+  }
+}

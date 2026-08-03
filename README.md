@@ -36,7 +36,7 @@ py -3.12 -m venv .venv
 pip install -r requirements.txt
 Copy-Item .env.example .env
 notepad .env
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main_v5:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Backend test:
@@ -71,7 +71,7 @@ The rest are optional fallbacks. GitHub token should not be placed in this app's
 2. In Render, create a new Web Service from the repository.
 3. Set Root Directory to `backend`.
 4. Build command: `pip install -r requirements.txt`
-5. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+5. Start command: `uvicorn app.main_v5:app --host 0.0.0.0 --port $PORT`
 6. Add environment variables from `backend/.env.example` using fresh keys.
 7. Set `ALLOWED_ORIGINS` temporarily to your future Vercel URL, or update it after frontend deployment.
 8. Copy your Render URL, for example `https://power-vasuki-ai-api.onrender.com`.
@@ -114,3 +114,16 @@ power-vasuki-ai/
 │   └── .env.example
 └── README.md
 ```
+
+
+## Supabase production v2 migration
+
+Run this file once in Supabase SQL Editor:
+
+```text
+backend/supabase/production-v2.sql
+```
+
+It enables persistent daily quota, scalable per-message chat storage and
+sanitized error-event storage. Backward-compatible fallbacks remain active
+until the SQL migration is installed.

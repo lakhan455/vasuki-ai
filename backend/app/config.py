@@ -57,8 +57,11 @@ class Settings(BaseSettings):
     chat_timeout_seconds: int = 25
     fast_provider_timeout_seconds: int = 9
     first_token_timeout_seconds: int = 6
+    large_provider_timeout_seconds: int = 45
     rate_limit_per_minute: int = 15
     daily_message_limit: int = 250
+    error_alert_webhook_url: str | None = None
+    error_alert_min_interval_seconds: int = 300
     provider_timeout_seconds: int = 18
     provider_cooldown_seconds: int = 120
     web_search_timeout_seconds: int = 14
@@ -74,7 +77,7 @@ class Settings(BaseSettings):
     context_reserve_chars: int = 7000
     max_output_tokens: int = 5000
     max_fast_output_tokens: int = 1600
-    max_continuations: int = 1
+    max_continuations: int = 2
 
     document_max_mb: int = 15
     document_max_chunks: int = 120
