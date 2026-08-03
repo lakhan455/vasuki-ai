@@ -901,9 +901,17 @@ export default function ChatApp() {
           },
         ];
       } else {
-        const requestMessages: ChatMessage[] = nextMessages.map(
-          ({ role, content }) => ({ role, content }),
-        );
+        const requestMessages: ChatMessage[] = nextMessages
+          .filter(
+            ({ content }) =>
+              typeof content === "string" &&
+              content.trim().length > 0,
+          )
+          .slice(-100)
+          .map(({ role, content }) => ({
+            role,
+            content: content.trim(),
+          }));
         const assistantId = makeId();
         let streamedAnswer = "";
         let providerName = "";
@@ -1009,6 +1017,18 @@ export default function ChatApp() {
       setMode("chat");
       await persistChat(finalMessages, currentChatId);
     } catch (caughtError) {
+      // Failed streams can leave an empty assistant placeholder in an old
+      // chat. Remove it so the next request remains valid.
+      setMessages((current) =>
+        current.filter(
+          (message) =>
+            !(
+              message.role === "assistant" &&
+              !message.content.trim()
+            ),
+        ),
+      );
+
       const stopped =
         streamAbortRef.current?.signal.aborted ||
         (

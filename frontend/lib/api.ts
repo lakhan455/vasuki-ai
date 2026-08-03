@@ -71,10 +71,33 @@ async function readResponse(response: Response) {
   }
 
   if (!response.ok) {
-    const detail =
-      typeof data.detail === "string"
-        ? data.detail
-        : `Request failed (${response.status})`;
+    const rawDetail = data.detail;
+    let detail = `Request failed (${response.status})`;
+
+    if (typeof rawDetail === "string" && rawDetail.trim()) {
+      detail = rawDetail.trim();
+    } else if (Array.isArray(rawDetail)) {
+      const messages = rawDetail
+        .map((item) => {
+          if (!item || typeof item !== "object") return "";
+          const value = item as {
+            msg?: unknown;
+            loc?: unknown;
+          };
+          const message =
+            typeof value.msg === "string" ? value.msg : "";
+          const location = Array.isArray(value.loc)
+            ? value.loc.map(String).join(".")
+            : "";
+          return [location, message].filter(Boolean).join(": ");
+        })
+        .filter(Boolean);
+
+      if (messages.length > 0) {
+        detail = messages.join(" | ");
+      }
+    }
+
     throw new Error(detail);
   }
 
