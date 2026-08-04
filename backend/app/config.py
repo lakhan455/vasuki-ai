@@ -42,6 +42,23 @@ class Settings(BaseSettings):
     cloudflare_edit_model: str = "@cf/black-forest-labs/flux-2-klein-4b"
     ocr_space_api: str | None = None
 
+    # Vasuki Pro local image engine (ComfyUI).
+    comfyui_base_url: str | None = None
+    comfyui_checkpoint: str | None = None
+    comfyui_api_key: str | None = None
+    comfyui_cf_access_client_id: str | None = None
+    comfyui_cf_access_client_secret: str | None = None
+    comfyui_width: int = 768
+    comfyui_height: int = 768
+    comfyui_steps: int = 12
+    comfyui_cfg: float = 7.0
+    comfyui_sampler_name: str = "euler"
+    comfyui_scheduler: str = "normal"
+    comfyui_timeout_seconds: int = 300
+    comfyui_negative_prompt: str = (
+        "blurry, low quality, distorted, duplicate, watermark, text"
+    )
+
     # Backend-only Supabase credentials.
     # Never put a service-role/secret key in the frontend or Vercel.
     supabase_url: str | None = None
@@ -52,6 +69,7 @@ class Settings(BaseSettings):
     vasuki_owner_emails: str = ""
     puter_free_for_all: bool = True
     puter_image_daily_limit: int = 100
+    pro_image_daily_limit: int = 100
     razorpay_key_id: str | None = None
     razorpay_key_secret: str | None = None
     razorpay_webhook_secret: str | None = None

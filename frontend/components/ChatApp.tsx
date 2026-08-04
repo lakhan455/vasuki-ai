@@ -23,18 +23,18 @@ import {
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
-  consumePuterImageQuota,
-  releasePuterImageQuota,
+  consumeProImageQuota,
+  releaseProImageQuota,
   fetchAccountPlan,
-  fetchPuterContext,
+  fetchProContext,
   type AccountPlan,
-  type PuterImageQuota,
+  type ProImageQuota,
 } from "@/lib/plans";
 import {
-  connectPuter,
-  generatePuterImage4K,
-  streamPuterChat,
-} from "@/lib/puter";
+  streamWebLLMChat,
+  supportsWebLLM,
+  type LocalChatProgress,
+} from "@/lib/webllm";
 
 const VASUKI_LOGO_URL =
   "https://images.jdmagicbox.com/v2/comp/jaipur/a2/0141px141.x141.260404193718.t6a2/catalogue/vasuki-nfc-luniawas-jaipur-printing-services-604tb4s28a.jpg";
@@ -106,7 +106,7 @@ type PendingAttachment = {
 };
 
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
-type AiEngine = "vasuki" | "puter";
+type AiEngine = "vasuki" | "local";
 
 type ChatResponse = {
   answer?: string;
@@ -392,8 +392,12 @@ export default function ChatApp() {
   const [quotaStatus, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
   const [accountPlan, setAccountPlan] = useState<AccountPlan | null>(null);
   const [aiEngine, setAiEngine] = useState<AiEngine>("vasuki");
-  const [puterImageQuota, setPuterImageQuota] = useState<PuterImageQuota | null>(null);
-  const [puterAccount, setPuterAccount] = useState("");
+  const [proImageQuota, setProImageQuota] = useState<ProImageQuota | null>(null);
+  const [localProgress, setLocalProgress] = useState<LocalChatProgress>({
+    phase: "idle",
+    text: "Local model first prompt par download hoga.",
+  });
+  const [localModel, setLocalModel] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
 
@@ -480,10 +484,6 @@ export default function ChatApp() {
       const accessToken = await currentAccessToken();
       const nextPlan = await fetchAccountPlan(accessToken);
       setAccountPlan(nextPlan);
-      if (!nextPlan.puter_access) {
-        setAiEngine("vasuki");
-        setPuterAccount("");
-      }
     } catch (planError) {
       setAccountPlan(null);
       setAiEngine("vasuki");
@@ -491,28 +491,31 @@ export default function ChatApp() {
     }
   }
 
-  async function selectPuterEngine() {
-    if (!accountPlan?.puter_access) {
-      setError("Vasuki Pro abhi locked hai.");
-      setModelMenuOpen(false);
-      return;
-    }
-
+  async function selectLocalEngine() {
     setPlanBusy(true);
     setError("");
 
     try {
-      const account = await connectPuter();
-      setPuterAccount(
-        account.username || account.email || "Connected",
-      );
-      setAiEngine("puter");
+      if (!supportsWebLLM()) {
+        throw new Error(
+          "Vasuki Pro Local ke liye WebGPU chahiye. " +
+            "Latest Chrome/Edge aur compatible GPU use karein.",
+        );
+      }
+
+      setAiEngine("local");
+      setLocalProgress({
+        phase: "idle",
+        text:
+          "Local model first prompt par browser me download hoga. " +
+          "Download ek baar hone ke baad cache rahega.",
+      });
       setModelMenuOpen(false);
-    } catch (puterError) {
+    } catch (localError) {
       setError(
-        puterError instanceof Error
-          ? puterError.message
-          : "Vasuki Pro account connect nahi hua.",
+        localError instanceof Error
+          ? localError.message
+          : "Vasuki Pro Local start nahi hua.",
       );
     } finally {
       setPlanBusy(false);
@@ -862,63 +865,38 @@ export default function ChatApp() {
         let imageProvider = "";
         let imageQuotaText = "";
 
-        if (aiEngine === "puter") {
-          if (!accountPlan?.puter_access) {
-            throw new Error("Vasuki Pro access required.");
-          }
-
-          const quota = await consumePuterImageQuota(accessToken);
-          setPuterImageQuota(quota);
+        if (aiEngine === "local") {
+          const quota = await consumeProImageQuota(accessToken);
+          setProImageQuota(quota);
           imageQuotaText =
             ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
 
           try {
-            const result = await generatePuterImage4K(effectiveText);
-            imageUrl = result.url;
-            imageProvider = result.provider;
-          } catch (puterImageError) {
-            try {
-              const fallback = (await generateImage(
-                effectiveText,
-                accessToken,
-              )) as ImageResponse;
+            const result = (await generateImage(
+              effectiveText,
+              accessToken,
+            )) as ImageResponse;
 
-              imageUrl =
-                typeof fallback.url === "string"
-                  ? fallback.url.trim()
-                  : "";
-              imageProvider = fallback.provider
-                ? `Vasuki fallback · ${fallback.provider}`
-                : "Vasuki fallback";
+            imageUrl =
+              typeof result.url === "string"
+                ? result.url.trim()
+                : "";
+            imageProvider = result.provider || "";
 
-              if (!imageUrl) {
-                throw new Error(
-                  "Vasuki fallback returned an empty image.",
-                );
-              }
-            } catch (fallbackError) {
-              try {
-                const restored =
-                  await releasePuterImageQuota(accessToken);
-                setPuterImageQuota(restored);
-              } catch {
-                // The backend will still reset the quota on the next day.
-              }
-
-              const puterMessage =
-                puterImageError instanceof Error
-                  ? puterImageError.message
-                  : "Puter image credits unavailable.";
-              const fallbackMessage =
-                fallbackError instanceof Error
-                  ? fallbackError.message
-                  : "Vasuki fallback unavailable.";
-
+            if (!imageUrl) {
               throw new Error(
-                `${puterMessage} Vasuki fallback bhi fail hua: ` +
-                  fallbackMessage,
+                "Local/cloud image engines returned an empty image.",
               );
             }
+          } catch (imageError) {
+            try {
+              const restored =
+                await releaseProImageQuota(accessToken);
+              setProImageQuota(restored);
+            } catch {
+              // The quota resets on the next India calendar day.
+            }
+            throw imageError;
           }
         } else {
           const data = (await generateImage(
@@ -987,25 +965,7 @@ export default function ChatApp() {
           );
         };
 
-        if (aiEngine === "puter") {
-          if (!accountPlan?.puter_access) {
-            throw new Error("Vasuki Pro access required.");
-          }
-
-          const puterContext = await fetchPuterContext(
-            accessToken,
-            memoryEnabled,
-          );
-          const usedModel = await streamPuterChat(
-            requestMessages,
-            {
-              systemContext: puterContext.system_prompt,
-              signal: controller.signal,
-            },
-            onStreamToken,
-          );
-          providerName = `vasuki-pro:${usedModel}`;
-        } else {
+        const runCloudEngine = async () => {
           const meta = await streamChat(
             requestMessages,
             {
@@ -1019,7 +979,7 @@ export default function ChatApp() {
             onStreamToken,
           );
 
-          providerName = meta.provider || "";
+          providerName = meta.provider || "vasuki-cloud";
           answerSources = normaliseSources(meta.sources);
 
           if (typeof meta.daily_remaining === "number") {
@@ -1039,6 +999,60 @@ export default function ChatApp() {
               dailyRemaining: meta.daily_remaining,
             });
           }
+        };
+
+        if (aiEngine === "local") {
+          const requiresLiveCloud =
+            webEnabled ||
+            mode === "web" ||
+            documentsEnabled;
+
+          if (requiresLiveCloud) {
+            setLocalProgress({
+              phase: "ready",
+              text:
+                "Live web/doc request ke liye Vasuki cloud engine use ho raha hai.",
+            });
+            await runCloudEngine();
+          } else {
+            const proContext = await fetchProContext(
+              accessToken,
+              memoryEnabled,
+            );
+
+            try {
+              const localMeta = await streamWebLLMChat(
+                requestMessages,
+                {
+                  systemContext: proContext.system_prompt,
+                  signal: controller.signal,
+                  onProgress: (progress) => {
+                    setLocalProgress(progress);
+                    if (progress.model) {
+                      setLocalModel(progress.model);
+                    }
+                  },
+                },
+                onStreamToken,
+              );
+
+              providerName = `webllm:${localMeta.model}`;
+              setLocalModel(localMeta.model);
+            } catch (localError) {
+              if (streamedAnswer.trim()) {
+                throw localError;
+              }
+
+              setLocalProgress({
+                phase: "error",
+                text:
+                  "Local model unavailable tha; Vasuki cloud fallback use hua.",
+              });
+              await runCloudEngine();
+            }
+          }
+        } else {
+          await runCloudEngine();
         }
 
         const answer = streamedAnswer.trim();
@@ -1338,7 +1352,7 @@ export default function ChatApp() {
               >
                 <Logo className="pv-header-logo" />
                 <span>
-                  {aiEngine === "puter"
+                  {aiEngine === "local"
                     ? "Vasuki Pro"
                     : "Vasuki AI"}
                 </span>
@@ -1359,27 +1373,36 @@ export default function ChatApp() {
                   >
                     <strong>Vasuki AI</strong>
                     <small>
-                      Normal · Web · Memory · Documents
+                      Cloud · Web · Memory · Documents
                     </small>
                   </button>
 
                   <button
                     type="button"
                     className={
-                      aiEngine === "puter" ? "is-active" : ""
+                      aiEngine === "local" ? "is-active" : ""
                     }
                     disabled={planBusy}
-                    onClick={() => void selectPuterEngine()}
+                    onClick={() => void selectLocalEngine()}
                   >
                     <strong>Vasuki Pro</strong>
                     <small>
-                      Smart answers · Complete coding · 100 images/day
+                      WebLLM local chat · ComfyUI images · cloud fallback
                     </small>
                   </button>
 
-                  {puterAccount && (
-                    <p className="pv-puter-account">
-                      Connected: {puterAccount}
+                  {aiEngine === "local" && (
+                    <p className="pv-local-status">
+                      {localProgress.text}
+                      {localProgress.phase === "loading" &&
+                      typeof localProgress.progress === "number"
+                        ? ` ${Math.round(
+                            localProgress.progress * 100,
+                          )}%`
+                        : ""}
+                      {localModel
+                        ? ` · ${localModel}`
+                        : ""}
                     </p>
                   )}
                 </div>
@@ -1400,13 +1423,13 @@ export default function ChatApp() {
             >
               {planLabel}
             </span>
-            {aiEngine === "puter" && puterImageQuota && (
+            {aiEngine === "local" && proImageQuota && (
               <span
                 className="pv-quota-indicator"
                 title="Vasuki Pro image quota resets daily"
               >
-                Images: {puterImageQuota.daily_remaining}/
-                {puterImageQuota.daily_limit}
+                Images: {proImageQuota.daily_remaining}/
+                {proImageQuota.daily_limit}
               </span>
             )}
             {quotaStatus && (

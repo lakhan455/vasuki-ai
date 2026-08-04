@@ -20,6 +20,8 @@ export type PuterImageQuota = {
   persistent: boolean;
 };
 
+export type ProImageQuota = PuterImageQuota;
+
 type RazorpayOrder = {
   key_id: string;
   order_id: string;
@@ -129,6 +131,55 @@ export async function releasePuterImageQuota(
   );
 
   return (await readJson(response)) as unknown as PuterImageQuota;
+}
+
+export async function fetchProContext(
+  accessToken: string,
+  useMemory: boolean,
+) {
+  const response = await fetch(`${API_URL}/api/pro/context`, {
+    method: "POST",
+    headers: headers(accessToken, true),
+    body: JSON.stringify({ use_memory: useMemory }),
+    cache: "no-store",
+  });
+
+  return (await readJson(response)) as {
+    allowed: boolean;
+    plan: string;
+    system_prompt: string;
+    engine: string;
+  };
+}
+
+export async function consumeProImageQuota(
+  accessToken: string,
+) {
+  const response = await fetch(
+    `${API_URL}/api/pro/image-quota`,
+    {
+      method: "POST",
+      headers: headers(accessToken),
+      cache: "no-store",
+    },
+  );
+
+  return (await readJson(response)) as unknown as ProImageQuota;
+}
+
+export async function releaseProImageQuota(
+  accessToken: string,
+) {
+  const response = await fetch(
+    `${API_URL}/api/pro/image-quota/release`,
+    {
+      method: "POST",
+      headers: headers(accessToken),
+      cache: "no-store",
+    },
+  );
+
+  return (await readJson(response)) as unknown as ProImageQuota;
 }
 
 async function createOrder(accessToken: string) {

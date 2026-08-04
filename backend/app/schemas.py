@@ -41,7 +41,13 @@ class ResearchRequest(BaseModel):
 
 class ImageRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=5000)
-    provider: Literal["auto", "deepai", "huggingface", "cloudflare"] = "auto"
+    provider: Literal[
+        "auto",
+        "comfyui",
+        "deepai",
+        "huggingface",
+        "cloudflare",
+    ] = "auto"
 
 
 class MemoryCreateRequest(BaseModel):

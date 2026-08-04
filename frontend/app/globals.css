@@ -2033,3 +2033,10 @@ button {
   }
 }
 
+.pv-local-status {
+  margin: 5px 10px 7px;
+  color: var(--pv-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
