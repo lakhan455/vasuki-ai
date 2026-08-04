@@ -14,6 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="hi" translate="no" suppressHydrationWarning>
+      <head>
+        <script src="https://js.puter.com/v2/" defer />
+      </head>
       <body>{children}</body>
     </html>
   );

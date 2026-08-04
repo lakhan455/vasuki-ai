@@ -10,7 +10,6 @@ import httpx
 from huggingface_hub import InferenceClient
 
 from app.config import Settings
-from app.services.comfyui_v1 import image_comfyui
 
 
 RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
@@ -244,7 +243,6 @@ async def image_deepai(prompt: str, settings: Settings) -> dict:
 
 async def route_image(provider: str, prompt: str, settings: Settings) -> dict:
     providers: dict[str, Callable[[str, Settings], Awaitable[dict]]] = {
-        "comfyui": image_comfyui,
         "cloudflare": image_cloudflare,
         "huggingface": image_huggingface,
         "deepai": image_deepai,
@@ -256,7 +254,7 @@ async def route_image(provider: str, prompt: str, settings: Settings) -> dict:
     order = (
         [provider]
         if provider != "auto"
-        else ["comfyui", "cloudflare", "huggingface", "deepai"]
+        else ["cloudflare", "huggingface", "deepai"]
     )
 
     errors: list[str] = []
