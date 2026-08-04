@@ -493,7 +493,7 @@ export default function ChatApp() {
 
   async function selectPuterEngine() {
     if (!accountPlan?.puter_access) {
-      setError("Vasuki Pro abhi locked hai.");
+      setError("Vasuki Pro is currently locked.");
       setModelMenuOpen(false);
       return;
     }
@@ -512,7 +512,7 @@ export default function ChatApp() {
       setError(
         puterError instanceof Error
           ? puterError.message
-          : "Vasuki Pro account connect nahi hua.",
+          : "The Vasuki Pro account could not be connected.",
       );
     } finally {
       setPlanBusy(false);
@@ -784,7 +784,26 @@ export default function ChatApp() {
   function selectAction(action: (typeof actionItems)[number]) {
     setMode(action.mode);
     setWebEnabled(action.mode === "web");
-    setInput((current) => current || action.prompt);
+    setInput((current) => {
+      const isPresetPrompt = actionItems.some(
+        (item) => item.prompt && current === item.prompt,
+      );
+      return !current || isPresetPrompt ? action.prompt : current;
+    });
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  function cancelAction(action: (typeof actionItems)[number]) {
+    setMode("chat");
+    setWebEnabled(false);
+
+    if (action.mode === "analyze") {
+      setAttachment(null);
+    }
+
+    setInput((current) =>
+      action.prompt && current === action.prompt ? "" : current,
+    );
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
@@ -799,8 +818,8 @@ export default function ChatApp() {
     const effectiveText =
       text ||
       (selectedAttachment?.kind === "pdf"
-        ? "Is document ko detail me analyze karo. Agar question paper hai to saare questions ke sahi answers order me do."
-        : "Is image ko detail me samjhao aur jo bhi important information hai woh batao.");
+        ? "Analyze this document in detail. If it is a question paper, answer every question in the correct order."
+        : "Analyze this image in detail and explain all important information.");
 
     const userMessage: UiMessage = {
       id: makeId(),
@@ -915,7 +934,7 @@ export default function ChatApp() {
                   : "Vasuki fallback unavailable.";
 
               throw new Error(
-                `${puterMessage} Vasuki fallback bhi fail hua: ` +
+                `${puterMessage} Vasuki fallback also failed: ` +
                   fallbackMessage,
               );
             }
@@ -1128,8 +1147,8 @@ export default function ChatApp() {
           <Logo className="pv-auth-logo" />
           <h1>Welcome to Vasuki AI</h1>
           <p>
-            Google se login karke apni chats save karein aur kisi bhi device
-            par wahi history wapas paayein.
+            Sign in with Google to save your chats and access the same
+            history on any device.
           </p>
 
           <button
@@ -1144,7 +1163,7 @@ export default function ChatApp() {
           {error && <div className="pv-auth-error">{error}</div>}
 
           <small>
-            Login ke baad har user sirf apni chats dekh sakta hai.
+            After signing in, each user can access only their own chats.
           </small>
         </section>
       </main>
@@ -1468,10 +1487,32 @@ export default function ChatApp() {
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    onClick={() => selectAction(action)}
+                    aria-label={
+                      mode === action.mode
+                        ? `Cancel ${action.label}`
+                        : action.label
+                    }
+                    title={
+                      mode === action.mode
+                        ? "Cancel and return to normal chat"
+                        : action.label
+                    }
+                    onClick={() =>
+                      mode === action.mode
+                        ? cancelAction(action)
+                        : selectAction(action)
+                    }
                   >
                     <Icon name={action.icon} />
                     <span>{action.label}</span>
+                    {mode === action.mode && (
+                      <span
+                        className="pv-action-cancel"
+                        aria-hidden="true"
+                      >
+                        ×
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>

@@ -82,8 +82,8 @@ async def puter_image_quota(
         raise HTTPException(
             status_code=429,
             detail=(
-                f"Aaj ki {quota.daily_limit} Vasuki Pro images "
-                "complete ho gayi hain. Kal dobara generate karein."
+                f"Today's limit of {quota.daily_limit} Vasuki Pro images "
+                "has been reached. Please generate again tomorrow."
             ),
         )
 
@@ -118,14 +118,21 @@ async def puter_context(
     current_date = datetime.now().astimezone().strftime("%Y-%m-%d")
     system_prompt = f"""You are Vasuki AI, a helpful and accurate assistant.
 Current date: {current_date}.
-Reply in the user's language unless they request another language.
+Reply in the same language and script as the user's latest message unless they
+explicitly request another language. Never mix Hindi and English into Hinglish
+unless the user explicitly asks for Hinglish. English questions must receive
+natural English answers. Hindi questions must receive natural Hindi answers in
+Devanagari. Other languages must receive answers in that same language.
 Answer every safe and legitimate question as completely as possible.
 For coding, provide complete runnable code, file structure, setup commands,
 error handling, and clear steps. Do not stop merely because the answer is long;
 continue in organized parts when needed.
 Never invent live facts. Say when verification is required.
-When asked who created you, reply exactly:
-मुझे लखन प्रजापत (Lakhan Prajapat) जी ने बनाया है।
+When asked who made, created, developed, or built you, answer only that you were
+created by Lakhan Prajapat, translated into the same language as the question.
+Keep the name exactly as "Lakhan Prajapat".
+English example: "I was created by Lakhan Prajapat."
+Hindi example: "मुझे लखन प्रजापत ने बनाया है।"
 {memory_context}
 """
     return {

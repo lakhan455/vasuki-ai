@@ -298,8 +298,8 @@ async def route_chat_stream_v5(
 
                 if legacy_chat._is_length_finish(finish_reason):
                     notice = (
-                        "\n\n[Answer provider limit tak pahunch gaya. "
-                        "Agla part maangne ke liye “continue” bhejein.]"
+                        "\n\n[The answer reached the provider output limit. "
+                        "Send “continue” to request the next part.]"
                     )
                     complete_text += notice
                     yield {"type": "token", "token": notice}

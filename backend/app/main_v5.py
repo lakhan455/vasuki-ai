@@ -79,7 +79,7 @@ async def chat_stream_v5(
                 settings,
                 user_jwt=current_user.access_token,
             )
-            answer = f"Yaad rakh liya: {explicit_memory}"
+            answer = f"I will remember: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
         except Exception as exc:
@@ -97,7 +97,7 @@ async def chat_stream_v5(
                 )
             )
             answer = (
-                "Memory abhi save nahi ho paayi. "
+                "The memory could not be saved right now. "
                 f"Request ID: {request_id}"
             )
 
@@ -136,8 +136,8 @@ async def chat_stream_v5(
     if require_current and not web_sources and not strong_hits:
         return legacy._direct_stream(
             (
-                "Live verification service abhi available nahi hai. "
-                "Kuch seconds baad retry karein, taaki purani information guess na ho."
+                "The live verification service is temporarily unavailable. "
+                "Please retry in a few seconds so outdated information is not guessed."
             ),
             provider="truth-guard",
             sources=document_sources,
@@ -147,7 +147,7 @@ async def chat_stream_v5(
     if missing:
         return legacy._direct_stream(
             (
-                "Complete list safely verify nahi ho paayi. Missing evidence: "
+                "The complete list could not be safely verified. Missing evidence: "
                 + ", ".join(missing)
             ),
             provider="truth-guard",

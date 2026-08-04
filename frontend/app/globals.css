@@ -498,6 +498,28 @@ button {
   color: #bed3ff;
 }
 
+.pv-action-cancel {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  margin-left: 1px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  transition:
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.pv-action-button--active:hover .pv-action-cancel {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
 .pv-conversation {
   min-height: 0;
   flex: 1;

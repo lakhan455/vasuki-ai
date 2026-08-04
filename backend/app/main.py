@@ -529,12 +529,12 @@ async def chat(
                 settings,
                 user_jwt=current_user.access_token,
             )
-            answer = f"Yaad rakh liya: {explicit_memory}"
+            answer = f"I will remember: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
         except Exception as exc:
             print("[memory] save failed:", type(exc).__name__, str(exc)[:500])
-            answer = "Memory save nahi ho paayi. Thodi der baad dobara try karein."
+            answer = "The memory could not be saved. Please try again shortly."
 
         return ChatResponse(
             answer=answer,
@@ -555,9 +555,9 @@ async def chat(
         )
         return ChatResponse(
             answer=(
-                "धन्यवाद। मैंने आपकी correction receive कर ली है। "
-                "इसे live sources से verify करके shared Vasuki knowledge में "
-                "save किया जाएगा। केवल verified जानकारी ही सभी users को दिखाई जाएगी।"
+                "Thank you. I received your correction. It will be "
+                "verified with live sources before being saved to shared "
+                "Vasuki knowledge. Only verified information is shown to users."
             ),
             provider="vasuki-learning",
             sources=[],
@@ -707,12 +707,12 @@ async def chat_stream(
                 settings,
                 user_jwt=current_user.access_token,
             )
-            answer = f"Yaad rakh liya: {explicit_memory}"
+            answer = f"I will remember: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
         except Exception as exc:
             print("[memory] save failed:", type(exc).__name__, str(exc)[:500])
-            answer = "Memory save nahi ho paayi. Thodi der baad dobara try karein."
+            answer = "The memory could not be saved. Please try again shortly."
         return _direct_stream(
             answer,
             provider="vasuki-personal-memory",
