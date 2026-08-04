@@ -337,8 +337,33 @@ button {
   transform: translateY(-18px);
 }
 
-.pv-welcome h1 {
+.pv-welcome-heading {
   margin: 0 0 28px;
+  text-align: center;
+}
+
+.pv-welcome-heading p {
+  margin: 0 0 7px;
+  background: linear-gradient(
+    90deg,
+    #8ab4f8,
+    #c58af9,
+    #f28b82,
+    #fdd663,
+    #81c995,
+    #8ab4f8
+  );
+  background-size: 240% 100%;
+  background-clip: text;
+  color: transparent;
+  font-size: clamp(19px, 2.2vw, 25px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  animation: pv-welcome-gradient 5s linear infinite;
+}
+
+.pv-welcome h1 {
+  margin: 0;
   color: #ffffff;
   font-size: clamp(28px, 3vw, 34px);
   font-weight: 600;
@@ -347,7 +372,93 @@ button {
   text-align: center;
 }
 
+@keyframes pv-welcome-gradient {
+  to {
+    background-position: 240% 0;
+  }
+}
+
+.pv-composer-frame {
+  position: relative;
+  width: 100%;
+  isolation: isolate;
+}
+
+.pv-composer-frame::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  inset: -2px;
+  border-radius: 28px;
+  background: linear-gradient(
+    100deg,
+    #4285f4,
+    #9b72cb,
+    #d96570,
+    #f9ab00,
+    #34a853,
+    #4285f4
+  );
+  background-size: 300% 100%;
+  opacity: 0;
+  filter: blur(0.5px);
+}
+
+.pv-composer-light {
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  right: 7%;
+  bottom: 35%;
+  left: 7%;
+  height: 180px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 18% 100%, rgba(66, 133, 244, 0.72), transparent 48%),
+    radial-gradient(ellipse at 42% 100%, rgba(155, 114, 203, 0.7), transparent 50%),
+    radial-gradient(ellipse at 65% 100%, rgba(217, 101, 112, 0.58), transparent 49%),
+    radial-gradient(ellipse at 84% 100%, rgba(52, 168, 83, 0.58), transparent 48%);
+  filter: blur(25px);
+  opacity: 0;
+  transform: translateY(72px) scaleX(0.56) scaleY(0.3);
+  transform-origin: 50% 100%;
+}
+
+.pv-composer-frame--welcome::before {
+  animation: pv-gemini-border 3.1s ease-out 120ms both;
+}
+
+.pv-composer-frame--welcome .pv-composer-light {
+  animation: pv-gemini-light 3.1s cubic-bezier(0.2, 0.75, 0.2, 1) 100ms both;
+}
+
+@keyframes pv-gemini-border {
+  0% { opacity: 0; background-position: 0 0; }
+  18% { opacity: 0.92; }
+  58% { opacity: 0.62; background-position: 100% 0; }
+  100% { opacity: 0; background-position: 200% 0; }
+}
+
+@keyframes pv-gemini-light {
+  0% {
+    opacity: 0;
+    transform: translateY(72px) scaleX(0.56) scaleY(0.3);
+  }
+  22% { opacity: 0.9; }
+  58% {
+    opacity: 0.58;
+    transform: translateY(-20px) scaleX(1) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-80px) scaleX(1.16) scaleY(1.18);
+  }
+}
+
 .pv-composer {
+  position: relative;
+  z-index: 1;
   width: 100%;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -2055,3 +2166,17 @@ button {
   }
 }
 
+
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-welcome-heading p,
+  .pv-composer-frame--welcome::before,
+  .pv-composer-frame--welcome .pv-composer-light {
+    animation: none !important;
+  }
+
+  .pv-composer-frame--welcome::before,
+  .pv-composer-frame--welcome .pv-composer-light {
+    opacity: 0;
+  }
+}

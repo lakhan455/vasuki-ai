@@ -403,13 +403,38 @@ export default function ChatApp() {
   const chatLoadTokenRef = useRef("");
 
   useEffect(() => {
-    void warmBackend();
-
-    const intervalId = window.setInterval(() => {
+    const wakeBackend = () => {
       void warmBackend();
-    }, 10 * 60 * 1000);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        wakeBackend();
+      }
+    };
 
-    return () => window.clearInterval(intervalId);
+    wakeBackend();
+
+    const intervalId = window.setInterval(
+      wakeBackend,
+      4 * 60 * 1000,
+    );
+
+    window.addEventListener("focus", wakeBackend);
+    window.addEventListener("online", wakeBackend);
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibility,
+    );
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", wakeBackend);
+      window.removeEventListener("online", wakeBackend);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibility,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -450,7 +475,7 @@ export default function ChatApp() {
 
   useEffect(() => {
     if (!user) return;
-    void loadChatHistory(true);
+    void loadChatHistory(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -1180,6 +1205,8 @@ export default function ChatApp() {
     typeof user.user_metadata?.avatar_url === "string"
       ? user.user_metadata.avatar_url
       : "";
+  const welcomeName =
+    profileName.trim().split(/\s+/)[0] || "there";
 
   const planLabel =
     accountPlan?.plan === "owner"
@@ -1457,7 +1484,10 @@ export default function ChatApp() {
           <section className="pv-welcome">
             <div className="pv-welcome-inner">
               <Logo className="pv-welcome-logo" />
-              <h1>Where should we begin?</h1>
+              <div className="pv-welcome-heading">
+                <p>Hi {welcomeName}, welcome</p>
+                <h1>How can I help you today?</h1>
+              </div>
 
               <Composer
                 input={input}
@@ -1710,12 +1740,26 @@ function Composer({
   }
 
   return (
-    <form
-      className={`pv-composer ${
-        welcome ? "pv-composer--welcome" : ""
-      }`}
-      onSubmit={(event) => void onSubmit(event)}
+    <div
+      className={[
+        "pv-composer-frame",
+        welcome ? "pv-composer-frame--welcome" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
+      {welcome && (
+        <span
+          className="pv-composer-light"
+          aria-hidden="true"
+        />
+      )}
+      <form
+        className={`pv-composer ${
+          welcome ? "pv-composer--welcome" : ""
+        }`}
+        onSubmit={(event) => void onSubmit(event)}
+      >
       <input
         ref={fileInputRef}
         className="pv-file-input"
@@ -1756,10 +1800,12 @@ function Composer({
         rows={2}
         value={input}
         onChange={(event) => setInput(event.target.value)}
+        onFocus={() => void warmBackend()}
+        onPointerDown={() => void warmBackend()}
         onKeyDown={onKeyDown}
         placeholder={
           attachment
-            ? "Image/file ke baare me poochho ya edit instruction likho"
+            ? "Ask about this image/file or describe an edit"
             : mode === "image"
               ? "Describe the image you want to create"
               : "Ask Vasuki AI"
@@ -1802,7 +1848,8 @@ function Composer({
           {busy ? <Icon name="stop" /> : <Icon name="arrowUp" />}
         </button>
       </div>
-    </form>
+      </form>
+    </div>
   );
 }
 

@@ -66,14 +66,14 @@ class Settings(BaseSettings):
 
     request_timeout_seconds: int = 12
     chat_timeout_seconds: int = 25
-    fast_provider_timeout_seconds: int = 9
-    first_token_timeout_seconds: int = 6
+    fast_provider_timeout_seconds: int = 7
+    first_token_timeout_seconds: int = 4
     large_provider_timeout_seconds: int = 45
     rate_limit_per_minute: int = 15
     daily_message_limit: int = 250
     error_alert_webhook_url: str | None = None
     error_alert_min_interval_seconds: int = 300
-    provider_timeout_seconds: int = 18
+    provider_timeout_seconds: int = 14
     provider_cooldown_seconds: int = 120
     web_search_timeout_seconds: int = 14
     total_chat_timeout_seconds: int = 55

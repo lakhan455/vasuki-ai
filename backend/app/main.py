@@ -138,7 +138,7 @@ async def _private_context(
                     settings,
                     user_jwt=access_token,
                 ),
-                timeout=4.0,
+                timeout=1.8,
             )
         except Exception:
             personal_pack = ""
@@ -168,7 +168,7 @@ async def _shared_knowledge(
     try:
         memory_hits = await asyncio.wait_for(
             find_verified_knowledge(query, settings),
-            timeout=1.2,
+            timeout=0.8,
         )
     except Exception:
         memory_hits = []

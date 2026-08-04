@@ -15,6 +15,15 @@ export default function RootLayout({
   return (
     <html lang="en" translate="no" suppressHydrationWarning>
       <head>
+        <link
+          rel="preconnect"
+          href="https://vasuki-ai.onrender.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="dns-prefetch"
+          href="https://vasuki-ai.onrender.com"
+        />
         <script src="https://js.puter.com/v2/" defer />
       </head>
       <body>{children}</body>
