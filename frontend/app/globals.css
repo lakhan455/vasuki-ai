@@ -2192,3 +2192,85 @@ button {
   animation: none !important;
 }
 /* VASUKI_WELCOME_STATIC_END */
+
+/* VASUKI_VOICE_MIC_START */
+.pv-composer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.pv-mic-button {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #d3d3d3;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.pv-mic-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+}
+
+.pv-mic-button--active {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  animation: pv-mic-pulse 1.35s ease-out infinite;
+}
+
+.pv-mic-button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.pv-mic-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.pv-speech-status {
+  min-height: 20px;
+  padding: 0 18px 2px;
+  color: #bfd1ff;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.pv-speech-status--error {
+  color: #fca5a5;
+}
+
+@keyframes pv-mic-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.38);
+  }
+
+  70% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-mic-button--active {
+    animation: none;
+  }
+}
+/* VASUKI_VOICE_MIC_END */

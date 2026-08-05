@@ -108,6 +108,47 @@ type PendingAttachment = {
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
 type AiEngine = "vasuki" | "puter";
 
+/* VASUKI_VOICE_TYPES_START */
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  0?: {
+    transcript?: string;
+  };
+};
+
+type SpeechRecognitionEventLike = Event & {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+};
+
+type SpeechRecognitionErrorEventLike = Event & {
+  error?: string;
+};
+
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type BrowserSpeechRecognitionConstructor =
+  new () => BrowserSpeechRecognition;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  }
+}
+/* VASUKI_VOICE_TYPES_END */
+
 type ChatResponse = {
   answer?: string;
   sources?: SourceInfo[];
@@ -1731,6 +1772,166 @@ function Composer({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+
+  /* VASUKI_VOICE_LOGIC_START */
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const speechBaseInputRef = useRef("");
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState("");
+
+  useEffect(() => {
+    return () => {
+      const recognition = recognitionRef.current;
+      recognitionRef.current = null;
+      if (recognition) {
+        try {
+          recognition.abort();
+        } catch {
+          // Recognition may already be stopped.
+        }
+      }
+    };
+  }, []);
+
+  function voiceErrorMessage(error?: string) {
+    switch (error) {
+      case "not-allowed":
+      case "service-not-allowed":
+        return "Microphone permission was denied. Allow microphone access and try again.";
+      case "audio-capture":
+        return "No working microphone was found on this device.";
+      case "no-speech":
+        return "No speech was detected. Tap the microphone and speak again.";
+      case "network":
+        return "Voice recognition could not connect. Check your internet connection.";
+      default:
+        return "Voice input could not start. Please try again.";
+    }
+  }
+
+  function endVoiceInput(abort = false) {
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    setIsListening(false);
+
+    if (!recognition) return;
+
+    try {
+      if (abort) {
+        recognition.abort();
+      } else {
+        recognition.stop();
+      }
+    } catch {
+      // Recognition may already be stopped.
+    }
+  }
+
+  function toggleVoiceInput() {
+    if (busy) return;
+
+    if (isListening) {
+      endVoiceInput(false);
+      return;
+    }
+
+    const SpeechRecognitionApi =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionApi) {
+      setSpeechError(
+        "Voice typing is not supported in this browser. Open Vasuki AI in Chrome or Edge.",
+      );
+      return;
+    }
+
+    const recognition = new SpeechRecognitionApi();
+    const browserLanguage =
+      navigator.language || document.documentElement.lang || "en-IN";
+
+    speechBaseInputRef.current = input.trim();
+    let finalTranscript = "";
+
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = /[\u0900-\u097F]/.test(input)
+      ? "hi-IN"
+      : browserLanguage;
+
+    recognition.onstart = () => {
+      setSpeechError("");
+      setIsListening(true);
+      void warmBackend();
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = "";
+
+      for (
+        let index = event.resultIndex;
+        index < event.results.length;
+        index += 1
+      ) {
+        const result = event.results[index];
+        const transcript = result?.[0]?.transcript?.trim() || "";
+        if (!transcript) continue;
+
+        if (result.isFinal) {
+          finalTranscript = `${finalTranscript} ${transcript}`.trim();
+        } else {
+          interimTranscript =
+            `${interimTranscript} ${transcript}`.trim();
+        }
+      }
+
+      const spokenText =
+        `${finalTranscript} ${interimTranscript}`.trim();
+      const originalText = speechBaseInputRef.current;
+
+      setInput(
+        originalText && spokenText
+          ? `${originalText} ${spokenText}`
+          : originalText || spokenText,
+      );
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== "aborted") {
+        setSpeechError(voiceErrorMessage(event.error));
+      }
+      setIsListening(false);
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null;
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null;
+      }
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
+
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setIsListening(false);
+      setSpeechError("Voice input could not start. Please try again.");
+    }
+  }
+
+  async function handleComposerSubmit(
+    event?: FormEvent<HTMLFormElement>,
+  ) {
+    endVoiceInput(true);
+    await onSubmit(event);
+  }
+  /* VASUKI_VOICE_LOGIC_END */
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1758,7 +1959,7 @@ function Composer({
         className={`pv-composer ${
           welcome ? "pv-composer--welcome" : ""
         }`}
-        onSubmit={(event) => void onSubmit(event)}
+        onSubmit={(event) => void handleComposerSubmit(event)}
       >
       <input
         ref={fileInputRef}
@@ -1812,6 +2013,22 @@ function Composer({
         }
       />
 
+
+      {(isListening || speechError) && (
+        <div
+          className={[
+            "pv-speech-status",
+            speechError ? "pv-speech-status--error" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          role="status"
+          aria-live="polite"
+        >
+          {speechError || "Listening… Speak now"}
+        </div>
+      )}
+
       <div className="pv-composer-toolbar">
         <div className="pv-composer-tools">
           <button
@@ -1838,15 +2055,39 @@ function Composer({
           ) : null}
         </div>
 
-        <button
-          type={busy ? "button" : "submit"}
-          className="pv-send-button"
-          disabled={!busy && !input.trim() && !attachment}
-          aria-label={busy ? "Stop generation" : "Send message"}
-          onClick={busy ? onStop : undefined}
-        >
-          {busy ? <Icon name="stop" /> : <Icon name="arrowUp" />}
-        </button>
+
+        <div className="pv-composer-actions">
+          <button
+            type="button"
+            className={[
+              "pv-mic-button",
+              isListening ? "pv-mic-button--active" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            disabled={busy}
+            aria-label={
+              isListening ? "Stop voice input" : "Start voice input"
+            }
+            aria-pressed={isListening}
+            title={
+              isListening ? "Stop listening" : "Use microphone"
+            }
+            onClick={toggleVoiceInput}
+          >
+            <Icon name="microphone" />
+          </button>
+
+          <button
+            type={busy ? "button" : "submit"}
+            className="pv-send-button"
+            disabled={!busy && !input.trim() && !attachment}
+            aria-label={busy ? "Stop generation" : "Send message"}
+            onClick={busy ? onStop : undefined}
+          >
+            {busy ? <Icon name="stop" /> : <Icon name="arrowUp" />}
+          </button>
+        </div>
       </div>
       </form>
     </div>
@@ -1992,6 +2233,7 @@ function Icon({
     | "analyze"
     | "arrowUp"
     | "stop"
+    | "microphone"
     | "copy"
     | "thumbUp"
     | "thumbDown"
@@ -2053,6 +2295,12 @@ function Icon({
         fill="currentColor"
         stroke="none"
       />
+    ),
+    microphone: (
+      <>
+        <rect x="9" y="3" width="6" height="12" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" />
+      </>
     ),
     copy: (
       <>
