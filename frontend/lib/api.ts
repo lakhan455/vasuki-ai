@@ -510,6 +510,76 @@ export async function analyzeAttachment(
   );
 }
 
+/* VASUKI_SMART_FILES_API_START */
+export type SmartFileArtifact = {
+  name: string;
+  mime_type: string;
+  size_bytes: number;
+  data_url: string;
+};
+
+export type SmartFileResponse = {
+  answer: string;
+  provider?: string;
+  files: SmartFileArtifact[];
+  processed_files: string[];
+  warnings: string[];
+};
+
+export async function analyzeSmartFiles(
+  files: File[],
+  prompt: string,
+  accessToken: string,
+): Promise<SmartFileResponse> {
+  const bases = Array.from(new Set([DIRECT_API_URL, PROXY_API_URL]));
+  const errors: string[] = [];
+
+  for (const baseUrl of bases) {
+    try {
+      const data = await postFormAt(
+        baseUrl,
+        "/api/smart-files",
+        () => {
+          const form = new FormData();
+          form.append("prompt", prompt);
+          for (const file of files) {
+            form.append("files", file, file.name);
+          }
+          return form;
+        },
+        240000,
+        1,
+        accessToken,
+      );
+
+      return {
+        answer: typeof data.answer === "string" ? data.answer : "",
+        provider: typeof data.provider === "string" ? data.provider : undefined,
+        files: Array.isArray(data.files)
+          ? (data.files as SmartFileArtifact[])
+          : [],
+        processed_files: Array.isArray(data.processed_files)
+          ? data.processed_files.map(String)
+          : [],
+        warnings: Array.isArray(data.warnings)
+          ? data.warnings.map(String)
+          : [],
+      };
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : "Unknown smart-file service error",
+      );
+    }
+  }
+
+  throw new Error(
+    errors.at(-1) || "Smart file processing failed after automatic fallback.",
+  );
+}
+/* VASUKI_SMART_FILES_API_END */
+
 export async function generateImage(
   prompt: string,
   accessToken: string,

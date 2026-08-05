@@ -141,3 +141,9 @@ Hindi example: "मुझे लखन प्रजापत ने बनाय
         "system_prompt": system_prompt.strip(),
         "note": "Puter usage runs on the signed-in user's Puter account and allowance.",
     }
+
+# VASUKI_SMART_FILES_ROUTE_START
+from app.routes.smart_files import router as smart_files_router
+
+app.include_router(smart_files_router)
+# VASUKI_SMART_FILES_ROUTE_END

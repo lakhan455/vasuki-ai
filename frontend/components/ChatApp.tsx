@@ -14,6 +14,7 @@ import type { User } from "@supabase/supabase-js";
 import ReactMarkdown from "react-markdown";
 
 import MemoryKnowledgePanel from "@/components/MemoryKnowledgePanel";
+import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   generateImage,
@@ -426,6 +427,7 @@ export default function ChatApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [knowledgePanelOpen, setKnowledgePanelOpen] = useState(false);
+  const [smartFilesOpen, setSmartFilesOpen] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [documentsEnabled, setDocumentsEnabled] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
@@ -1323,6 +1325,19 @@ export default function ChatApp() {
             <span className="pv-nav-symbol" aria-hidden="true">🧠</span>
             <span>Memory & documents</span>
           </button>
+
+          <button
+            type="button"
+            className="pv-nav-button"
+            onClick={() => {
+              setSmartFilesOpen(true);
+              setMobileSidebarOpen(false);
+            }}
+            aria-label="Open smart files"
+          >
+            <span className="pv-nav-symbol" aria-hidden="true">📚</span>
+            <span>Smart files</span>
+          </button>
         </nav>
 
         <div className="pv-recent">
@@ -1586,6 +1601,16 @@ export default function ChatApp() {
                     )}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className="pv-action-button"
+                  aria-label="Open Smart files"
+                  title="Analyze multiple files and create downloads"
+                  onClick={() => setSmartFilesOpen(true)}
+                >
+                  <span aria-hidden="true">📚</span>
+                  <span>Smart files</span>
+                </button>
               </div>
 
               {error && <div className="pv-error pv-error--welcome">{error}</div>}
@@ -1710,6 +1735,11 @@ export default function ChatApp() {
           </>
         )}
       </section>
+
+      <SmartFileWorkspace
+        open={smartFilesOpen}
+        onClose={() => setSmartFilesOpen(false)}
+      />
 
       <MemoryKnowledgePanel
         open={knowledgePanelOpen}

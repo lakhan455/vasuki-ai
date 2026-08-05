@@ -2274,3 +2274,215 @@ button {
   }
 }
 /* VASUKI_VOICE_MIC_END */
+
+/* VASUKI_SMART_FILES_STYLES_START */
+.pv-smart-backdrop {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(9px);
+}
+
+.pv-smart-panel {
+  width: min(980px, 100%);
+  max-height: min(92vh, 920px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  background: #1f1f1f;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55);
+}
+
+.pv-smart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(135deg, rgba(79, 134, 247, 0.12), rgba(155, 114, 203, 0.08), transparent 65%);
+}
+
+.pv-smart-eyebrow {
+  color: #8ab4ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.pv-smart-header h2 {
+  margin: 5px 0 5px;
+  color: #fff;
+  font-size: 25px;
+}
+
+.pv-smart-header p {
+  margin: 0;
+  color: #a9a9a9;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pv-smart-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.pv-smart-close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+
+.pv-smart-body {
+  max-height: calc(min(92vh, 920px) - 112px);
+  overflow-y: auto;
+  padding: 22px 24px 26px;
+}
+
+.pv-smart-upload-zone {
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  border: 1px dashed rgba(138, 180, 255, 0.42);
+  border-radius: 18px;
+  background: rgba(79, 134, 247, 0.055);
+  text-align: center;
+}
+
+.pv-smart-upload-zone > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 15px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #f2f2f2;
+  font-size: 13px;
+}
+
+.pv-smart-upload-zone > button:hover { background: rgba(255, 255, 255, 0.14); }
+.pv-smart-upload-zone small { margin-top: 8px; color: #858585; font-size: 11px; }
+
+.pv-smart-file-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pv-smart-file-chip {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.pv-smart-file-type {
+  display: grid;
+  width: 42px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(79, 134, 247, 0.15);
+  color: #a9c7ff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.pv-smart-file-copy { min-width: 0; flex: 1; }
+.pv-smart-file-copy strong { display: block; overflow: hidden; color: #e9e9e9; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.pv-smart-file-copy small { color: #858585; font-size: 10px; }
+.pv-smart-file-chip > button { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; background: transparent; color: #999; font-size: 18px; }
+.pv-smart-file-chip > button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.pv-smart-total { grid-column: 1 / -1; color: #777; font-size: 10px; text-align: right; }
+
+.pv-smart-prompt { display: block; margin-top: 18px; }
+.pv-smart-prompt > span { display: block; margin-bottom: 8px; color: #d7d7d7; font-size: 12px; font-weight: 600; }
+.pv-smart-prompt textarea {
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  outline: 0;
+  border-radius: 15px;
+  background: #292929;
+  color: #fff;
+  padding: 13px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pv-smart-prompt textarea:focus { border-color: rgba(138, 180, 255, 0.55); box-shadow: 0 0 0 3px rgba(79, 134, 247, 0.08); }
+.pv-smart-prompt textarea::placeholder { color: #777; }
+
+.pv-smart-suggestions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.pv-smart-suggestions button { padding: 7px 10px; border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 999px; background: transparent; color: #a9a9a9; font-size: 10px; }
+.pv-smart-suggestions button:hover { background: rgba(255, 255, 255, 0.06); color: #e5e5e5; }
+
+.pv-smart-submit-row { display: flex; justify-content: flex-end; gap: 9px; margin-top: 16px; }
+.pv-smart-clear, .pv-smart-submit { min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pv-smart-clear { background: transparent; color: #aaa; }
+.pv-smart-clear:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.pv-smart-submit { background: #4f86f7; color: #fff; }
+.pv-smart-submit:hover:not(:disabled) { background: #6597f8; transform: translateY(-1px); }
+.pv-smart-submit:disabled { cursor: default; opacity: 0.5; }
+
+.pv-smart-error { margin-top: 14px; padding: 11px 13px; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 11px; background: rgba(239, 68, 68, 0.09); color: #fecaca; font-size: 12px; line-height: 1.45; }
+
+.pv-smart-result { margin-top: 20px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; background: #252525; }
+.pv-smart-result-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.pv-smart-result-title span { color: #81c995; font-size: 9px; font-weight: 700; letter-spacing: 0.15em; }
+.pv-smart-result-title h3 { margin: 4px 0 0; color: #fff; font-size: 17px; }
+.pv-smart-result-title small { color: #858585; font-size: 10px; }
+.pv-smart-markdown { color: #e4e4e4; font-size: 13px; line-height: 1.65; }
+.pv-smart-markdown > :first-child { margin-top: 0; }
+.pv-smart-markdown > :last-child { margin-bottom: 0; }
+.pv-smart-markdown h1, .pv-smart-markdown h2, .pv-smart-markdown h3 { color: #fff; }
+.pv-smart-markdown pre { overflow-x: auto; padding: 12px; border-radius: 10px; background: #111; }
+
+.pv-smart-downloads { display: grid; gap: 8px; margin-top: 16px; }
+.pv-smart-download {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  border: 1px solid rgba(129, 201, 149, 0.22);
+  border-radius: 13px;
+  background: rgba(129, 201, 149, 0.055);
+  color: inherit;
+  text-decoration: none;
+}
+.pv-smart-download:hover { border-color: rgba(129, 201, 149, 0.42); background: rgba(129, 201, 149, 0.09); }
+.pv-smart-download-icon { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 10px; background: rgba(129, 201, 149, 0.12); color: #9bd7ab; font-size: 19px; }
+.pv-smart-download-copy { min-width: 0; flex: 1; }
+.pv-smart-download-copy strong { display: block; overflow: hidden; color: #efefef; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.pv-smart-download-copy small { color: #888; font-size: 10px; }
+.pv-smart-download-action { color: #9bd7ab; font-size: 11px; font-weight: 600; }
+.pv-smart-warnings { margin-top: 12px; color: #d6b37a; font-size: 11px; }
+.pv-smart-warnings p { margin: 6px 0; }
+.pv-smart-privacy { margin: 17px 0 0; color: #6f6f6f; font-size: 10px; line-height: 1.45; text-align: center; }
+
+@media (max-width: 680px) {
+  .pv-smart-backdrop { padding: 0; place-items: stretch; }
+  .pv-smart-panel { max-height: 100dvh; border: 0; border-radius: 0; }
+  .pv-smart-header { padding: 17px 16px 14px; }
+  .pv-smart-header h2 { font-size: 21px; }
+  .pv-smart-body { max-height: calc(100dvh - 102px); padding: 16px; }
+  .pv-smart-file-list { grid-template-columns: 1fr; }
+  .pv-smart-download-action { display: none; }
+  .pv-smart-suggestions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .pv-smart-suggestions button { flex: 0 0 auto; }
+}
+/* VASUKI_SMART_FILES_STYLES_END */
