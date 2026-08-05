@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color-scheme: dark;
   --pv-main: #212121;
   --pv-sidebar: #171717;
@@ -29,7 +29,7 @@ button,
 textarea,
 input {
   font-family:
-    "Söhne",
+    "SÃ¶hne",
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -2180,3 +2180,16 @@ button {
     opacity: 0;
   }
 }
+
+/* VASUKI_WELCOME_STATIC_START */
+/* Keep the personalized greeting clean and static.
+   Gemini-style animation remains only around the prompt composer. */
+.pv-welcome-heading p {
+  background: none !important;
+  background-clip: initial !important;
+  -webkit-background-clip: initial !important;
+  color: #b4b4b4 !important;
+  animation: none !important;
+}
+/* VASUKI_WELCOME_STATIC_END */
+
