@@ -17,10 +17,12 @@ import MemoryKnowledgePanel from "@/components/MemoryKnowledgePanel";
 import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
+  analyzeSmartFiles,
   generateImage,
   streamChat,
   warmBackend,
   type ChatMessage,
+  type SmartFileArtifact,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
@@ -47,6 +49,21 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/webp",
   "image/gif",
   "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "text/markdown",
+]);
+
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".pdf",
+  ".docx",
+  ".txt",
+  ".md",
 ]);
 
 type SourceInfo = {
@@ -65,6 +82,7 @@ type UiMessage = ChatMessage & {
   fileName?: string;
   provider?: string;
   sources?: SourceInfo[];
+  artifacts?: SmartFileArtifact[];
 };
 
 type StoredMessage = {
@@ -103,7 +121,7 @@ type ChatMessageRow = {
 type PendingAttachment = {
   file: File;
   previewUrl?: string;
-  kind: "image" | "pdf";
+  kind: "image" | "document";
 };
 
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
@@ -218,6 +236,35 @@ function fileToDataUrl(file: File) {
     reader.readAsDataURL(file);
   });
 }
+
+/* VASUKI_INLINE_ARTIFACT_FIX_START */
+function attachmentExtension(name: string) {
+  const dot = name.lastIndexOf(".");
+  return dot >= 0 ? name.slice(dot).toLowerCase() : "";
+}
+
+function wantsDownloadableArtifact(value: string) {
+  const normalized = value.toLocaleLowerCase();
+
+  const hasFormat =
+    /\b(?:pdf|docx|word\s+(?:file|document)|txt|text\s+file|qr(?:\s+code)?|one[-\s]?sheet|single[-\s]?page|downloadable\s+file)\b/i.test(
+      normalized,
+    ) ||
+    /पीडीएफ|क्यूआर|एक\s*शीट/.test(normalized);
+
+  const hasAction =
+    /\b(?:create|make|generate|prepare|export|download|provide|give|convert|save|print|build|banao|bana\s*do|banado|bana|de\s*do|dedo|chahiye|create\s+karo|bana\s+kar\s+do|pdf\s+m(?:e|ein))\b/i.test(
+      normalized,
+    ) ||
+    /बना|बनाओ|दे\s*दो|डाउनलोड|तैयार/.test(normalized);
+
+  return (
+    (hasFormat && hasAction) ||
+    /\bqr(?:\s+code)?\b[\s\S]{0,120}https?:\/\//i.test(normalized) ||
+    /https?:\/\/\S+[\s\S]{0,120}\bqr(?:\s+code)?\b/i.test(normalized)
+  );
+}
+/* VASUKI_INLINE_ARTIFACT_FIX_END */
 
 function normaliseSources(value: unknown): SourceInfo[] {
   if (!Array.isArray(value)) return [];
@@ -826,8 +873,14 @@ export default function ChatApp() {
   async function chooseAttachment(file: File) {
     setError("");
 
-    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
-      setError("Only JPG, PNG, WEBP, GIF images and PDF files are supported.");
+    const extension = attachmentExtension(file.name);
+    if (
+      !ALLOWED_ATTACHMENT_TYPES.has(file.type) &&
+      !ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)
+    ) {
+      setError(
+        "Only JPG, PNG, WEBP, GIF, PDF, DOCX, TXT and MD files are supported.",
+      );
       return;
     }
 
@@ -842,7 +895,7 @@ export default function ChatApp() {
     setAttachment({
       file,
       previewUrl,
-      kind: isImage ? "image" : "pdf",
+      kind: isImage ? "image" : "document",
     });
     setMode("analyze");
     setWebEnabled(false);
@@ -885,7 +938,7 @@ export default function ChatApp() {
 
     const effectiveText =
       text ||
-      (selectedAttachment?.kind === "pdf"
+      (selectedAttachment?.kind === "document"
         ? "Analyze this document in detail. If it is a question paper, answer every question in the correct order."
         : "Analyze this image in detail and explain all important information.");
 
@@ -917,7 +970,44 @@ export default function ChatApp() {
 
       let finalMessages: UiMessage[];
 
-      if (selectedAttachment) {
+      const requestedDownload = wantsDownloadableArtifact(effectiveText);
+      const shouldUseSmartFiles =
+        requestedDownload ||
+        selectedAttachment?.kind === "document";
+
+      if (shouldUseSmartFiles) {
+        const data = await analyzeSmartFiles(
+          selectedAttachment ? [selectedAttachment.file] : [],
+          effectiveText,
+          accessToken,
+        );
+
+        if (requestedDownload && data.files.length === 0) {
+          throw new Error(
+            "A downloadable file was requested, but the file generator returned no file. Please retry once.",
+          );
+        }
+
+        const previewArtifact = data.files.find((artifact) =>
+          artifact.mime_type.toLowerCase().startsWith("image/"),
+        );
+
+        finalMessages = [
+          ...nextMessages,
+          {
+            id: makeId(),
+            role: "assistant",
+            content:
+              data.answer.trim() ||
+              (data.files.length > 0
+                ? "Your requested files are ready below."
+                : "The document was analyzed."),
+            imageUrl: previewArtifact?.data_url,
+            provider: data.provider,
+            artifacts: data.files,
+          },
+        ];
+      } else if (selectedAttachment) {
         const data = (await analyzeAttachment(
           selectedAttachment.file,
           effectiveText,
@@ -1646,6 +1736,10 @@ export default function ChatApp() {
                             />
                           )}
 
+                          <InlineArtifactDownloads
+                            artifacts={message.artifacts}
+                          />
+
                           <div className="pv-message-actions">
                             <button
                               type="button"
@@ -1995,7 +2089,7 @@ function Composer({
         ref={fileInputRef}
         className="pv-file-input"
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+        accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
         onChange={handleFileChange}
       />
 
@@ -2011,7 +2105,7 @@ function Composer({
           <span className="pv-attachment-copy">
             <strong>{attachment.file.name}</strong>
             <small>
-              {attachment.kind === "image" ? "Image" : "PDF"} ·{" "}
+              {attachment.kind === "image" ? "Image" : "Document"} ·{" "}
               {fileSizeLabel(attachment.file.size)}
             </small>
           </span>
@@ -2063,15 +2157,15 @@ function Composer({
         <div className="pv-composer-tools">
           <button
             type="button"
-            aria-label="Attach image or PDF"
-            title="Upload image or PDF"
+            aria-label="Attach image or document"
+            title="Upload image or document"
             onClick={() => fileInputRef.current?.click()}
           >
             <Icon name="plus" />
           </button>
 
           {attachment ? (
-            <span className="pv-active-tool">Image/file attached</span>
+            <span className="pv-active-tool">File attached</span>
           ) : mode !== "chat" ? (
             <span className="pv-active-tool">
               {mode === "image"
@@ -2120,6 +2214,53 @@ function Composer({
         </div>
       </div>
       </form>
+    </div>
+  );
+}
+
+function InlineArtifactDownloads({
+  artifacts,
+}: {
+  artifacts?: SmartFileArtifact[];
+}) {
+  if (!artifacts || artifacts.length === 0) return null;
+
+  return (
+    <div
+      className="pv-smart-downloads pv-inline-artifact-downloads"
+      aria-label="Download generated files"
+    >
+      {artifacts.map((artifact) => {
+        const lowerName = artifact.name.toLowerCase();
+        const label = lowerName.endsWith(".pdf")
+          ? "PDF"
+          : lowerName.endsWith(".docx")
+            ? "DOCX"
+            : lowerName.endsWith(".png")
+              ? "PNG"
+              : "TXT";
+
+        return (
+          <a
+            className="pv-smart-download"
+            href={artifact.data_url}
+            download={artifact.name}
+            key={`${artifact.name}-${artifact.size_bytes}`}
+            aria-label={`Download ${artifact.name}`}
+          >
+            <span className="pv-smart-download-icon" aria-hidden="true">
+              ↓
+            </span>
+            <span className="pv-smart-download-copy">
+              <strong>{artifact.name}</strong>
+              <small>
+                {label} · {fileSizeLabel(artifact.size_bytes)}
+              </small>
+            </span>
+            <span className="pv-smart-download-action">Download</span>
+          </a>
+        );
+      })}
     </div>
   );
 }

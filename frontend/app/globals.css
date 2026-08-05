@@ -2486,3 +2486,15 @@ button {
   .pv-smart-suggestions button { flex: 0 0 auto; }
 }
 /* VASUKI_SMART_FILES_STYLES_END */
+
+/* VASUKI_INLINE_ARTIFACT_STYLES_START */
+.pv-inline-artifact-downloads {
+  width: min(100%, 620px);
+  margin-top: 14px;
+}
+
+.pv-inline-artifact-downloads + .pv-message-actions {
+  margin-top: 8px;
+}
+/* VASUKI_INLINE_ARTIFACT_STYLES_END */
+
