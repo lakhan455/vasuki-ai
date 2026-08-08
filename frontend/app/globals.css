@@ -2499,62 +2499,122 @@ button {
 /* VASUKI_INLINE_ARTIFACT_STYLES_END */
 
 /* VASUKI_ATTACHMENT_MENU_START */
+/* ChatGPT-style floating attachment menu.
+   Keep the + trigger clean, round and borderless. */
+
+.pv-composer {
+  overflow: visible;
+}
+
 .pv-attachment-menu-wrap {
   position: relative;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
 }
 
-.pv-attachment-menu-wrap > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.pv-composer-tools .pv-attachment-menu-wrap > button {
+  display: grid;
+  width: 37px;
+  height: 37px;
+  min-width: 37px;
+  min-height: 37px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: #d3d3d3;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.pv-composer-tools .pv-attachment-menu-wrap > button:hover,
+.pv-composer-tools .pv-attachment-menu-wrap > button:focus-visible {
+  border: 0;
+  outline: none;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.pv-composer-tools .pv-attachment-menu-wrap > button svg {
+  width: 20px;
+  height: 20px;
 }
 
 .pv-attachment-menu {
   position: absolute;
-  left: 0;
-  bottom: calc(100% + 10px);
-  z-index: 80;
-  min-width: 178px;
-  padding: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  left: -4px;
+  bottom: calc(100% + 11px);
+  z-index: 200;
+  display: flex;
+  width: 196px;
+  min-width: 196px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
   background: #2f2f2f;
-  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
-.pv-attachment-menu button {
-  width: 100%;
-  min-height: 42px;
+.pv-composer .pv-attachment-menu button {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  height: auto;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 11px;
+  margin: 0;
   padding: 9px 11px;
   border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: #f4f4f4;
-  text-align: left;
-  cursor: pointer;
-}
-
-.pv-attachment-menu button:hover,
-.pv-attachment-menu button:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
   outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: #ececec;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.25;
+  text-align: left;
+  white-space: nowrap;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.pv-attachment-menu button svg {
+.pv-composer .pv-attachment-menu button:hover,
+.pv-composer .pv-attachment-menu button:focus-visible {
+  border: 0;
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.pv-composer .pv-attachment-menu button svg {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
+  color: #d7d7d7;
 }
 
 @media (max-width: 640px) {
   .pv-attachment-menu {
-    min-width: 164px;
+    left: -2px;
+    width: 184px;
+    min-width: 184px;
   }
 }
 /* VASUKI_ATTACHMENT_MENU_END */
