@@ -209,12 +209,6 @@ const actionItems: Array<{
     prompt: "Search the web for ",
     icon: "web",
   },
-  {
-    mode: "analyze",
-    label: "Analyze image/file",
-    prompt: "",
-    icon: "analyze",
-  },
 ];
 
 function makeId() {
@@ -897,7 +891,7 @@ export default function ChatApp() {
       previewUrl,
       kind: isImage ? "image" : "document",
     });
-    setMode("analyze");
+    setMode("chat");
     setWebEnabled(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
@@ -1407,27 +1401,6 @@ export default function ChatApp() {
             <span>New chat</span>
           </button>
 
-          <button
-            type="button"
-            className="pv-nav-button"
-            onClick={() => setKnowledgePanelOpen(true)}
-          >
-            <span className="pv-nav-symbol" aria-hidden="true">🧠</span>
-            <span>Memory & documents</span>
-          </button>
-
-          <button
-            type="button"
-            className="pv-nav-button"
-            onClick={() => {
-              setSmartFilesOpen(true);
-              setMobileSidebarOpen(false);
-            }}
-            aria-label="Open smart files"
-          >
-            <span className="pv-nav-symbol" aria-hidden="true">📚</span>
-            <span>Smart files</span>
-          </button>
         </nav>
 
         <div className="pv-recent">
@@ -1691,16 +1664,6 @@ export default function ChatApp() {
                     )}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className="pv-action-button"
-                  aria-label="Open Smart files"
-                  title="Analyze multiple files and create downloads"
-                  onClick={() => setSmartFilesOpen(true)}
-                >
-                  <span aria-hidden="true">📚</span>
-                  <span>Smart files</span>
-                </button>
               </div>
 
               {error && <div className="pv-error pv-error--welcome">{error}</div>}
@@ -1894,7 +1857,9 @@ function Composer({
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   welcome?: boolean;
 }) {
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
 
 
   /* VASUKI_VOICE_LOGIC_START */
@@ -2059,6 +2024,7 @@ function Composer({
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
+    setAttachmentMenuOpen(false);
     if (file) {
       void onAttachmentSelected(file);
     }
@@ -2086,10 +2052,17 @@ function Composer({
         onSubmit={(event) => void handleComposerSubmit(event)}
       >
       <input
+        ref={photoInputRef}
+        className="pv-file-input"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+        onChange={handleFileChange}
+      />
+      <input
         ref={fileInputRef}
         className="pv-file-input"
         type="file"
-        accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,.pdf,.docx,.txt,.md"
         onChange={handleFileChange}
       />
 
@@ -2155,14 +2128,44 @@ function Composer({
 
       <div className="pv-composer-toolbar">
         <div className="pv-composer-tools">
-          <button
-            type="button"
-            aria-label="Attach image or document"
-            title="Upload image or document"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Icon name="plus" />
-          </button>
+          <div className="pv-attachment-menu-wrap">
+            <button
+              type="button"
+              aria-label="Add photo or file"
+              title="Add photo or file"
+              aria-expanded={attachmentMenuOpen}
+              onClick={() => setAttachmentMenuOpen((open) => !open)}
+            >
+              <Icon name="plus" />
+            </button>
+
+            {attachmentMenuOpen && (
+              <div className="pv-attachment-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachmentMenuOpen(false);
+                    photoInputRef.current?.click();
+                  }}
+                >
+                  <Icon name="image" />
+                  <span>Add photo</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachmentMenuOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                >
+                  <Icon name="file" />
+                  <span>Add file</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {attachment ? (
             <span className="pv-active-tool">File attached</span>

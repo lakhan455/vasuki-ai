@@ -2498,3 +2498,64 @@ button {
 }
 /* VASUKI_INLINE_ARTIFACT_STYLES_END */
 
+/* VASUKI_ATTACHMENT_MENU_START */
+.pv-attachment-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pv-attachment-menu-wrap > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-attachment-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 80;
+  min-width: 178px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: #2f2f2f;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38);
+}
+
+.pv-attachment-menu button {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #f4f4f4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pv-attachment-menu button:hover,
+.pv-attachment-menu button:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.pv-attachment-menu button svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .pv-attachment-menu {
+    min-width: 164px;
+  }
+}
+/* VASUKI_ATTACHMENT_MENU_END */
+
