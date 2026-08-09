@@ -2919,3 +2919,66 @@ button {
   }
 }
 /* VASUKI_SIDEBAR_SEARCH_ICON_V1_END */
+
+
+/* VASUKI_MOBILE_BOTTOM_COMPOSER_V1_START */
+@media (max-width: 768px) {
+  /* Keep the mobile header clean: projects remain available from the sidebar. */
+  .pv-project-picker {
+    display: none !important;
+  }
+
+  /*
+   * Gemini-style welcome layout:
+   * greeting stays above, while the composer rests near the bottom edge.
+   * 100dvh keeps it responsive when the mobile keyboard opens.
+   */
+  .pv-welcome {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 66px 12px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .pv-welcome-inner {
+    display: flex;
+    width: min(100%, 768px);
+    min-height: 0;
+    height: 100%;
+    flex: 1;
+    flex-direction: column;
+    transform: none;
+  }
+
+  .pv-welcome-logo {
+    margin-top: clamp(72px, 17dvh, 155px);
+  }
+
+  .pv-welcome-heading {
+    margin-bottom: 0;
+  }
+
+  .pv-welcome-inner > .pv-composer-frame {
+    margin-top: auto;
+    margin-bottom: max(2px, env(safe-area-inset-bottom));
+  }
+
+  .pv-welcome .pv-composer {
+    border-radius: 24px;
+  }
+}
+
+@media (max-width: 420px) {
+  .pv-welcome {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .pv-welcome-logo {
+    margin-top: clamp(58px, 14dvh, 120px);
+  }
+
+  .pv-welcome h1 {
+    font-size: 25px;
+  }
+}
+/* VASUKI_MOBILE_BOTTOM_COMPOSER_V1_END */
