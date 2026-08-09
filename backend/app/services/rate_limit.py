@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import time
@@ -47,7 +47,7 @@ class InMemoryChatQuota:
         daily_limit: int,
     ) -> QuotaStatus:
         safe_minute_limit = max(1, int(minute_limit))
-        safe_daily_limit = max(safe_minute_limit, int(daily_limit))
+        safe_daily_limit = max(1, int(daily_limit))
         now_monotonic = time.monotonic()
         day_key = self._day_key()
 
@@ -119,3 +119,4 @@ class InMemoryChatQuota:
 
 
 CHAT_QUOTA = InMemoryChatQuota()
+

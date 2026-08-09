@@ -1,0 +1,72 @@
+from __future__ import annotations
+import re
+from dataclasses import dataclass
+from typing import Any
+from app.config import Settings
+
+_CODE = ("bug","debug","traceback","exception","typeerror","syntaxerror","optimize",
+         "refactor","python","javascript","typescript","react","next.js","fastapi",
+         "sql","html","css","flutter","kotlin","gradle")
+_REASON = ("proof","prove","derive","equation","theorem","algorithm","logic",
+           "reasoning","puzzle","calculate","solve","complexity")
+_RESEARCH = ("research","compare","analysis","report","latest","current","today",
+             "verify","sources","citation","evidence")
+_SIMPLE = ("hi","hello","hey","thanks","thank you","good morning","good evening",
+           "define ","meaning of ","translate ")
+
+@dataclass(frozen=True, slots=True)
+class RoutingDecision:
+    task_type: str
+    difficulty: str
+    tier: str
+    language: str
+    needs_web: bool
+
+def last_user_query(messages: list[dict[str, Any]]) -> str:
+    return next((str(x.get("content") or "") for x in reversed(messages)
+                 if x.get("role") == "user"), "")
+
+def detect_language(text: str) -> str:
+    if re.search(r"[\u0900-\u097F]", text): return "hi"
+    words = set(re.findall(r"[a-z]+", text.casefold()))
+    if len(words & {"kya","kaise","kese","batao","mujhe","mera","mere","hai","he","nhi","abhi"}) >= 2:
+        return "roman-hi"
+    return "en" if re.search(r"[A-Za-z]", text) else "other"
+
+def classify_route(messages: list[dict[str, Any]], *, require_current: bool=False) -> RoutingDecision:
+    q0 = last_user_query(messages).strip()
+    q = q0.casefold()
+    code = "```" in q0 or any(x in q for x in _CODE)
+    reasoning = any(x in q for x in _REASON) or bool(re.search(r"(?:\d|\w)\s*[=<>+\-*/^]\s*(?:\d|\w)", q0))
+    research = require_current or any(x in q for x in _RESEARCH)
+    large = len(q0) > 1800 or len(messages) > 18 or any(x in q for x in (
+        "complete code","full code","detailed report","step by step","all countries",
+        "all states","poori list","puri list","sabhi","saare"))
+    if code: task = "code"
+    elif reasoning: task = "reasoning"
+    elif research: task = "research"
+    elif any(q.startswith(x) for x in _SIMPLE): task = "simple"
+    else: task = "general"
+    simple = task == "simple" and len(q0) <= 180 and not require_current and not large
+    return RoutingDecision(
+        task_type=task,
+        difficulty="low" if simple else ("high" if code or reasoning or large else "medium"),
+        tier="fast" if simple else "strong",
+        language=detect_language(q0),
+        needs_web=research,
+    )
+
+def configured_provider(name: str, s: Settings) -> bool:
+    return {
+        "groq_fast": bool(s.groq_api_key), "groq": bool(s.groq_api_key),
+        "sambanova": bool(s.sambanova_api_key), "cerebras": bool(s.cerebras_api_key),
+        "gemini": bool(s.google_gemini_api), "openrouter": bool(s.openrouter_api),
+        "mistral": bool(s.mistral_ai_api),
+    }.get(name, False)
+
+def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
+    if provider != "auto": return [provider]
+    if d.tier == "fast": return ["groq_fast","mistral","openrouter"]
+    if d.task_type == "code": return ["groq","openrouter","gemini","cerebras","sambanova"]
+    if d.task_type in {"research","reasoning"}: return ["groq","gemini","sambanova","cerebras","openrouter"]
+    return ["groq","gemini","openrouter","sambanova","cerebras"]

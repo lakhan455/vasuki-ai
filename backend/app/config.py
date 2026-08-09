@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     error_alert_min_interval_seconds: int = 300
     provider_timeout_seconds: int = 14
     provider_cooldown_seconds: int = 120
+    max_provider_attempts: int = 3
+    response_cache_enabled: bool = True
+    response_cache_ttl_seconds: int = 900
+    web_cache_current_ttl_seconds: int = 60
+    web_cache_stable_ttl_seconds: int = 600
     web_search_timeout_seconds: int = 14
     total_chat_timeout_seconds: int = 55
     image_timeout_seconds: int = 95
