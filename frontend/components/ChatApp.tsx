@@ -499,10 +499,12 @@ export default function ChatApp() {
   const [projects, setProjects] = useState<VasukiProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
+  const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [historySearchResults, setHistorySearchResults] = useState<ChatSearchResult[]>([]);
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historySearchInputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const chatLoadTokenRef = useRef("");
@@ -668,12 +670,24 @@ export default function ChatApp() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
+  function openHistorySearch() {
+    setHistorySearchOpen(true);
+    requestAnimationFrame(() => historySearchInputRef.current?.focus());
+  }
+
+  function closeHistorySearch() {
+    setHistorySearchOpen(false);
+    setHistoryQuery("");
+    setHistorySearchResults([]);
+    setHistorySearchBusy(false);
+  }
+
   async function openSearchResult(result: ChatSearchResult) {
     if (!user) return;
     const local = chatRecords.find((chat) => chat.id === result.chat_id);
     if (local) {
       openChat(local);
-      setHistoryQuery("");
+      closeHistorySearch();
       return;
     }
     const { data, error: searchOpenError } = await supabase
@@ -687,7 +701,7 @@ export default function ChatApp() {
       return;
     }
     openChat(data as ChatRecord);
-    setHistoryQuery("");
+    closeHistorySearch();
   }
 
   async function selectPuterEngine() {
@@ -1645,24 +1659,69 @@ export default function ChatApp() {
             <span className="pv-brand-text">Vasuki AI</span>
           </button>
 
-          <button
-            type="button"
-            className="pv-icon-button pv-desktop-only"
-            aria-label="Collapse sidebar"
-            onClick={() => setSidebarCollapsed(true)}
-          >
-            <Icon name="sidebar" />
-          </button>
+          <div className="pv-sidebar-top-actions">
+            <button
+              type="button"
+              className={[
+                "pv-icon-button",
+                "pv-sidebar-search-trigger",
+                historySearchOpen ? "is-active" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-label={historySearchOpen ? "Close chat search" : "Search chats"}
+              title="Search chats"
+              aria-expanded={historySearchOpen}
+              onClick={() =>
+                historySearchOpen ? closeHistorySearch() : openHistorySearch()
+              }
+            >
+              <Icon name="search" />
+            </button>
 
-          <button
-            type="button"
-            className="pv-icon-button pv-mobile-only"
-            aria-label="Close sidebar"
-            onClick={() => setMobileSidebarOpen(false)}
-          >
-            <Icon name="close" />
-          </button>
+            <button
+              type="button"
+              className="pv-icon-button pv-desktop-only"
+              aria-label="Collapse sidebar"
+              onClick={() => setSidebarCollapsed(true)}
+            >
+              <Icon name="sidebar" />
+            </button>
+
+            <button
+              type="button"
+              className="pv-icon-button pv-mobile-only"
+              aria-label="Close sidebar"
+              onClick={() => setMobileSidebarOpen(false)}
+            >
+              <Icon name="close" />
+            </button>
+          </div>
         </div>
+
+        {historySearchOpen && (
+          <div className="pv-history-search pv-history-search--header">
+            <span className="pv-history-search-icon" aria-hidden="true">
+              <Icon name="search" />
+            </span>
+            <input
+              ref={historySearchInputRef}
+              value={historyQuery}
+              onChange={(event) => setHistoryQuery(event.target.value)}
+              placeholder="Search chats"
+              aria-label="Search chat history"
+            />
+            <button
+              type="button"
+              className="pv-history-search-close"
+              aria-label="Close chat search"
+              title="Close search"
+              onClick={closeHistorySearch}
+            >
+              <Icon name="close" />
+            </button>
+          </div>
+        )}
 
         <nav className="pv-sidebar-nav">
           <button
@@ -1682,15 +1741,6 @@ export default function ChatApp() {
           )}
 
         </nav>
-
-        <div className="pv-history-search">
-          <input
-            value={historyQuery}
-            onChange={(event) => setHistoryQuery(event.target.value)}
-            placeholder="Search chats"
-            aria-label="Search chat history"
-          />
-        </div>
 
         <div className="pv-recent">
           <p className="pv-section-label">
@@ -2764,6 +2814,7 @@ function Icon({
     | "close"
     | "sidebar"
     | "plus"
+    | "search"
     | "chevron"
     | "image"
     | "write"
@@ -2803,6 +2854,12 @@ function Icon({
       </>
     ),
     plus: <path d="M12 5v14M5 12h14" />,
+    search: (
+      <>
+        <circle cx="11" cy="11" r="6" />
+        <path d="m16 16 4 4" />
+      </>
+    ),
     chevron: <path d="m8 10 4 4 4-4" />,
     image: (
       <>

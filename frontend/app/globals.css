@@ -2822,3 +2822,100 @@ button {
   }
 }
 /* VASUKI_PLUS_TOOLS_MENU_V2_END */
+
+
+/* VASUKI_SIDEBAR_SEARCH_ICON_V1_START */
+.pv-sidebar-top-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.pv-sidebar-search-trigger.is-active {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+}
+
+.pv-history-search--header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 10px 5px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 11px;
+  background: #202020;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.pv-history-search--header:focus-within {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.pv-history-search--header input {
+  min-width: 0;
+  height: 39px;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f4f4f4;
+  padding: 0;
+  font-size: 13px;
+}
+
+.pv-history-search--header input::placeholder {
+  color: #858585;
+}
+
+.pv-history-search-icon {
+  display: grid;
+  width: 34px;
+  height: 39px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #9b9b9b;
+}
+
+.pv-history-search-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.pv-history-search-close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-right: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #9b9b9b;
+  cursor: pointer;
+}
+
+.pv-history-search-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.pv-history-search-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 768px) {
+  .pv-sidebar-top-actions {
+    gap: 1px;
+  }
+
+  .pv-history-search--header {
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+}
+/* VASUKI_SIDEBAR_SEARCH_ICON_V1_END */
