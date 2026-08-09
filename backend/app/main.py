@@ -192,13 +192,14 @@ async def _web_context(
     current_date: str,
     request: ChatRequest,
 ) -> tuple[bool, list[dict[str, Any]], str]:
-    require_current = needs_live_web(query)
+    research_mode = bool(getattr(request, "research_mode", False))
+    require_current = needs_live_web(query) or research_mode
     should_search = request.use_web or require_current
 
     if not should_search:
         return require_current, [], ""
 
-    max_results = 8 if require_current else 4
+    max_results = 10 if research_mode else (8 if require_current else 4)
     try:
         sources, _provider = await asyncio.wait_for(
             search_web(

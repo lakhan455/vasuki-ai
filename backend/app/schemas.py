@@ -24,6 +24,9 @@ class ChatRequest(BaseModel):
     use_documents: bool = False
     document_ids: list[str] = Field(default_factory=list, max_length=50)
     project_id: str | None = Field(default=None, max_length=80)
+    research_mode: bool = False
+    cache_bypass: bool = False
+    exclude_provider: str | None = Field(default=None, max_length=40)
 
 
 class ChatResponse(BaseModel):

@@ -2695,3 +2695,88 @@ button {
   .pv-v8-branch-compare { grid-template-columns:1fr; }
 }
 /* VASUKI_V8_PHASE4_STYLES_END */
+
+/* VASUKI_V8_PHASE5_UI_START */
+.pv-phase5-shell {
+  min-height: 100vh;
+  padding: 32px;
+  background: radial-gradient(circle at 15% 0%, rgba(79, 124, 255, .12), transparent 34%), #171717;
+  color: #f5f5f5;
+}
+.pv-phase5-card {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px;
+  border: 1px solid #303030;
+  border-radius: 22px;
+  background: rgba(34, 34, 34, .92);
+  box-shadow: 0 24px 80px rgba(0,0,0,.24);
+}
+.pv-phase5-wide { max-width: 1100px; }
+.pv-phase5-head, .pv-code-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.pv-phase5-head h1, .pv-code-head h1 { margin: 4px 0 8px; font-size: clamp(28px, 4vw, 42px); }
+.pv-phase5-head p, .pv-code-head p { margin: 0; color: #a9a9a9; }
+.pv-phase5-kicker { color: #8eafff !important; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; }
+.pv-phase5-controls { margin: 24px 0 12px; }
+.pv-phase5-controls select, .pv-phase5-textarea {
+  width: 100%;
+  border: 1px solid #383838;
+  border-radius: 14px;
+  background: #202020;
+  color: #f3f3f3;
+  outline: none;
+}
+.pv-phase5-controls select { padding: 11px 13px; }
+.pv-phase5-textarea { padding: 15px; resize: vertical; line-height: 1.55; }
+.pv-phase5-textarea:focus, .pv-phase5-controls select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.12); }
+.pv-phase5-actions, .pv-code-head-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.pv-phase5-button, .pv-phase5-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+}
+.pv-phase5-button { border: 0; background: #f2f2f2; color: #161616; font-weight: 700; }
+.pv-phase5-button:disabled { opacity: .55; cursor: not-allowed; }
+.pv-phase5-ghost { border: 1px solid #3a3a3a; background: #242424; color: #ededed; }
+.pv-phase5-error { margin-top: 16px; padding: 12px 14px; border: 1px solid #713f46; border-radius: 12px; background: #321f22; color: #ffc5cc; }
+.pv-phase5-result, .pv-phase5-sources { margin-top: 24px; border-top: 1px solid #333; padding-top: 20px; }
+.pv-phase5-result-head { display: flex; justify-content: space-between; gap: 12px; color: #bdbdbd; }
+.pv-phase5-result pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.65; color: #efefef; }
+.pv-phase5-source-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 10px; }
+.pv-phase5-source { display: grid; gap: 5px; padding: 13px; border: 1px solid #343434; border-radius: 13px; background: #202020; color: #eee; text-decoration: none; }
+.pv-phase5-source span, .pv-phase5-source small { color: #999; }
+
+.pv-code-shell { min-height: 100vh; padding: 24px; background: #151515; color: #f5f5f5; }
+.pv-code-head { max-width: 1500px; margin: 0 auto 18px; }
+.pv-code-head-actions { margin-top: 0; justify-content: flex-end; }
+.pv-code-grid { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; min-height: calc(100vh - 150px); }
+.pv-code-editor, .pv-code-preview { min-width: 0; overflow: hidden; border: 1px solid #303030; border-radius: 16px; background: #1e1e1e; }
+.pv-code-editor { display: flex; flex-direction: column; }
+.pv-code-tabs { display: flex; align-items: center; gap: 6px; padding: 9px; border-bottom: 1px solid #303030; overflow-x: auto; }
+.pv-code-tabs button { border: 0; border-radius: 9px; padding: 7px 10px; background: transparent; color: #aaa; cursor: pointer; }
+.pv-code-tabs button.is-active { background: #333; color: #fff; }
+.pv-code-tabs label { margin-left: auto; display: flex; align-items: center; gap: 7px; color: #aaa; white-space: nowrap; font-size: 13px; }
+.pv-code-editor textarea { flex: 1; min-height: 560px; width: 100%; resize: none; border: 0; outline: 0; padding: 16px; background: #171717; color: #e8e8e8; font: 13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size: 2; }
+.pv-code-preview { display: flex; flex-direction: column; background: white; }
+.pv-code-preview-bar { display: flex; align-items: center; gap: 6px; height: 42px; padding: 0 12px; background: #242424; color: #aaa; }
+.pv-code-preview-bar span { width: 9px; height: 9px; border-radius: 999px; background: #595959; }
+.pv-code-preview-bar strong { margin-left: 8px; font-size: 12px; }
+.pv-code-preview iframe { flex: 1; width: 100%; min-height: 560px; border: 0; background: white; }
+@media (max-width: 900px) {
+  .pv-phase5-shell, .pv-code-shell { padding: 14px; }
+  .pv-phase5-head, .pv-code-head { flex-direction: column; }
+  .pv-code-grid { grid-template-columns: 1fr; }
+  .pv-code-editor textarea, .pv-code-preview iframe { min-height: 420px; }
+}
+/* VASUKI_V8_PHASE5_UI_END */

@@ -20,19 +20,43 @@ def _cache_key(messages,tier):
     if any(x in low for x in ("my ","mere ","mera ","mujhe ","remember","yaad","today","latest","current","abhi")): return None
     return hashlib.sha256(f"{tier}|{norm(q)}".encode()).hexdigest()
 
-async def route_chat_stream_v7(provider: str,messages: list[dict[str,Any]],settings: Settings,web_context: str="",*,require_current=False,as_of=None)->AsyncIterator[dict[str,str]]:
+def _provider_family(name: str | None) -> str:
+    value = str(name or "").strip().casefold()
+    if value.startswith("cache:"):
+        value = value.split(":", 1)[1]
+    if value in {"groq", "groq_fast"}:
+        return "groq"
+    return value
+
+async def route_chat_stream_v7(
+    provider: str,
+    messages: list[dict[str,Any]],
+    settings: Settings,
+    web_context: str="",
+    *,
+    require_current=False,
+    as_of=None,
+    cache_bypass: bool=False,
+    exclude_provider: str | None=None,
+)->AsyncIterator[dict[str,str]]:
     started=time.perf_counter()
     d=classify_route(messages,require_current=require_current)
     q=last_user_query(messages)
     max_attempts=max(1,min(3,int(getattr(settings,"max_provider_attempts",3))))
-    candidates=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and available(n) and legacy._provider_is_available(n)]
-    candidates=rank(candidates)[:max_attempts]
+    excluded_family=_provider_family(exclude_provider)
+    base=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and legacy._provider_is_available(n)]
+    healthy=[n for n in base if available(n)]
+    alternatives=[n for n in healthy if not excluded_family or _provider_family(n)!=excluded_family]
+    candidates=rank(alternatives)[:max_attempts]
     if not candidates:
-        candidates=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and legacy._provider_is_available(n)][:max_attempts]
+        alternatives=[n for n in base if not excluded_family or _provider_family(n)!=excluded_family]
+        candidates=rank(alternatives)[:max_attempts]
+    if not candidates:
+        candidates=rank(healthy or base)[:max_attempts]
     if not candidates: raise RuntimeError("No healthy AI provider is currently available.")
 
     ckey=None
-    if getattr(settings,"response_cache_enabled",True) and not require_current and not web_context.strip() and d.task_type in {"simple","general"}:
+    if (not cache_bypass) and getattr(settings,"response_cache_enabled",True) and not require_current and not web_context.strip() and d.task_type in {"simple","general"}:
         ckey=_cache_key(messages,d.tier)
         if ckey:
             hit=RESPONSE_CACHE.get(ckey)

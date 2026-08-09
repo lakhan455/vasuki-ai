@@ -304,6 +304,9 @@ type StreamOptions = {
   useDocuments: boolean;
   documentIds: string[];
   projectId?: string;
+  researchMode?: boolean;
+  cacheBypass?: boolean;
+  excludeProvider?: string;
   signal?: AbortSignal;
 };
 
@@ -349,6 +352,9 @@ async function streamAt(
       use_documents: options.useDocuments,
       document_ids: options.documentIds,
       project_id: options.projectId || null,
+      research_mode: Boolean(options.researchMode),
+      cache_bypass: Boolean(options.cacheBypass),
+      exclude_provider: options.excludeProvider || null,
     }),
     cache: "no-store",
     signal: options.signal,
@@ -872,3 +878,20 @@ export async function fetchRecentBranches(accessToken: string): Promise<Conversa
   return Array.isArray(data.branches) ? (data.branches as ConversationBranch[]) : [];
 }
 /* VASUKI_V8_PHASE4_API_END */
+
+/* VASUKI_V8_PHASE5_API_START */
+export async function extractProjectMemories(
+  accessToken: string,
+  projectId: string,
+  messages: ChatMessage[],
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/memories/auto-extract`,
+    { messages: messages.slice(-24) },
+    20000,
+    1,
+    accessToken,
+  );
+}
+/* VASUKI_V8_PHASE5_API_END */

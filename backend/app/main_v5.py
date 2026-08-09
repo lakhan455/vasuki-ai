@@ -154,7 +154,15 @@ async def chat_stream_v5(
             sources=web_sources,
         )
 
+    research_instruction = ""
+    if bool(getattr(chat_request, "research_mode", False)):
+        research_instruction = (
+            "DEEP RESEARCH V2: Cross-check important claims across the supplied sources. "
+            "Prefer authoritative and recent evidence, distinguish confirmed facts from inference, "
+            "mention material disagreement, and never invent citations or unsupported claims."
+        )
     web_context = legacy._join_context(
+        research_instruction,
         shared_pack,
         private_pack,
         live_pack,
@@ -198,6 +206,8 @@ async def chat_stream_v5(
                 web_context,
                 require_current=require_current,
                 as_of=current_date,
+                cache_bypass=bool(getattr(chat_request, "cache_bypass", False)),
+                exclude_provider=getattr(chat_request, "exclude_provider", None),
             ):
                 if await http_request.is_disconnected():
                     return

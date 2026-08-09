@@ -19,6 +19,7 @@ import {
   analyzeAttachment,
   analyzeSmartFiles,
   createConversationBranch,
+  extractProjectMemories,
   fetchProjects,
   generateImage,
   searchChatHistory,
@@ -1294,6 +1295,7 @@ export default function ChatApp() {
               useMemory: memoryEnabled,
               useDocuments: documentsEnabled,
               documentIds: selectedDocumentIds,
+              projectId: activeProjectId || undefined,
               signal: controller.signal,
             },
             onStreamToken,
@@ -1346,6 +1348,15 @@ export default function ChatApp() {
         finalMessages,
         originalEditedMessage && currentChatId ? null : currentChatId,
       );
+
+      if (activeProjectId) {
+        const memoryMessages: ChatMessage[] = finalMessages
+          .filter((message) => message.content.trim())
+          .slice(-16)
+          .map(({ role, content }) => ({ role, content: content.trim() }));
+        void extractProjectMemories(accessToken, activeProjectId, memoryMessages)
+          .catch((memoryError) => console.error("Automatic project memory capture failed", memoryError));
+      }
     } catch (caughtError) {
       // Failed streams can leave an empty assistant placeholder in an old
       // chat. Remove it so the next request remains valid.
@@ -1421,6 +1432,13 @@ export default function ChatApp() {
     );
     if (assistantIndex < 0) return;
 
+    const priorProviderRaw = String(messages[assistantIndex]?.provider || "")
+      .replace(/^cache:/i, "")
+      .trim();
+    const priorProvider = [
+      "groq", "groq_fast", "sambanova", "cerebras", "gemini", "openrouter", "mistral",
+    ].includes(priorProviderRaw) ? priorProviderRaw : undefined;
+
     const priorMessages = messages.slice(0, assistantIndex);
     const lastUser = [...priorMessages].reverse().find(
       (message) => message.role === "user" && message.content.trim(),
@@ -1474,6 +1492,8 @@ export default function ChatApp() {
           useDocuments: documentsEnabled,
           documentIds: selectedDocumentIds,
           projectId: activeProjectId || undefined,
+          cacheBypass: true,
+          excludeProvider: priorProvider,
           signal: controller.signal,
         },
         (token) => {
@@ -1649,6 +1669,8 @@ export default function ChatApp() {
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
           <a className="pv-nav-button" href="/branches"><span aria-hidden="true">Branches</span><span>Branch Explorer</span></a>
+          <a className="pv-nav-button" href="/research"><span aria-hidden="true">⌕</span><span>Deep Research</span></a>
+          <a className="pv-nav-button" href="/code"><span aria-hidden="true">&lt;/&gt;</span><span>Code Lab</span></a>
           {accountPlan?.plan === "owner" && (
             <a className="pv-nav-button" href="/owner"><span aria-hidden="true">⌁</span><span>Owner Analytics</span></a>
           )}
