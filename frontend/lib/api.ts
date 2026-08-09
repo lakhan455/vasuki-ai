@@ -1275,3 +1275,231 @@ export async function ocrDocumentV3(
   ) as DocumentIntelligenceV3;
 }
 /* VASUKI_V9_PHASE3_API_END */
+
+/* VASUKI_V9_PHASE4_API_START */
+export type BackgroundJobV9 = {
+  id: string;
+  kind: string;
+  status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+  progress: number;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  error?: string | null;
+  attempts?: number;
+  created_at?: string;
+  updated_at?: string;
+  finished_at?: string | null;
+};
+
+export type NotificationV9 = {
+  id: string;
+  title: string;
+  body: string;
+  kind?: string;
+  action_url?: string | null;
+  metadata?: Record<string, unknown>;
+  read_at?: string | null;
+  created_at?: string;
+};
+
+export type UsageSnapshotV9 = {
+  period_days?: number;
+  requests?: number;
+  features?: Record<string, number>;
+  providers?: Record<string, number>;
+  statuses?: Record<string, number>;
+  average_latency_ms?: number | null;
+  errors?: number;
+  quota_429?: number;
+  daily?: Array<{ date: string; requests: number }>;
+  cost?: {
+    reported_cost_usd?: number;
+    estimated_cost_usd?: number;
+    reported_cost_events?: number;
+    estimated_cost_events?: number;
+    unpriced_events?: number;
+    by_provider?: Record<string, {
+      reported_cost_usd?: number;
+      estimated_cost_usd?: number;
+      events?: number;
+    }>;
+    note?: string;
+  };
+};
+
+export type PlanPolicyV3 = {
+  plan?: string;
+  background_jobs_daily?: number;
+  active_background_jobs?: number;
+  image_variations_max?: number;
+  allowed_background_kinds?: string[];
+};
+
+export type FeatureAssignmentV9 = {
+  enabled?: boolean;
+  rollout_percent?: number;
+  bucket?: number;
+  variant?: string | null;
+  description?: string;
+  source?: string;
+};
+
+export type PlatformSnapshotV9 = {
+  ok?: boolean;
+  plan?: {
+    plan?: string;
+    is_owner?: boolean;
+    puter_access?: boolean;
+    pro_expires_at?: string | null;
+  };
+  policy?: PlanPolicyV3;
+  usage?: UsageSnapshotV9;
+  jobs?: BackgroundJobV9[];
+  notifications?: {
+    items?: NotificationV9[];
+    unread?: number;
+  };
+  features?: Record<string, FeatureAssignmentV9>;
+  experiments?: Record<string, string>;
+};
+
+export type OwnerPlatformV9 = {
+  ok?: boolean;
+  period_days?: number;
+  usage?: UsageSnapshotV9 & { active_users?: number };
+  jobs?: {
+    total?: number;
+    statuses?: Record<string, number>;
+    kinds?: Record<string, number>;
+  };
+  experiments?: Record<string, Record<string, { exposure?: number; conversion?: number }>>;
+  feature_flags?: Record<string, {
+    enabled?: boolean;
+    rollout_percent?: number;
+    variants?: Record<string, number>;
+    description?: string;
+    source?: string;
+  }>;
+};
+
+export async function fetchPlatformSnapshotV9(
+  accessToken: string,
+  days = 30,
+): Promise<PlatformSnapshotV9> {
+  return await getAt(
+    DIRECT_API_URL,
+    `/api/platform/v9/snapshot?days=${encodeURIComponent(days)}`,
+    accessToken,
+  ) as PlatformSnapshotV9;
+}
+
+export async function createBackgroundJobV9(
+  accessToken: string,
+  kind: string,
+  payload: Record<string, unknown>,
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    "/api/jobs/v9",
+    { kind, payload },
+    30000,
+    1,
+    accessToken,
+  );
+}
+
+export async function cancelBackgroundJobV9(
+  accessToken: string,
+  jobId: string,
+) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/jobs/v9/${encodeURIComponent(jobId)}`,
+    accessToken,
+  );
+}
+
+export async function markNotificationReadV9(
+  accessToken: string,
+  notificationId: string,
+) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/notifications/v9/${encodeURIComponent(notificationId)}/read`,
+    {},
+    accessToken,
+  );
+}
+
+export async function markAllNotificationsReadV9(accessToken: string) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    "/api/notifications/v9/read-all",
+    {},
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function recordExperimentExposureV9(
+  accessToken: string,
+  experiment: string,
+  variant: string,
+  metadata: Record<string, unknown> = {},
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/experiments/v9/${encodeURIComponent(experiment)}/exposure`,
+    { variant, metadata },
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function recordExperimentConversionV9(
+  accessToken: string,
+  experiment: string,
+  variant: string,
+  metadata: Record<string, unknown> = {},
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/experiments/v9/${encodeURIComponent(experiment)}/conversion`,
+    { variant, metadata },
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function fetchOwnerPlatformV9(
+  accessToken: string,
+  days = 30,
+): Promise<OwnerPlatformV9> {
+  return await getAt(
+    DIRECT_API_URL,
+    `/api/owner/platform/v9?days=${encodeURIComponent(days)}`,
+    accessToken,
+  ) as OwnerPlatformV9;
+}
+
+export async function updateOwnerFeatureFlagV9(
+  accessToken: string,
+  key: string,
+  value: {
+    enabled: boolean;
+    rollout_percent: number;
+    variants?: Record<string, number>;
+    description?: string;
+  },
+) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/owner/features/v9/${encodeURIComponent(key)}`,
+    value,
+    accessToken,
+  );
+}
+/* VASUKI_V9_PHASE4_API_END */
