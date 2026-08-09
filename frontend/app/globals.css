@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color-scheme: dark;
   --pv-main: #212121;
   --pv-sidebar: #171717;
@@ -29,7 +29,7 @@ button,
 textarea,
 input {
   font-family:
-    "Söhne",
+    "SÃ¶hne",
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -2982,3 +2982,128 @@ button {
   }
 }
 /* VASUKI_MOBILE_BOTTOM_COMPOSER_V1_END */
+
+/* VASUKI_V9_PHASE2_CSS_START */
+.pv-agent-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, .8fr) minmax(360px, 1.4fr);
+  gap: 16px;
+  margin: 18px 0 24px;
+}
+.pv-agent-card,
+.pv-agent-output,
+.pv-code-sandbox-head {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 18px;
+  background: rgba(255,255,255,.035);
+}
+.pv-agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.pv-agent-card select,
+.pv-agent-card textarea {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  background: #18191d;
+  color: inherit;
+  padding: 11px 12px;
+}
+.pv-agent-instruction { min-height: 125px; }
+.pv-agent-upload {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.pv-agent-file-list {
+  display: grid;
+  gap: 7px;
+  max-height: 240px;
+  overflow: auto;
+}
+.pv-agent-file-list > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding-top: 8px;
+}
+.pv-agent-file-list span {
+  min-width: 0;
+  display: grid;
+}
+.pv-agent-file-list b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-agent-file-list small,
+.pv-agent-output-head small {
+  opacity: .58;
+}
+.pv-agent-actions,
+.pv-agent-output-head,
+.pv-code-sandbox-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.pv-agent-actions { justify-content: flex-start; flex-wrap: wrap; }
+.pv-agent-card button,
+.pv-agent-output button {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 11px;
+  background: #26272c;
+  color: inherit;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.pv-agent-card button:disabled,
+.pv-agent-output button:disabled { opacity: .45; cursor: not-allowed; }
+.pv-agent-output {
+  margin: 0 0 22px;
+  padding: 14px;
+}
+.pv-agent-output-head { margin-bottom: 12px; }
+.pv-agent-output-head > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pv-agent-output pre,
+.pv-agent-console pre {
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.pv-agent-output pre {
+  max-height: 520px;
+  border-radius: 12px;
+  background: #101114;
+  padding: 14px;
+}
+.pv-code-sandbox-head {
+  margin: 20px 0 12px;
+  padding: 16px;
+}
+.pv-code-sandbox-head h2 { margin: 3px 0 4px; }
+.pv-agent-console {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding: 10px 12px;
+  background: #0d0e11;
+}
+.pv-agent-console pre {
+  min-height: 70px;
+  max-height: 160px;
+  margin-top: 7px;
+}
+@media (max-width: 900px) {
+  .pv-agent-grid { grid-template-columns: 1fr; }
+  .pv-agent-output-head,
+  .pv-code-sandbox-head { align-items: flex-start; flex-direction: column; }
+}
+/* VASUKI_V9_PHASE2_CSS_END */
+

@@ -1,4 +1,4 @@
-// Vasuki AI authenticated API client with true SSE streaming.
+﻿// Vasuki AI authenticated API client with true SSE streaming.
 const PROXY_API_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "/backend-api"
 ).replace(/\/$/, "");
@@ -895,3 +895,166 @@ export async function extractProjectMemories(
   );
 }
 /* VASUKI_V8_PHASE5_API_END */
+
+/* VASUKI_V9_PHASE2_API_START */
+export type ProjectKbFile = {
+  id: string;
+  project_id: string;
+  path: string;
+  name: string;
+  mime_type?: string;
+  size_bytes?: number;
+  language?: string;
+  content_sha256?: string;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProjectCodeChange = {
+  path: string;
+  action: "update" | "create" | "delete";
+  reason?: string;
+  content: string;
+  diff?: string;
+};
+
+export type ProjectCodeResult = {
+  ok?: boolean;
+  mode?: "patch" | "tests" | "debug";
+  provider?: string;
+  context_files?: string[];
+  diff?: string;
+  plan?: {
+    summary?: string;
+    changes?: ProjectCodeChange[];
+    tests?: string[];
+    risk_notes?: string[];
+  };
+};
+
+export async function fetchProjectKbFiles(
+  accessToken: string,
+  projectId: string,
+): Promise<ProjectKbFile[]> {
+  const data = await getAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/kb/files`,
+    accessToken,
+  );
+  return Array.isArray(data.files) ? (data.files as ProjectKbFile[]) : [];
+}
+
+export async function uploadProjectKbFiles(
+  accessToken: string,
+  projectId: string,
+  files: File[],
+) {
+  return postFormAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/kb/files`,
+    () => {
+      const form = new FormData();
+      for (const file of files) {
+        form.append("files", file, file.name);
+        form.append("paths", file.webkitRelativePath || file.name);
+      }
+      return form;
+    },
+    180000,
+    1,
+    accessToken,
+  );
+}
+
+export async function deleteProjectKbFile(
+  accessToken: string,
+  projectId: string,
+  path: string,
+) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/kb/files?path=${encodeURIComponent(path)}`,
+    accessToken,
+  );
+}
+
+export async function fetchProjectCodebaseMap(
+  accessToken: string,
+  projectId: string,
+) {
+  return getAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/kb/map`,
+    accessToken,
+  );
+}
+
+export async function generateProjectPatch(
+  accessToken: string,
+  projectId: string,
+  instruction: string,
+): Promise<ProjectCodeResult> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/code/patch`,
+    { instruction, target_paths: [] },
+    120000,
+    1,
+    accessToken,
+  )) as ProjectCodeResult;
+}
+
+export async function generateProjectTests(
+  accessToken: string,
+  projectId: string,
+  instruction: string,
+): Promise<ProjectCodeResult> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/tests/generate`,
+    { instruction, target_paths: [] },
+    120000,
+    1,
+    accessToken,
+  )) as ProjectCodeResult;
+}
+
+export async function generateProjectDebugPlan(
+  accessToken: string,
+  projectId: string,
+  instruction: string,
+  errorLog: string,
+): Promise<ProjectCodeResult> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/debug`,
+    { instruction, error_log: errorLog, target_paths: [] },
+    120000,
+    1,
+    accessToken,
+  )) as ProjectCodeResult;
+}
+
+export async function applyProjectCodePlan(
+  accessToken: string,
+  projectId: string,
+  changes: ProjectCodeChange[],
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/code/apply`,
+    {
+      changes: changes.map((change) => ({
+        path: change.path,
+        action: change.action,
+        content: change.content,
+      })),
+    },
+    60000,
+    1,
+    accessToken,
+  );
+}
+/* VASUKI_V9_PHASE2_API_END */
+
