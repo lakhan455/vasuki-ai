@@ -303,6 +303,7 @@ type StreamOptions = {
   useMemory: boolean;
   useDocuments: boolean;
   documentIds: string[];
+  projectId?: string;
   signal?: AbortSignal;
 };
 
@@ -347,6 +348,7 @@ async function streamAt(
       use_memory: options.useMemory,
       use_documents: options.useDocuments,
       document_ids: options.documentIds,
+      project_id: options.projectId || null,
     }),
     cache: "no-store",
     signal: options.signal,
@@ -800,3 +802,73 @@ export async function createConversationBranch(
   return postJsonAt(DIRECT_API_URL, "/api/chat/branch", payload, 15000, 1, accessToken);
 }
 /* VASUKI_V8_PHASE3_PART2_API_END */
+
+/* VASUKI_V8_PHASE4_API_START */
+export type ProjectMemory = {
+  id: string;
+  project_id: string;
+  memory_text: string;
+  normalized_text?: string;
+  source?: string;
+  confidence?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ChatSearchResult = {
+  chat_id: string;
+  title: string;
+  snippet?: string;
+  updated_at?: string;
+  project_id?: string;
+  score?: number;
+};
+
+export type ConversationBranch = {
+  id: string;
+  conversation_id: string;
+  source_message_id?: string;
+  original_prompt: string;
+  edited_prompt: string;
+  note?: string;
+  created_at?: string;
+};
+
+export async function fetchProjectMemories(accessToken: string, projectId: string): Promise<ProjectMemory[]> {
+  const data = await getAt(DIRECT_API_URL, `/api/projects/${encodeURIComponent(projectId)}/memories`, accessToken);
+  return Array.isArray(data.memories) ? (data.memories as ProjectMemory[]) : [];
+}
+
+export async function addProjectMemory(accessToken: string, projectId: string, memoryText: string) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/memories`,
+    { memory_text: memoryText },
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function deleteProjectMemory(accessToken: string, projectId: string, memoryId: string) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/projects/${encodeURIComponent(projectId)}/memories/${encodeURIComponent(memoryId)}`,
+    accessToken,
+  );
+}
+
+export async function searchChatHistory(accessToken: string, query: string): Promise<ChatSearchResult[]> {
+  const data = await getAt(
+    DIRECT_API_URL,
+    `/api/chat/search?q=${encodeURIComponent(query)}&limit=24`,
+    accessToken,
+  );
+  return Array.isArray(data.results) ? (data.results as ChatSearchResult[]) : [];
+}
+
+export async function fetchRecentBranches(accessToken: string): Promise<ConversationBranch[]> {
+  const data = await getAt(DIRECT_API_URL, "/api/chat/branches/recent?limit=120", accessToken);
+  return Array.isArray(data.branches) ? (data.branches as ConversationBranch[]) : [];
+}
+/* VASUKI_V8_PHASE4_API_END */

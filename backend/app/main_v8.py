@@ -17,6 +17,7 @@ from app.services.memory_v8 import (
     personal_memory_context_v8,
 )
 from app.services.rag_v8 import search_user_documents_hybrid
+from app.services.project_memory_v8 import project_context_v8
 
 app = v7.app
 settings = v7.settings
@@ -36,6 +37,7 @@ async def _private_context_v8(
     request,
 ) -> tuple[str, list[dict[str, Any]]]:
     personal_pack = ""
+    project_pack = ""
     document_pack = ""
     document_sources: list[dict[str, Any]] = []
 
@@ -53,6 +55,21 @@ async def _private_context_v8(
         except Exception:
             personal_pack = ""
 
+    project_id = str(getattr(request, "project_id", "") or "").strip()
+    if project_id:
+        try:
+            project_pack, _ = await asyncio.wait_for(
+                project_context_v8(
+                    settings,
+                    user_id=user_id,
+                    project_id=project_id,
+                    query=query,
+                ),
+                timeout=4.5,
+            )
+        except Exception:
+            project_pack = ""
+
     if request.use_documents:
         try:
             hits = await asyncio.wait_for(
@@ -69,7 +86,7 @@ async def _private_context_v8(
         except Exception:
             document_pack, document_sources = "", []
 
-    return legacy._join_context(personal_pack, document_pack), document_sources
+    return legacy._join_context(personal_pack, project_pack, document_pack), document_sources
 
 
 legacy._private_context = _private_context_v8

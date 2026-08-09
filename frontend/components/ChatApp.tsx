@@ -19,12 +19,16 @@ import {
   analyzeAttachment,
   analyzeSmartFiles,
   createConversationBranch,
+  fetchProjects,
   generateImage,
+  searchChatHistory,
   streamChat,
   submitResponseFeedback,
   warmBackend,
   type ChatMessage,
+  type ChatSearchResult,
   type SmartFileArtifact,
+  type VasukiProject,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
@@ -101,6 +105,7 @@ type ChatRecord = {
   title: string;
   messages: unknown;
   updated_at: string;
+  project_id?: string | null;
 };
 
 type QuotaUiStatus = {
@@ -484,6 +489,11 @@ export default function ChatApp() {
   const [planBusy, setPlanBusy] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [feedbackById, setFeedbackById] = useState<Record<string, "up" | "down">>({});
+  const [projects, setProjects] = useState<VasukiProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historySearchResults, setHistorySearchResults] = useState<ChatSearchResult[]>([]);
+  const [historySearchBusy, setHistorySearchBusy] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -574,6 +584,43 @@ export default function ChatApp() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user) return;
+    void (async () => {
+      try {
+        const accessToken = await currentAccessToken();
+        setProjects((await fetchProjects(accessToken)).filter((project) => !project.archived));
+      } catch (projectError) {
+        console.error(projectError);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || historyQuery.trim().length < 2) {
+      setHistorySearchResults([]);
+      setHistorySearchBusy(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          setHistorySearchBusy(true);
+          const accessToken = await currentAccessToken();
+          setHistorySearchResults(await searchChatHistory(accessToken, historyQuery.trim()));
+        } catch (searchError) {
+          console.error(searchError);
+          setHistorySearchResults([]);
+        } finally {
+          setHistorySearchBusy(false);
+        }
+      })();
+    }, 350);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyQuery, user?.id]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
 
@@ -602,6 +649,38 @@ export default function ChatApp() {
       setAiEngine("vasuki");
       console.error(planError);
     }
+  }
+
+  function selectProject(projectId: string) {
+    if (projectId === activeProjectId) return;
+    if (currentChatId || messages.length > 0) {
+      startNewChat();
+    }
+    setActiveProjectId(projectId);
+    setMobileSidebarOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  async function openSearchResult(result: ChatSearchResult) {
+    if (!user) return;
+    const local = chatRecords.find((chat) => chat.id === result.chat_id);
+    if (local) {
+      openChat(local);
+      setHistoryQuery("");
+      return;
+    }
+    const { data, error: searchOpenError } = await supabase
+      .from("user_chats")
+      .select("id,title,messages,updated_at,project_id")
+      .eq("id", result.chat_id)
+      .eq("user_id", user.id)
+      .single();
+    if (searchOpenError || !data) {
+      setError(searchOpenError?.message || "Chat could not be opened.");
+      return;
+    }
+    openChat(data as ChatRecord);
+    setHistoryQuery("");
   }
 
   async function selectPuterEngine() {
@@ -662,7 +741,7 @@ export default function ChatApp() {
     setHistoryBusy(true);
     const { data, error: historyError } = await supabase
       .from("user_chats")
-      .select("id,title,messages,updated_at")
+      .select("id,title,messages,updated_at,project_id")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(100);
@@ -687,6 +766,7 @@ export default function ChatApp() {
     chatLoadTokenRef.current = loadToken;
 
     setCurrentChatId(record.id);
+    setActiveProjectId(record.project_id || "");
     setMessages(restoreMessages(record.messages));
     setAttachment(null);
     setInput("");
@@ -764,6 +844,7 @@ export default function ChatApp() {
       user_id: user.id,
       title: chatTitle(nextMessages),
       messages: boundedFallback,
+      project_id: activeProjectId || null,
       updated_at: now,
     };
 
@@ -1392,6 +1473,7 @@ export default function ChatApp() {
           useMemory: memoryEnabled,
           useDocuments: documentsEnabled,
           documentIds: selectedDocumentIds,
+          projectId: activeProjectId || undefined,
           signal: controller.signal,
         },
         (token) => {
@@ -1566,18 +1648,47 @@ export default function ChatApp() {
           <a className="pv-nav-button" href="/projects"><span aria-hidden="true">▦</span><span>Projects</span></a>
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
+          <a className="pv-nav-button" href="/branches"><span aria-hidden="true">Branches</span><span>Branch Explorer</span></a>
           {accountPlan?.plan === "owner" && (
             <a className="pv-nav-button" href="/owner"><span aria-hidden="true">⌁</span><span>Owner Analytics</span></a>
           )}
 
         </nav>
 
+        <div className="pv-history-search">
+          <input
+            value={historyQuery}
+            onChange={(event) => setHistoryQuery(event.target.value)}
+            placeholder="Search chats"
+            aria-label="Search chat history"
+          />
+        </div>
+
         <div className="pv-recent">
           <p className="pv-section-label">
-            Recent {historyBusy ? "· loading…" : ""}
+            {historyQuery.trim().length >= 2 ? "Search results" : "Recent"}{" "}
+            {(historyBusy || historySearchBusy) ? "· loading…" : ""}
           </p>
 
-          {chatRecords.length === 0 && !historyBusy ? (
+          {historyQuery.trim().length >= 2 ? (
+            historySearchResults.length === 0 && !historySearchBusy ? (
+              <p className="pv-empty-history">No matching chats.</p>
+            ) : (
+              historySearchResults.map((result) => (
+                <div className="pv-recent-row" key={result.chat_id}>
+                  <button
+                    type="button"
+                    className="pv-recent-button"
+                    onClick={() => void openSearchResult(result)}
+                    title={result.snippet || result.title}
+                  >
+                    <span>{result.title}</span>
+                    {result.snippet ? <small className="pv-search-snippet">{result.snippet}</small> : null}
+                  </button>
+                </div>
+              ))
+            )
+          ) : chatRecords.length === 0 && !historyBusy ? (
             <p className="pv-empty-history">Abhi koi saved chat nahi hai.</p>
           ) : (
             chatRecords.map((chat) => (
@@ -1718,6 +1829,21 @@ export default function ChatApp() {
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="pv-project-picker">
+              <select
+                value={activeProjectId}
+                onChange={(event) => selectProject(event.target.value)}
+                aria-label="Active project"
+                title="Active project memory and instructions"
+              >
+                <option value="">General chat</option>
+                {projects.map((project) => (
+                  <option value={project.id} key={project.id}>{project.name}</option>
+                ))}
+              </select>
+              {activeProjectId ? <span className="pv-active-project-pill">Project memory on</span> : null}
             </div>
           </div>
 

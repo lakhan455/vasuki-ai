@@ -23,6 +23,7 @@ class ChatRequest(BaseModel):
     use_memory: bool = True
     use_documents: bool = False
     document_ids: list[str] = Field(default_factory=list, max_length=50)
+    project_id: str | None = Field(default=None, max_length=80)
 
 
 class ChatResponse(BaseModel):
