@@ -1,10 +1,10 @@
-﻿services:
+services:
   - type: web
     name: power-vasuki-ai-api
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main_v9_phase2:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main_v9_phase3:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION

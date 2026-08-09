@@ -1,4 +1,4 @@
-﻿// Vasuki AI authenticated API client with true SSE streaming.
+// Vasuki AI authenticated API client with true SSE streaming.
 const PROXY_API_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "/backend-api"
 ).replace(/\/$/, "");
@@ -1058,3 +1058,220 @@ export async function applyProjectCodePlan(
 }
 /* VASUKI_V9_PHASE2_API_END */
 
+/* VASUKI_V9_PHASE3_API_START */
+export type ImageStudioResult = {
+  ok?: boolean;
+  url?: string;
+  provider?: string;
+  preset?: string;
+  aspect_ratio?: string;
+  width?: number;
+  height?: number;
+  operation?: string;
+  error?: string;
+  index?: number;
+  artifact?: GeneratedArtifact | null;
+};
+
+export type DocumentCitationV3 = {
+  citation_id?: string;
+  document?: string;
+  page?: number | null;
+  section?: string | null;
+  kind?: string;
+  excerpt?: string;
+};
+
+export type DocumentBlockV3 = {
+  citation_id: string;
+  source_id: string;
+  page?: number | null;
+  section?: string | null;
+  kind?: string;
+  text: string;
+  word_count?: number;
+};
+
+export type StructuredDocumentV3 = {
+  source_id: string;
+  name: string;
+  type: string;
+  pages?: number | null;
+  blocks: DocumentBlockV3[];
+  warnings?: string[];
+  ocr_provider?: string;
+};
+
+export type DocumentIntelligenceV3 = {
+  ok?: boolean;
+  answer?: string;
+  provider?: string;
+  citations?: DocumentCitationV3[];
+  evidence?: DocumentCitationV3[];
+  documents?: StructuredDocumentV3[];
+  warnings?: string[];
+  total_blocks?: number;
+  text?: string;
+  document?: StructuredDocumentV3;
+  comparison?: {
+    left?: string;
+    right?: string;
+    similarity_percent?: number;
+    added_samples?: string[];
+    removed_samples?: string[];
+  };
+};
+
+export async function generateImageStudio(
+  accessToken: string,
+  prompt: string,
+  preset: string,
+  aspectRatio: string,
+): Promise<ImageStudioResult> {
+  return await postJsonAt(
+    DIRECT_API_URL,
+    "/api/image/v3/generate",
+    { prompt, preset, aspect_ratio: aspectRatio },
+    180000,
+    1,
+    accessToken,
+  ) as ImageStudioResult;
+}
+
+export async function generateImageVariations(
+  accessToken: string,
+  prompt: string,
+  preset: string,
+  aspectRatio: string,
+  count: number,
+): Promise<{ ok?: boolean; items: ImageStudioResult[]; requested?: number; succeeded?: number; failed?: number }> {
+  const data = await postJsonAt(
+    DIRECT_API_URL,
+    "/api/image/v3/variations",
+    { prompt, preset, aspect_ratio: aspectRatio, count },
+    300000,
+    1,
+    accessToken,
+  );
+  return {
+    ok: data.ok !== false,
+    items: Array.isArray(data.items) ? data.items as ImageStudioResult[] : [],
+    requested: typeof data.requested === "number" ? data.requested : undefined,
+    succeeded: typeof data.succeeded === "number" ? data.succeeded : undefined,
+    failed: typeof data.failed === "number" ? data.failed : undefined,
+  };
+}
+
+export async function editImageStudio(
+  accessToken: string,
+  file: File,
+  prompt: string,
+  preset: string,
+  aspectRatio: string,
+): Promise<ImageStudioResult> {
+  return await postFormAt(
+    DIRECT_API_URL,
+    "/api/image/v3/edit",
+    () => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      form.append("prompt", prompt);
+      form.append("preset", preset);
+      form.append("aspect_ratio", aspectRatio);
+      return form;
+    },
+    240000,
+    1,
+    accessToken,
+  ) as ImageStudioResult;
+}
+
+export async function enhanceImageStudio(
+  accessToken: string,
+  file: File,
+  scale: number,
+): Promise<ImageStudioResult> {
+  return await postFormAt(
+    DIRECT_API_URL,
+    "/api/image/v3/enhance",
+    () => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      form.append("scale", String(scale));
+      return form;
+    },
+    120000,
+    1,
+    accessToken,
+  ) as ImageStudioResult;
+}
+
+function v3DocumentForm(files: File[], prompt?: string) {
+  const form = new FormData();
+  if (typeof prompt === "string") form.append("prompt", prompt);
+  for (const file of files) form.append("files", file, file.name);
+  return form;
+}
+
+export async function extractDocumentsV3(
+  accessToken: string,
+  files: File[],
+): Promise<DocumentIntelligenceV3> {
+  return await postFormAt(
+    DIRECT_API_URL,
+    "/api/documents/v3/extract",
+    () => v3DocumentForm(files),
+    240000,
+    1,
+    accessToken,
+  ) as DocumentIntelligenceV3;
+}
+
+export async function askDocumentsV3(
+  accessToken: string,
+  files: File[],
+  prompt: string,
+): Promise<DocumentIntelligenceV3> {
+  return await postFormAt(
+    DIRECT_API_URL,
+    "/api/documents/v3/ask",
+    () => v3DocumentForm(files, prompt),
+    300000,
+    1,
+    accessToken,
+  ) as DocumentIntelligenceV3;
+}
+
+export async function compareDocumentsV3(
+  accessToken: string,
+  files: File[],
+  prompt: string,
+): Promise<DocumentIntelligenceV3> {
+  return await postFormAt(
+    DIRECT_API_URL,
+    "/api/documents/v3/compare",
+    () => v3DocumentForm(files, prompt),
+    300000,
+    1,
+    accessToken,
+  ) as DocumentIntelligenceV3;
+}
+
+export async function ocrDocumentV3(
+  accessToken: string,
+  file: File,
+): Promise<DocumentIntelligenceV3> {
+  return await postFormAt(
+    DIRECT_API_URL,
+    "/api/documents/v3/ocr",
+    () => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      return form;
+    },
+    240000,
+    1,
+    accessToken,
+  ) as DocumentIntelligenceV3;
+}
+/* VASUKI_V9_PHASE3_API_END */

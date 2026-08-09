@@ -1,4 +1,4 @@
-﻿# Vasuki AI V9 Master Upgrade Plan
+# Vasuki AI V9 Master Upgrade Plan
 
 ## Phase 1 â€” Quality / Research / Memory Intelligence
 Items 1,2,3,4 foundation,5,6,29 foundation,31 foundation,48,49 foundation,50 foundation.
@@ -20,3 +20,5 @@ Items 43â€“47 plus hardening of 48â€“50.
 
 Phase 2 implementation added in V9 Phase 2.
 
+## V9 Phase 3 implementation
+Items 14-22 implemented: image presets, aspect ratio, variations, image edit UI, local enhancement/upscale, OCR V2, structured extraction, citations, and document compare.

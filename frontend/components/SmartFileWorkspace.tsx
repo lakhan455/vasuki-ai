@@ -51,10 +51,10 @@ function DownloadCard({ artifact }: { artifact: SmartFileArtifact }) {
       download={artifact.name}
       aria-label={`Download ${artifact.name}`}
     >
-      <span className="pv-smart-download-icon">↓</span>
+      <span className="pv-smart-download-icon">â†“</span>
       <span className="pv-smart-download-copy">
         <strong>{artifact.name}</strong>
-        <small>{label} · {sizeLabel(artifact.size_bytes)}</small>
+        <small>{label} Â· {sizeLabel(artifact.size_bytes)}</small>
       </span>
       <span className="pv-smart-download-action">Download</span>
     </a>
@@ -166,8 +166,9 @@ export default function SmartFileWorkspace({
             <span className="pv-smart-eyebrow">VASUKI AI</span>
             <h2>Smart files</h2>
             <p>Analyze multiple documents, solve question papers and create downloadable files.</p>
+            <a className="pv-v9-smart-doc-link" href="/documents">Open Document Intelligence V3</a>
           </div>
-          <button type="button" className="pv-smart-close" onClick={onClose} aria-label="Close smart files">×</button>
+          <button type="button" className="pv-smart-close" onClick={onClose} aria-label="Close smart files">Ã—</button>
         </header>
 
         <div className="pv-smart-body">
@@ -181,10 +182,10 @@ export default function SmartFileWorkspace({
               onChange={addFiles}
             />
             <button type="button" onClick={() => inputRef.current?.click()}>
-              <span aria-hidden="true">＋</span>
+              <span aria-hidden="true">ï¼‹</span>
               Add PDF, DOCX, TXT, notes or images
             </button>
-            <small>Up to 8 files · 15 MB each · 50 MB combined</small>
+            <small>Up to 8 files Â· 15 MB each Â· 50 MB combined</small>
           </div>
 
           {files.length > 0 && (
@@ -204,11 +205,11 @@ export default function SmartFileWorkspace({
                       setResult(null);
                     }}
                   >
-                    ×
+                    Ã—
                   </button>
                 </div>
               ))}
-              <div className="pv-smart-total">{files.length}/{MAX_FILES} files · {sizeLabel(totalBytes)}</div>
+              <div className="pv-smart-total">{files.length}/{MAX_FILES} files Â· {sizeLabel(totalBytes)}</div>
             </div>
           )}
 
@@ -252,7 +253,7 @@ export default function SmartFileWorkspace({
               disabled={!prompt.trim() || busy}
               onClick={() => void submit()}
             >
-              {busy ? "Analyzing…" : "Analyze with Vasuki AI"}
+              {busy ? "Analyzingâ€¦" : "Analyze with Vasuki AI"}
             </button>
           </div>
 
