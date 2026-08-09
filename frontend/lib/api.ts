@@ -538,7 +538,7 @@ export async function analyzeSmartFiles(
     try {
       const data = await postFormAt(
         baseUrl,
-        "/api/smart-files",
+        "/api/smart-files/v2",
         () => {
           const form = new FormData();
           form.append("prompt", prompt);
@@ -595,7 +595,7 @@ export async function generateImage(
     try {
       return await postJsonAt(
         baseUrl,
-        "/api/image",
+        "/api/image/v2",
         body,
         150000,
         3,
