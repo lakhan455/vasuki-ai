@@ -1,61 +1,70 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-
-type Project = {
-  id: string;
-  name: string;
-  description?: string;
-  instructions?: string;
-  color?: string;
-  archived?: boolean;
-};
+import { createProject, fetchProjects, type VasukiProject } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function ProjectsPage() {
-  const [items, setItems] = useState<Project[]>([]);
+  const [items, setItems] = useState<VasukiProject[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  async function load() {
-    const response = await fetch("/api/projects", { credentials: "include" });
-    const data = await response.json();
-    setItems(Array.isArray(data?.projects) ? data.projects : []);
-    setLoading(false);
+  async function token() {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.access_token) throw new Error("Please sign in to use Projects.");
+    return data.session.access_token;
   }
 
-  useEffect(() => { load(); }, []);
+  async function load() {
+    try {
+      setLoading(true);
+      setError("");
+      setItems(await fetchProjects(await token()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Projects could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return;
-    await fetch("/api/projects", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description }),
-    });
-    setName("");
-    setDescription("");
-    load();
+    try {
+      await createProject(await token(), { name, description, instructions });
+      setName(""); setDescription(""); setInstructions("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Project creation failed.");
+    }
   }
 
   return (
-    <main style={{ padding: 24, color: "white", background: "#212121", minHeight: "100vh" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>Projects & Workspaces</h1>
-      <p style={{ color: "#b4b4b4", marginBottom: 20 }}>Keep chats, files and instructions organized per project.</p>
-      <form onSubmit={submit} style={{ display: "grid", gap: 10, maxWidth: 640, marginBottom: 20 }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" style={{ background: "#171717", border: "1px solid #3a3a3a", borderRadius: 12, padding: 12, color: "white" }} />
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description" style={{ background: "#171717", border: "1px solid #3a3a3a", borderRadius: 12, padding: 12, color: "white", minHeight: 100 }} />
-        <button type="submit" style={{ background: "#7c3aed", color: "white", border: "none", borderRadius: 12, padding: 12, width: 180 }}>Create project</button>
+    <main className="pv-v8-page">
+      <div className="pv-v8-page-head">
+        <div><p className="pv-v8-kicker">Workspace foundation</p><h1>Projects & Workspaces</h1><p>Organize project instructions and future project-specific chats/files.</p></div>
+        <a className="pv-v8-back" href="/">Back to chat</a>
+      </div>
+      <form className="pv-v8-form" onSubmit={(event) => void submit(event)}>
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" />
+        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Short description" />
+        <textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder="Project instructions (optional)" />
+        <button type="submit">Create project</button>
       </form>
+      {error && <div className="pv-v8-error">{error}</div>}
       {loading && <p>Loading projects...</p>}
-      <div style={{ display: "grid", gap: 12 }}>
+      <div className="pv-v8-grid">
         {items.map((item) => (
-          <div key={item.id} style={{ border: "1px solid #3a3a3a", borderRadius: 14, padding: 16, background: "#171717" }}>
-            <div style={{ fontWeight: 600 }}>{item.name}</div>
-            {item.description ? <div style={{ color: "#d1d5db", marginTop: 6 }}>{item.description}</div> : null}
-          </div>
+          <article className="pv-v8-card pv-v8-card--block" key={item.id}>
+            <strong>{item.name}</strong>
+            {item.description ? <p>{item.description}</p> : null}
+            {item.instructions ? <small>Instructions saved</small> : null}
+          </article>
         ))}
       </div>
     </main>

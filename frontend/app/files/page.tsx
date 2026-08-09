@@ -1,69 +1,61 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type Item = {
-  id: string;
-  name: string;
-  artifact_type: string;
-  mime_type: string;
-  provider?: string;
-  created_at?: string;
-  download_url?: string;
-};
+import { deleteMyFile, fetchMyFiles, type GeneratedArtifact } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function FilesPage() {
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<GeneratedArtifact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  async function token() {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.access_token) throw new Error("Please sign in to view My Files.");
+    return data.session.access_token;
+  }
 
   async function load() {
     try {
       setLoading(true);
       setError("");
-      const response = await fetch("/api/files", { credentials: "include" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.detail || "Failed to load files");
-      setItems(Array.isArray(data?.files) ? data.files : []);
+      setItems(await fetchMyFiles(await token()));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load files");
+      setError(err instanceof Error ? err.message : "Failed to load files.");
     } finally {
       setLoading(false);
     }
   }
 
   async function removeFile(id: string) {
-    await fetch(`/api/files/${id}`, { method: "DELETE", credentials: "include" });
-    load();
+    try {
+      await deleteMyFile(await token(), id);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "File delete failed.");
+    }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
   return (
-    <main style={{ padding: 24, color: "white", background: "#212121", minHeight: "100vh" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>My Files</h1>
-      <p style={{ color: "#b4b4b4", marginBottom: 20 }}>Generated PDFs, QR files, DOCX, TXT and other artifacts.</p>
+    <main className="pv-v8-page">
+      <div className="pv-v8-page-head">
+        <div><p className="pv-v8-kicker">Vasuki AI</p><h1>My Files</h1><p>Generated PDFs, DOCX, TXT, QR codes and saved artifacts.</p></div>
+        <a className="pv-v8-back" href="/">Back to chat</a>
+      </div>
       {loading && <p>Loading files...</p>}
-      {error && <p style={{ color: "#fca5a5" }}>{error}</p>}
-      {!loading && !items.length && <p style={{ color: "#b4b4b4" }}>No files found yet.</p>}
-      <div style={{ display: "grid", gap: 12 }}>
+      {error && <div className="pv-v8-error">{error}</div>}
+      {!loading && !items.length && !error && <div className="pv-v8-empty">No generated files yet.</div>}
+      <div className="pv-v8-grid">
         {items.map((item) => (
-          <div key={item.id} style={{ border: "1px solid #3a3a3a", borderRadius: 14, padding: 16, background: "#171717" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{item.name}</div>
-                <div style={{ color: "#9ca3af", fontSize: 13 }}>{item.mime_type} • {item.artifact_type}</div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {item.download_url ? (
-                  <a href={item.download_url} target="_blank" rel="noreferrer" style={{ color: "#c4b5fd" }}>Download</a>
-                ) : null}
-                <button onClick={() => removeFile(item.id)} style={{ background: "transparent", color: "#fca5a5", border: "1px solid #7f1d1d", borderRadius: 10, padding: "6px 10px" }}>Delete</button>
-              </div>
+          <article className="pv-v8-card" key={item.id}>
+            <div><strong>{item.name}</strong><small>{item.mime_type} · {item.artifact_type}</small></div>
+            <div className="pv-v8-card-actions">
+              {item.download_url ? <a href={item.download_url} target="_blank" rel="noreferrer">Open</a> : null}
+              <button type="button" onClick={() => void removeFile(item.id)}>Delete</button>
             </div>
-          </div>
+          </article>
         ))}
       </div>
     </main>

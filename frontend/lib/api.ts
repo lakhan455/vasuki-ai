@@ -699,3 +699,104 @@ export async function removeKnowledgeDocument(
     accessToken,
   );
 }
+
+/* VASUKI_V8_PHASE3_PART2_API_START */
+export type GeneratedArtifact = {
+  id: string;
+  name: string;
+  artifact_type: string;
+  mime_type: string;
+  provider?: string;
+  prompt?: string;
+  created_at?: string;
+  expires_at?: string;
+  download_url?: string;
+};
+
+export type VasukiProject = {
+  id: string;
+  name: string;
+  description?: string;
+  instructions?: string;
+  color?: string;
+  archived?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type OwnerAnalytics = {
+  ok?: boolean;
+  persistent?: {
+    requests?: number;
+    active_users?: number;
+    average_latency_ms?: number | null;
+    errors?: number;
+    quota_429?: number;
+    features?: Record<string, number>;
+    providers?: Record<string, number>;
+  };
+  chat_provider_health?: Record<string, unknown>;
+  image_provider_health?: Record<string, unknown>;
+  cache?: Record<string, unknown>;
+};
+
+export async function fetchMyFiles(accessToken: string): Promise<GeneratedArtifact[]> {
+  const data = await getAt(DIRECT_API_URL, "/api/files", accessToken);
+  return Array.isArray(data.files) ? (data.files as GeneratedArtifact[]) : [];
+}
+
+export async function deleteMyFile(accessToken: string, artifactId: string) {
+  return deleteAt(DIRECT_API_URL, `/api/files/${encodeURIComponent(artifactId)}`, accessToken);
+}
+
+export async function fetchImageHistory(accessToken: string): Promise<GeneratedArtifact[]> {
+  const data = await getAt(DIRECT_API_URL, "/api/images/history", accessToken);
+  return Array.isArray(data.images) ? (data.images as GeneratedArtifact[]) : [];
+}
+
+export async function fetchOwnerAnalytics(accessToken: string, days = 7): Promise<OwnerAnalytics> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/owner/analytics/v2?days=${Math.max(1, Math.min(days, 90))}`,
+    accessToken,
+  )) as OwnerAnalytics;
+}
+
+export async function fetchProjects(accessToken: string): Promise<VasukiProject[]> {
+  const data = await getAt(DIRECT_API_URL, "/api/projects", accessToken);
+  return Array.isArray(data.projects) ? (data.projects as VasukiProject[]) : [];
+}
+
+export async function createProject(
+  accessToken: string,
+  payload: { name: string; description?: string; instructions?: string; color?: string },
+) {
+  return postJsonAt(DIRECT_API_URL, "/api/projects", payload, 20000, 1, accessToken);
+}
+
+export async function submitResponseFeedback(
+  accessToken: string,
+  payload: {
+    rating: "up" | "down";
+    category: string;
+    message_id?: string;
+    comment?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  return postJsonAt(DIRECT_API_URL, "/api/feedback", payload, 15000, 1, accessToken);
+}
+
+export async function createConversationBranch(
+  accessToken: string,
+  payload: {
+    conversation_id: string;
+    source_message_id?: string;
+    original_prompt: string;
+    edited_prompt: string;
+    note?: string;
+  },
+) {
+  return postJsonAt(DIRECT_API_URL, "/api/chat/branch", payload, 15000, 1, accessToken);
+}
+/* VASUKI_V8_PHASE3_PART2_API_END */

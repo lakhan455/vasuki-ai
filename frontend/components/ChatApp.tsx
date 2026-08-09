@@ -18,8 +18,10 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
+  createConversationBranch,
   generateImage,
   streamChat,
+  submitResponseFeedback,
   warmBackend,
   type ChatMessage,
   type SmartFileArtifact,
@@ -480,6 +482,8 @@ export default function ChatApp() {
   const [puterAccount, setPuterAccount] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [feedbackById, setFeedbackById] = useState<Record<string, "up" | "down">>({});
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -689,6 +693,7 @@ export default function ChatApp() {
     setError("");
     setMode("chat");
     setWebEnabled(false);
+    setEditingMessageId(null);
     setMobileSidebarOpen(false);
 
     void (async () => {
@@ -818,6 +823,7 @@ export default function ChatApp() {
     setError("");
     setMode("chat");
     setWebEnabled(false);
+    setEditingMessageId(null);
     setMobileSidebarOpen(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
@@ -930,6 +936,14 @@ export default function ChatApp() {
 
     if ((!text && !selectedAttachment) || busy || !user) return;
 
+    const editingIndex = editingMessageId
+      ? messages.findIndex((message) => message.id === editingMessageId)
+      : -1;
+    const originalEditedMessage =
+      editingIndex >= 0 && messages[editingIndex]?.role === "user"
+        ? messages[editingIndex]
+        : null;
+
     const effectiveText =
       text ||
       (selectedAttachment?.kind === "document"
@@ -944,7 +958,11 @@ export default function ChatApp() {
       fileName: selectedAttachment?.file.name,
     };
 
-    const nextMessages = [...messages, userMessage];
+    const baseMessages =
+      originalEditedMessage && editingIndex >= 0
+        ? messages.slice(0, editingIndex)
+        : messages;
+    const nextMessages = [...baseMessages, userMessage];
 
     setMessages(nextMessages);
     setInput("");
@@ -960,6 +978,16 @@ export default function ChatApp() {
       const accessToken = session?.access_token;
       if (!accessToken) {
         throw new Error("Login session expired. Please sign in again.");
+      }
+
+      if (originalEditedMessage) {
+        void createConversationBranch(accessToken, {
+          conversation_id: currentChatId || `unsaved-${user.id}`,
+          source_message_id: originalEditedMessage.id,
+          original_prompt: originalEditedMessage.content,
+          edited_prompt: effectiveText,
+          note: "Edit & Resend branch",
+        }).catch((branchError) => console.error("Branch metadata save failed", branchError));
       }
 
       let finalMessages: UiMessage[];
@@ -1232,7 +1260,11 @@ export default function ChatApp() {
       setMessages(finalMessages);
       setAttachment(null);
       setMode("chat");
-      await persistChat(finalMessages, currentChatId);
+      setEditingMessageId(null);
+      await persistChat(
+        finalMessages,
+        originalEditedMessage && currentChatId ? null : currentChatId,
+      );
     } catch (caughtError) {
       // Failed streams can leave an empty assistant placeholder in an old
       // chat. Remove it so the next request remains valid.
@@ -1260,6 +1292,137 @@ export default function ChatApp() {
             ? caughtError.message
             : "Something went wrong. Please try again.",
       );
+    } finally {
+      streamAbortRef.current = null;
+      setStreamingStarted(false);
+      setBusy(false);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }
+
+
+  function beginEditMessage(message: UiMessage) {
+    if (busy || message.role !== "user") return;
+    setEditingMessageId(message.id);
+    setAttachment(null);
+    setMode("chat");
+    setWebEnabled(false);
+    setInput(message.content);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  function cancelEditMessage() {
+    setEditingMessageId(null);
+    setInput("");
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  async function sendFeedback(message: UiMessage, rating: "up" | "down") {
+    if (message.role !== "assistant") return;
+    try {
+      const accessToken = await currentAccessToken();
+      await submitResponseFeedback(accessToken, {
+        rating,
+        category: rating === "up" ? "helpful" : "incorrect",
+        message_id: message.id,
+        metadata: { provider: message.provider || "", chat_id: currentChatId || "" },
+      });
+      setFeedbackById((current) => ({ ...current, [message.id]: rating }));
+    } catch (feedbackError) {
+      setError(feedbackError instanceof Error ? feedbackError.message : "Feedback could not be saved.");
+    }
+  }
+
+  async function regenerateAssistant(messageId: string) {
+    if (busy || !user) return;
+    const assistantIndex = messages.findIndex(
+      (message) => message.id === messageId && message.role === "assistant",
+    );
+    if (assistantIndex < 0) return;
+
+    const priorMessages = messages.slice(0, assistantIndex);
+    const lastUser = [...priorMessages].reverse().find(
+      (message) => message.role === "user" && message.content.trim(),
+    );
+    if (!lastUser) return;
+
+    setBusy(true);
+    setStreamingStarted(false);
+    setError("");
+
+    const assistantId = makeId();
+    let streamedAnswer = "";
+
+    try {
+      const accessToken = await currentAccessToken();
+      const nonce = makeId();
+
+      if (currentChatId) {
+        void createConversationBranch(accessToken, {
+          conversation_id: currentChatId,
+          source_message_id: lastUser.id,
+          original_prompt: lastUser.content,
+          edited_prompt: lastUser.content,
+          note: "Regenerate answer branch",
+        }).catch((branchError) => console.error("Regenerate branch save failed", branchError));
+      }
+
+      const requestMessages: ChatMessage[] = priorMessages
+        .filter((message) => message.content.trim())
+        .slice(-98)
+        .map(({ role, content }) => ({ role, content: content.trim() }));
+
+      requestMessages.push({
+        role: "user",
+        content:
+          "Answer the immediately preceding user request again from scratch. " +
+          "Use a fresh approach, do not mention this regeneration instruction, " +
+          `and ignore cached wording. Internal fresh request ${nonce}.`,
+      });
+
+      setMessages([...priorMessages, { id: assistantId, role: "assistant", content: "" }]);
+      const controller = new AbortController();
+      streamAbortRef.current = controller;
+
+      const meta = await streamChat(
+        requestMessages,
+        {
+          accessToken,
+          useWeb: webEnabled || mode === "web",
+          useMemory: memoryEnabled,
+          useDocuments: documentsEnabled,
+          documentIds: selectedDocumentIds,
+          signal: controller.signal,
+        },
+        (token) => {
+          streamedAnswer += token;
+          setStreamingStarted(true);
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId ? { ...message, content: streamedAnswer } : message,
+            ),
+          );
+        },
+      );
+
+      const answer = streamedAnswer.trim();
+      if (!answer) throw new Error("The AI returned an empty regenerated response.");
+
+      const finalMessages: UiMessage[] = [
+        ...priorMessages,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: answer,
+          provider: meta.provider || "",
+          sources: normaliseSources(meta.sources),
+        },
+      ];
+      setMessages(finalMessages);
+      await persistChat(finalMessages, currentChatId ? null : currentChatId);
+    } catch (regenerateError) {
+      setMessages(messages);
+      setError(regenerateError instanceof Error ? regenerateError.message : "Regeneration failed. Please retry.");
     } finally {
       streamAbortRef.current = null;
       setStreamingStarted(false);
@@ -1400,6 +1563,12 @@ export default function ChatApp() {
             <Icon name="plus" />
             <span>New chat</span>
           </button>
+          <a className="pv-nav-button" href="/projects"><span aria-hidden="true">▦</span><span>Projects</span></a>
+          <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
+          <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
+          {accountPlan?.plan === "owner" && (
+            <a className="pv-nav-button" href="/owner"><span aria-hidden="true">⌁</span><span>Owner Analytics</span></a>
+          )}
 
         </nav>
 
@@ -1718,15 +1887,32 @@ export default function ChatApp() {
                             <button
                               type="button"
                               aria-label="Good response"
+                              aria-pressed={feedbackById[message.id] === "up"}
+                              onClick={() => void sendFeedback(message, "up")}
                             >
                               <Icon name="thumbUp" />
                             </button>
                             <button
                               type="button"
                               aria-label="Bad response"
+                              aria-pressed={feedbackById[message.id] === "down"}
+                              onClick={() => void sendFeedback(message, "down")}
                             >
                               <Icon name="thumbDown" />
                             </button>
+                            {message.id === messages[messages.length - 1]?.id &&
+                              !message.imageUrl &&
+                              !message.artifacts?.length && (
+                                <button
+                                  type="button"
+                                  aria-label="Regenerate answer"
+                                  title="Regenerate answer in a new branch"
+                                  disabled={busy}
+                                  onClick={() => void regenerateAssistant(message.id)}
+                                >
+                                  <span aria-hidden="true">↻</span>
+                                </button>
+                              )}
                           </div>
                         </>
                       ) : (
@@ -1746,6 +1932,17 @@ export default function ChatApp() {
                           )}
                           <div className="pv-user-bubble">
                             {message.content}
+                          </div>
+                          <div className="pv-message-actions pv-user-message-actions">
+                            <button
+                              type="button"
+                              aria-label="Edit and resend"
+                              title="Edit & Resend in a new branch"
+                              disabled={busy}
+                              onClick={() => beginEditMessage(message)}
+                            >
+                              <span aria-hidden="true">✎</span>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -1771,6 +1968,12 @@ export default function ChatApp() {
 
             <div className="pv-composer-dock">
               <div className="pv-composer-dock-inner">
+                {editingMessageId && (
+                  <div className="pv-editing-banner">
+                    <span>Editing an earlier prompt · resend creates a new branch</span>
+                    <button type="button" onClick={cancelEditMessage}>Cancel</button>
+                  </div>
+                )}
                 <Composer
                   input={input}
                   setInput={setInput}

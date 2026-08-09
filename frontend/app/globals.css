@@ -2619,3 +2619,48 @@ button {
 }
 /* VASUKI_ATTACHMENT_MENU_END */
 
+/* VASUKI_V8_PHASE3_PART2_STYLES_START */
+.pv-sidebar-nav a.pv-nav-button { text-decoration: none; color: inherit; }
+.pv-v8-page { min-height: 100vh; padding: 32px; background: #212121; color: #f5f5f5; }
+.pv-v8-page-head { display:flex; justify-content:space-between; gap:20px; max-width:1100px; margin:0 auto 24px; }
+.pv-v8-page-head h1 { margin:2px 0 6px; font-size:30px; }
+.pv-v8-page-head p { margin:0; color:#aaa; }
+.pv-v8-kicker { color:#c4b5fd !important; font-size:12px; text-transform:uppercase; letter-spacing:.12em; }
+.pv-v8-back { color:#eee; text-decoration:none; border:1px solid #3a3a3a; border-radius:12px; padding:9px 12px; }
+.pv-v8-grid,.pv-v8-image-grid,.pv-v8-stat-grid,.pv-v8-form { max-width:1100px; margin-left:auto; margin-right:auto; }
+.pv-v8-grid { display:grid; gap:12px; }
+.pv-v8-card { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:16px; background:#171717; border:1px solid #383838; border-radius:14px; }
+.pv-v8-card--block { display:block; }
+.pv-v8-card small { display:block; margin-top:5px; color:#9ca3af; }
+.pv-v8-card pre { max-height:340px; overflow:auto; white-space:pre-wrap; color:#cfcfcf; }
+.pv-v8-card-actions { display:flex; gap:10px; align-items:center; }
+.pv-v8-card-actions a,.pv-v8-image-copy a { color:#c4b5fd; text-decoration:none; }
+.pv-v8-card-actions button { background:transparent; color:#fca5a5; border:1px solid #713737; border-radius:9px; padding:7px 10px; }
+.pv-v8-empty,.pv-v8-error { max-width:1100px; margin:16px auto; padding:16px; border-radius:12px; background:#171717; border:1px solid #383838; }
+.pv-v8-error { color:#fecaca; border-color:#713737; }
+.pv-v8-image-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+.pv-v8-image-card { overflow:hidden; background:#171717; border:1px solid #383838; border-radius:14px; }
+.pv-v8-image-card img,.pv-v8-image-placeholder { width:100%; aspect-ratio:1/1; object-fit:cover; background:#111; }
+.pv-v8-image-placeholder { display:grid; place-items:center; color:#777; }
+.pv-v8-image-copy { padding:14px; }
+.pv-v8-image-copy p { color:#cfcfcf; font-size:13px; }
+.pv-v8-image-copy small { display:block; color:#929292; margin-bottom:10px; }
+.pv-v8-stat-grid { display:grid; grid-template-columns:repeat(5,minmax(120px,1fr)); gap:12px; margin-bottom:18px; }
+.pv-v8-stat { background:#171717; border:1px solid #383838; border-radius:14px; padding:16px; }
+.pv-v8-stat span { display:block; color:#9ca3af; font-size:12px; }
+.pv-v8-stat strong { display:block; margin-top:6px; font-size:20px; }
+.pv-v8-form { display:grid; gap:10px; margin-bottom:22px; }
+.pv-v8-form input,.pv-v8-form textarea { width:100%; box-sizing:border-box; background:#171717; color:#f5f5f5; border:1px solid #383838; border-radius:12px; padding:12px; }
+.pv-v8-form textarea { min-height:90px; resize:vertical; }
+.pv-v8-form button { width:max-content; padding:10px 16px; border:0; border-radius:11px; color:#fff; background:#7c3aed; }
+.pv-editing-banner { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; padding:8px 12px; background:#171717; border:1px solid #444; border-radius:10px; color:#d4d4d4; font-size:13px; }
+.pv-editing-banner button { border:0; background:transparent; color:#c4b5fd; cursor:pointer; }
+.pv-message-actions button[aria-pressed="true"] { color:#c4b5fd; background:#2b2440; }
+.pv-user-message-actions { justify-content:flex-end; opacity:.75; }
+.pv-user-message-stack:hover .pv-user-message-actions { opacity:1; }
+@media (max-width:760px) {
+  .pv-v8-page { padding:18px; }
+  .pv-v8-page-head { flex-direction:column; }
+  .pv-v8-stat-grid { grid-template-columns:repeat(2,1fr); }
+}
+/* VASUKI_V8_PHASE3_PART2_STYLES_END */
