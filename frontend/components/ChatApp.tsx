@@ -132,7 +132,7 @@ type PendingAttachment = {
   kind: "image" | "document";
 };
 
-type ActionMode = "chat" | "image" | "write" | "web" | "analyze";
+type ActionMode = "chat" | "image" | "write" | "web" | "analyze" | "research";
 type AiEngine = "vasuki" | "puter";
 
 /* VASUKI_VOICE_TYPES_START */
@@ -197,7 +197,7 @@ const actionItems: Array<{
   mode: ActionMode;
   label: string;
   prompt: string;
-  icon: "image" | "write" | "web" | "analyze";
+  icon: "image" | "write" | "web" | "analyze" | "research";
 }> = [
   {
     mode: "image",
@@ -216,6 +216,12 @@ const actionItems: Array<{
     label: "Search the web",
     prompt: "Search the web for ",
     icon: "web",
+  },
+  {
+    mode: "research",
+    label: "Deep research",
+    prompt: "",
+    icon: "research",
   },
 ];
 
@@ -986,7 +992,7 @@ export default function ChatApp() {
 
   function selectAction(action: (typeof actionItems)[number]) {
     setMode(action.mode);
-    setWebEnabled(action.mode === "web");
+    setWebEnabled(action.mode === "web" || action.mode === "research");
     setInput((current) => {
       const isPresetPrompt = actionItems.some(
         (item) => item.prompt && current === item.prompt,
@@ -1268,7 +1274,7 @@ export default function ChatApp() {
           );
         };
 
-        if (aiEngine === "puter") {
+        if (aiEngine === "puter" && mode !== "research") {
           if (!accountPlan?.puter_access) {
             throw new Error("Vasuki Pro access required.");
           }
@@ -1291,11 +1297,13 @@ export default function ChatApp() {
             requestMessages,
             {
               accessToken,
-              useWeb: webEnabled || mode === "web",
+              useWeb: webEnabled || mode === "web" || mode === "research",
               useMemory: memoryEnabled,
               useDocuments: documentsEnabled,
               documentIds: selectedDocumentIds,
               projectId: activeProjectId || undefined,
+              researchMode: mode === "research",
+              cacheBypass: mode === "research",
               signal: controller.signal,
             },
             onStreamToken,
@@ -1668,8 +1676,6 @@ export default function ChatApp() {
           <a className="pv-nav-button" href="/projects"><span aria-hidden="true">▦</span><span>Projects</span></a>
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
-          <a className="pv-nav-button" href="/branches"><span aria-hidden="true">Branches</span><span>Branch Explorer</span></a>
-          <a className="pv-nav-button" href="/research"><span aria-hidden="true">⌕</span><span>Deep Research</span></a>
           <a className="pv-nav-button" href="/code"><span aria-hidden="true">&lt;/&gt;</span><span>Code Lab</span></a>
           {accountPlan?.plan === "owner" && (
             <a className="pv-nav-button" href="/owner"><span aria-hidden="true">⌁</span><span>Owner Analytics</span></a>
@@ -1937,51 +1943,10 @@ export default function ChatApp() {
                 onSubmit={submit}
                 onStop={stopStreaming}
                 onKeyDown={handleKeyDown}
+                onSelectAction={selectAction}
+                onCancelAction={cancelAction}
                 welcome
               />
-
-              <div className="pv-actions">
-                {actionItems.map((action) => (
-                  <button
-                    type="button"
-                    key={action.mode}
-                    className={[
-                      "pv-action-button",
-                      mode === action.mode
-                        ? "pv-action-button--active"
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-label={
-                      mode === action.mode
-                        ? `Cancel ${action.label}`
-                        : action.label
-                    }
-                    title={
-                      mode === action.mode
-                        ? "Cancel and return to normal chat"
-                        : action.label
-                    }
-                    onClick={() =>
-                      mode === action.mode
-                        ? cancelAction(action)
-                        : selectAction(action)
-                    }
-                  >
-                    <Icon name={action.icon} />
-                    <span>{action.label}</span>
-                    {mode === action.mode && (
-                      <span
-                        className="pv-action-cancel"
-                        aria-hidden="true"
-                      >
-                        ×
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
 
               {error && <div className="pv-error pv-error--welcome">{error}</div>}
             </div>
@@ -2134,6 +2099,8 @@ export default function ChatApp() {
                   onSubmit={submit}
                   onStop={stopStreaming}
                   onKeyDown={handleKeyDown}
+                  onSelectAction={selectAction}
+                  onCancelAction={cancelAction}
                 />
                 <p className="pv-disclaimer">
                   Vasuki AI can make mistakes. Verify important information.
@@ -2193,6 +2160,8 @@ function Composer({
   onSubmit,
   onStop,
   onKeyDown,
+  onSelectAction,
+  onCancelAction,
   welcome = false,
 }: {
   input: string;
@@ -2206,6 +2175,8 @@ function Composer({
   onSubmit: (event?: FormEvent<HTMLFormElement>) => Promise<void>;
   onStop: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onSelectAction: (action: (typeof actionItems)[number]) => void;
+  onCancelAction: (action: (typeof actionItems)[number]) => void;
   welcome?: boolean;
 }) {
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -2457,7 +2428,9 @@ function Composer({
             ? "Ask about this image/file or describe an edit"
             : mode === "image"
               ? "Describe the image you want to create"
-              : "Ask Vasuki AI"
+              : mode === "research"
+                ? "What would you like me to research deeply?"
+                : "Ask Vasuki AI"
         }
       />
 
@@ -2514,6 +2487,44 @@ function Composer({
                   <Icon name="file" />
                   <span>Add file</span>
                 </button>
+                <div className="pv-plus-menu-separator" role="separator" />
+
+                {actionItems.map((action) => (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    key={action.mode}
+                    className={mode === action.mode ? "is-active" : ""}
+                    onClick={() => {
+                      setAttachmentMenuOpen(false);
+                      if (mode === action.mode) {
+                        onCancelAction(action);
+                      } else {
+                        onSelectAction(action);
+                      }
+                    }}
+                  >
+                    <Icon name={action.icon} />
+                    <span>{action.label}</span>
+                    {mode === action.mode ? (
+                      <span className="pv-plus-menu-check" aria-hidden="true">✓</span>
+                    ) : null}
+                  </button>
+                ))}
+
+                <div className="pv-plus-menu-separator" role="separator" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachmentMenuOpen(false);
+                    window.location.assign("/branches");
+                  }}
+                >
+                  <Icon name="branch" />
+                  <span>Branch Explorer</span>
+                </button>
               </div>
             )}
           </div>
@@ -2528,7 +2539,9 @@ function Composer({
                   ? "Write"
                   : mode === "web"
                     ? "Search web"
-                    : "Analyze"}
+                    : mode === "research"
+                      ? "Deep research"
+                      : "Analyze"}
             </span>
           ) : null}
         </div>
@@ -2755,6 +2768,8 @@ function Icon({
     | "image"
     | "write"
     | "web"
+    | "research"
+    | "branch"
     | "analyze"
     | "arrowUp"
     | "stop"
@@ -2806,6 +2821,21 @@ function Icon({
       <>
         <circle cx="12" cy="12" r="9" />
         <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+      </>
+    ),
+    research: (
+      <>
+        <circle cx="10.5" cy="10.5" r="5.5" />
+        <path d="m14.5 14.5 4 4" />
+        <path d="M18 4v4M16 6h4" />
+      </>
+    ),
+    branch: (
+      <>
+        <circle cx="6" cy="5" r="2" />
+        <circle cx="18" cy="7" r="2" />
+        <circle cx="18" cy="18" r="2" />
+        <path d="M8 5h3a5 5 0 0 1 5 5v6M8 5v10a3 3 0 0 0 3 3h5" />
       </>
     ),
     analyze: <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" />,

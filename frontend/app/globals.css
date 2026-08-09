@@ -2780,3 +2780,45 @@ button {
   .pv-code-editor textarea, .pv-code-preview iframe { min-height: 420px; }
 }
 /* VASUKI_V8_PHASE5_UI_END */
+
+
+/* VASUKI_PLUS_TOOLS_MENU_V2_START */
+.pv-attachment-menu {
+  width: 246px;
+  min-width: 246px;
+  max-height: min(560px, 72vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 7px;
+}
+
+.pv-plus-menu-separator {
+  height: 1px;
+  margin: 5px 7px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.pv-composer .pv-attachment-menu button.is-active {
+  background: rgba(79, 134, 247, 0.14);
+  color: #dbe8ff;
+}
+
+.pv-composer .pv-attachment-menu button.is-active svg {
+  color: #9fc0ff;
+}
+
+.pv-plus-menu-check {
+  margin-left: auto;
+  color: #9fc0ff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .pv-attachment-menu {
+    width: min(246px, calc(100vw - 26px));
+    min-width: min(246px, calc(100vw - 26px));
+    max-height: min(520px, 68vh);
+  }
+}
+/* VASUKI_PLUS_TOOLS_MENU_V2_END */
