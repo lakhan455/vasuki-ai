@@ -8,7 +8,8 @@ from app.services.cache_v7 import RESPONSE_CACHE, norm
 from app.services.chat_v4 import safe_error
 from app.services.chat_v5 import _stream_provider_segment, build_resume_messages
 from app.services.router_v7 import base_candidates, classify_route, configured_provider, last_user_query
-from app.services.telemetry_v7 import available, rank, attempt, success, failure, record
+from app.services.telemetry_v7 import available, attempt, success, failure, record
+from app.services.quality_v9 import rank_for_task
 
 def _chunks(s,size=80): return [s[i:i+size] for i in range(0,len(s),size)]
 
@@ -47,12 +48,12 @@ async def route_chat_stream_v7(
     base=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and legacy._provider_is_available(n)]
     healthy=[n for n in base if available(n)]
     alternatives=[n for n in healthy if not excluded_family or _provider_family(n)!=excluded_family]
-    candidates=rank(alternatives)[:max_attempts]
+    candidates=rank_for_task(alternatives,d.task_type)[:max_attempts]
     if not candidates:
         alternatives=[n for n in base if not excluded_family or _provider_family(n)!=excluded_family]
-        candidates=rank(alternatives)[:max_attempts]
+        candidates=rank_for_task(alternatives,d.task_type)[:max_attempts]
     if not candidates:
-        candidates=rank(healthy or base)[:max_attempts]
+        candidates=rank_for_task(healthy or base,d.task_type)[:max_attempts]
     if not candidates: raise RuntimeError("No healthy AI provider is currently available.")
 
     ckey=None

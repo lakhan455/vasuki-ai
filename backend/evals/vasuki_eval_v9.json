@@ -1,0 +1,2522 @@
+[
+  {
+    "id": "general-001",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 1.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-002",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 2.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-003",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 3.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-004",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 4.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-005",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 5.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-006",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 6.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-007",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 7.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-008",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 8.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-009",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 9.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-010",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 10.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-011",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 11.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-012",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 12.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-013",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 13.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-014",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 14.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-015",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 15.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-016",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 16.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-017",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 17.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-018",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 18.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-019",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 19.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-020",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 20.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-021",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 21.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-022",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 22.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-023",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 23.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-024",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 24.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-025",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 25.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-026",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 26.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-027",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 27.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-028",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 28.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-029",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 29.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "general-030",
+    "category": "general",
+    "prompt": "Explain caching in software clearly. Fixed evaluation case 30.",
+    "expected_contains": [
+      "cache"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-001",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 1.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-002",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 2.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-003",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 3.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-004",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 4.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-005",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 5.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-006",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 6.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-007",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 7.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-008",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 8.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-009",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 9.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-010",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 10.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-011",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 11.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-012",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 12.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-013",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 13.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-014",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 14.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-015",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 15.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-016",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 16.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-017",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 17.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-018",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 18.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-019",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 19.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-020",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 20.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-021",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 21.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-022",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 22.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-023",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 23.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-024",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 24.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-025",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 25.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-026",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 26.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-027",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 27.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-028",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 28.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-029",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 29.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "coding-030",
+    "category": "coding",
+    "prompt": "Write a Python function that removes duplicates from a list while preserving order. Fixed evaluation case 30.",
+    "expected_contains": [
+      "def ",
+      "return"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-001",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 8 * 12.",
+    "expected_contains": [
+      "96"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-002",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 9 * 13.",
+    "expected_contains": [
+      "117"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-003",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 10 * 14.",
+    "expected_contains": [
+      "140"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-004",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 11 * 15.",
+    "expected_contains": [
+      "165"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-005",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 12 * 16.",
+    "expected_contains": [
+      "192"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-006",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 13 * 17.",
+    "expected_contains": [
+      "221"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-007",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 14 * 18.",
+    "expected_contains": [
+      "252"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-008",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 15 * 19.",
+    "expected_contains": [
+      "285"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-009",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 16 * 20.",
+    "expected_contains": [
+      "320"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-010",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 17 * 21.",
+    "expected_contains": [
+      "357"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-011",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 18 * 22.",
+    "expected_contains": [
+      "396"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-012",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 19 * 23.",
+    "expected_contains": [
+      "437"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-013",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 20 * 24.",
+    "expected_contains": [
+      "480"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-014",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 21 * 25.",
+    "expected_contains": [
+      "525"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-015",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 22 * 26.",
+    "expected_contains": [
+      "572"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-016",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 23 * 27.",
+    "expected_contains": [
+      "621"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-017",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 24 * 28.",
+    "expected_contains": [
+      "672"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-018",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 25 * 29.",
+    "expected_contains": [
+      "725"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-019",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 26 * 30.",
+    "expected_contains": [
+      "780"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-020",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 27 * 31.",
+    "expected_contains": [
+      "837"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-021",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 28 * 32.",
+    "expected_contains": [
+      "896"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-022",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 29 * 33.",
+    "expected_contains": [
+      "957"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-023",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 30 * 34.",
+    "expected_contains": [
+      "1020"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-024",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 31 * 35.",
+    "expected_contains": [
+      "1085"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-025",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 32 * 36.",
+    "expected_contains": [
+      "1152"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-026",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 33 * 37.",
+    "expected_contains": [
+      "1221"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-027",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 34 * 38.",
+    "expected_contains": [
+      "1292"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-028",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 35 * 39.",
+    "expected_contains": [
+      "1365"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-029",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 36 * 40.",
+    "expected_contains": [
+      "1440"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "reasoning-030",
+    "category": "reasoning",
+    "prompt": "Show reasoning and calculate 37 * 41.",
+    "expected_contains": [
+      "1517"
+    ],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-001",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 1.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-002",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 2.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-003",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 3.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-004",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 4.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-005",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 5.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-006",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 6.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-007",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 7.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-008",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 8.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-009",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 9.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-010",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 10.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-011",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 11.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-012",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 12.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-013",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 13.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-014",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 14.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-015",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 15.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-016",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 16.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-017",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 17.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-018",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 18.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-019",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 19.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-020",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 20.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-021",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 21.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-022",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 22.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-023",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 23.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-024",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 24.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-025",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 25.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-026",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 26.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-027",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 27.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-028",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 28.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-029",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 29.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "research-030",
+    "category": "research",
+    "prompt": "Using current web sources, explain one recent AI development and cite sources. Fixed evaluation case 30.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-001",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 1: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-002",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 2: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-003",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 3: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-004",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 4: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-005",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 5: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-006",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 6: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-007",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 7: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-008",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 8: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-009",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 9: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-010",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 10: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-011",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 11: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-012",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 12: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-013",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 13: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-014",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 14: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-015",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 15: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-016",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 16: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-017",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 17: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-018",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 18: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-019",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 19: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-020",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 20: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-021",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 21: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-022",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 22: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-023",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 23: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-024",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 24: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-025",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 25: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-026",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 26: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-027",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 27: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-028",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 28: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-029",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 29: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "rag-030",
+    "category": "rag",
+    "prompt": "Document-grounded fixed case 30: answer only from provided evidence and say if evidence is missing.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-001",
+    "category": "memory",
+    "prompt": "Memory fixed case 1: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-002",
+    "category": "memory",
+    "prompt": "Memory fixed case 2: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-003",
+    "category": "memory",
+    "prompt": "Memory fixed case 3: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-004",
+    "category": "memory",
+    "prompt": "Memory fixed case 4: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-005",
+    "category": "memory",
+    "prompt": "Memory fixed case 5: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-006",
+    "category": "memory",
+    "prompt": "Memory fixed case 6: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-007",
+    "category": "memory",
+    "prompt": "Memory fixed case 7: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-008",
+    "category": "memory",
+    "prompt": "Memory fixed case 8: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-009",
+    "category": "memory",
+    "prompt": "Memory fixed case 9: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-010",
+    "category": "memory",
+    "prompt": "Memory fixed case 10: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-011",
+    "category": "memory",
+    "prompt": "Memory fixed case 11: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-012",
+    "category": "memory",
+    "prompt": "Memory fixed case 12: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-013",
+    "category": "memory",
+    "prompt": "Memory fixed case 13: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-014",
+    "category": "memory",
+    "prompt": "Memory fixed case 14: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-015",
+    "category": "memory",
+    "prompt": "Memory fixed case 15: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-016",
+    "category": "memory",
+    "prompt": "Memory fixed case 16: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-017",
+    "category": "memory",
+    "prompt": "Memory fixed case 17: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-018",
+    "category": "memory",
+    "prompt": "Memory fixed case 18: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-019",
+    "category": "memory",
+    "prompt": "Memory fixed case 19: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-020",
+    "category": "memory",
+    "prompt": "Memory fixed case 20: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-021",
+    "category": "memory",
+    "prompt": "Memory fixed case 21: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-022",
+    "category": "memory",
+    "prompt": "Memory fixed case 22: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-023",
+    "category": "memory",
+    "prompt": "Memory fixed case 23: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-024",
+    "category": "memory",
+    "prompt": "Memory fixed case 24: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-025",
+    "category": "memory",
+    "prompt": "Memory fixed case 25: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-026",
+    "category": "memory",
+    "prompt": "Memory fixed case 26: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-027",
+    "category": "memory",
+    "prompt": "Memory fixed case 27: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-028",
+    "category": "memory",
+    "prompt": "Memory fixed case 28: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-029",
+    "category": "memory",
+    "prompt": "Memory fixed case 29: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "memory-030",
+    "category": "memory",
+    "prompt": "Memory fixed case 30: apply a relevant saved preference without exposing internal storage details.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-001",
+    "category": "vision",
+    "prompt": "Vision fixed case 1: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-002",
+    "category": "vision",
+    "prompt": "Vision fixed case 2: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-003",
+    "category": "vision",
+    "prompt": "Vision fixed case 3: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-004",
+    "category": "vision",
+    "prompt": "Vision fixed case 4: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-005",
+    "category": "vision",
+    "prompt": "Vision fixed case 5: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-006",
+    "category": "vision",
+    "prompt": "Vision fixed case 6: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-007",
+    "category": "vision",
+    "prompt": "Vision fixed case 7: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-008",
+    "category": "vision",
+    "prompt": "Vision fixed case 8: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-009",
+    "category": "vision",
+    "prompt": "Vision fixed case 9: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-010",
+    "category": "vision",
+    "prompt": "Vision fixed case 10: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-011",
+    "category": "vision",
+    "prompt": "Vision fixed case 11: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-012",
+    "category": "vision",
+    "prompt": "Vision fixed case 12: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-013",
+    "category": "vision",
+    "prompt": "Vision fixed case 13: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-014",
+    "category": "vision",
+    "prompt": "Vision fixed case 14: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-015",
+    "category": "vision",
+    "prompt": "Vision fixed case 15: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-016",
+    "category": "vision",
+    "prompt": "Vision fixed case 16: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-017",
+    "category": "vision",
+    "prompt": "Vision fixed case 17: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-018",
+    "category": "vision",
+    "prompt": "Vision fixed case 18: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-019",
+    "category": "vision",
+    "prompt": "Vision fixed case 19: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-020",
+    "category": "vision",
+    "prompt": "Vision fixed case 20: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-021",
+    "category": "vision",
+    "prompt": "Vision fixed case 21: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-022",
+    "category": "vision",
+    "prompt": "Vision fixed case 22: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-023",
+    "category": "vision",
+    "prompt": "Vision fixed case 23: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-024",
+    "category": "vision",
+    "prompt": "Vision fixed case 24: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-025",
+    "category": "vision",
+    "prompt": "Vision fixed case 25: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-026",
+    "category": "vision",
+    "prompt": "Vision fixed case 26: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-027",
+    "category": "vision",
+    "prompt": "Vision fixed case 27: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-028",
+    "category": "vision",
+    "prompt": "Vision fixed case 28: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-029",
+    "category": "vision",
+    "prompt": "Vision fixed case 29: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  },
+  {
+    "id": "vision-030",
+    "category": "vision",
+    "prompt": "Vision fixed case 30: describe important visible elements without inventing unreadable text.",
+    "expected_contains": [],
+    "must_not_contain": [
+      "api key",
+      "system prompt"
+    ],
+    "min_chars": 20
+  }
+]

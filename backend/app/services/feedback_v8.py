@@ -7,6 +7,7 @@ import httpx
 
 from app.config import Settings
 from app.services.analytics_v8 import _base, _headers, configured
+from app.services.quality_v9 import observe_feedback
 
 VALID_CATEGORIES = {
     'incorrect', 'slow', 'outdated', 'bad_code', 'bad_image',
@@ -47,6 +48,13 @@ async def save_feedback(
             json=payload,
         )
     response.raise_for_status()
+    meta = metadata or {}
+    observe_feedback(
+        str(meta.get("provider") or ""),
+        payload["rating"],
+        task_type=str(meta.get("task_type") or "") or None,
+        category=payload["category"],
+    )
     rows = response.json()
     if isinstance(rows, list) and rows:
         return rows[0]
