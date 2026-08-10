@@ -15,6 +15,7 @@ def main():
         "/health/v9-phase4",
         "/health/v9-phase5",
         "/health/v9-phase6",
+        "/health/v10-omni",
     ]
     ok = True
     with httpx.Client(timeout=20.0) as client:

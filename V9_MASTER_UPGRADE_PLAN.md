@@ -31,3 +31,20 @@ Items 32-42 implemented: exports, account deletion, storage quota/cleanup, PWA, 
 
 ## V9 Phase 6 implementation
 Items 43-47 plus hardening 48-50 implemented: security audit, audit logs, secret rotation workflow, application backup/restore, error tracking, release health, CI secret scan and persisted Eval Score.
+
+<!-- VASUKI_V10_OMNI_BRAIN_START -->
+## V10 Omni Brain
+
+OmniRoute v3.8.50 integration layer:
+- source-derived technical knowledge corpus;
+- optional OpenAI-compatible OmniRoute sidecar for `auto/*` routing;
+- automatic mode selection for fast/coding/reasoning/research;
+- gateway failure/partial-stream fallback to the existing Vasuki router;
+- optional image and embeddings gateway paths;
+- owner status and V10 health endpoints;
+- OmniRoute MIT attribution preserved.
+
+Full OmniRoute provider pools, 13-factor scoring, circuit breakers, connection cooldowns,
+model lockouts, quota/cost telemetry, MCP and A2A execute in the separate OmniRoute runtime
+when that runtime is deployed and configured.
+<!-- VASUKI_V10_OMNI_BRAIN_END -->

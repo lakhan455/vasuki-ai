@@ -58,6 +58,23 @@ class Settings(BaseSettings):
     razorpay_plan_amount_paise: int = 9900
     razorpay_plan_days: int = 30
 
+    # VASUKI_V10_OMNI_BRAIN_START
+    # Optional OmniRoute sidecar. Secrets stay backend-only.
+    omniroute_enabled: bool = False
+    omniroute_base_url: str = ""
+    omniroute_api_key: str | None = None
+    omniroute_timeout_seconds: int = 65
+    omniroute_compression: str = "default"
+    omniroute_budget_usd: float = 0.0
+    omniroute_budget_fallback: str = "cheapest"
+    omniroute_knowledge_enabled: bool = True
+    omniroute_search_enabled: bool = False
+    omniroute_image_enabled: bool = False
+    omniroute_image_model: str = ""
+    omniroute_embedding_enabled: bool = False
+    omniroute_embedding_model: str = ""
+    # VASUKI_V10_OMNI_BRAIN_END
+
     global_learning_enabled: bool = True
     global_memory_direct_answer_score: float = 0.58
     global_memory_max_results: int = 3
