@@ -264,7 +264,7 @@ function wantsDownloadableArtifact(value: string) {
     /\b(?:create|make|generate|prepare|export|download|provide|give|convert|save|print|build|banao|bana\s*do|banado|bana|de\s*do|dedo|chahiye|create\s+karo|bana\s+kar\s+do|pdf\s+m(?:e|ein))\b/i.test(
       normalized,
     ) ||
-    /à¤¬à¤¨à¤¾|à¤¬à¤¨à¤¾à¤“|à¤¦à¥‡\s*à¤¦à¥‹|à¤¡à¤¾à¤‰à¤¨à¤²à¥‹à¤¡|à¤¤à¥ˆà¤¯à¤¾à¤°/.test(normalized);
+    /बना|बनाओ|दे\s*दो|डाउनलोड|तैयार/.test(normalized);
 
   return (
     (hasFormat && hasAction) ||
@@ -1171,7 +1171,7 @@ export default function ChatApp() {
           const quota = await consumePuterImageQuota(accessToken);
           setPuterImageQuota(quota);
           imageQuotaText =
-            ` Â· Today ${quota.daily_remaining}/${quota.daily_limit} left`;
+            ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
 
           try {
             const result = await generatePuterImage4K(effectiveText);
@@ -1189,7 +1189,7 @@ export default function ChatApp() {
                   ? fallback.url.trim()
                   : "";
               imageProvider = fallback.provider
-                ? `Vasuki fallback Â· ${fallback.provider}`
+                ? `Vasuki fallback · ${fallback.provider}`
                 : "Vasuki fallback";
 
               if (!imageUrl) {
@@ -1572,7 +1572,7 @@ export default function ChatApp() {
         <div className="pv-auth-card">
           <Logo className="pv-auth-logo" />
           <h1>Vasuki AI</h1>
-          <p>Securely loading your accountâ€¦</p>
+          <p>Securely loading your account…</p>
           <div className="pv-auth-spinner" />
         </div>
       </main>
@@ -1732,12 +1732,12 @@ export default function ChatApp() {
             <Icon name="plus" />
             <span>New chat</span>
           </button>
-          <a className="pv-nav-button" href="/projects"><span aria-hidden="true">â–¦</span><span>Projects</span></a>
+          <a className="pv-nav-button" href="/projects"><Icon name="project" /><span>Projects</span></a>
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
-          <a className="pv-nav-button" href="/code"><span aria-hidden="true">&lt;/&gt;</span><span>Code Lab</span></a>
+          <a className="pv-nav-button" href="/code"><Icon name="code" /><span>Code Lab</span></a>
           {accountPlan?.plan === "owner" && (
-            <a className="pv-nav-button" href="/owner"><span aria-hidden="true">âŒ</span><span>Owner Analytics</span></a>
+            <a className="pv-nav-button" href="/owner"><Icon name="analytics" /><span>Owner Analytics</span></a>
           )}
 
         </nav>
@@ -1745,7 +1745,7 @@ export default function ChatApp() {
         <div className="pv-recent">
           <p className="pv-section-label">
             {historyQuery.trim().length >= 2 ? "Search results" : "Recent"}{" "}
-            {(historyBusy || historySearchBusy) ? "Â· loadingâ€¦" : ""}
+            {(historyBusy || historySearchBusy) ? "· loading…" : ""}
           </p>
 
           {historyQuery.trim().length >= 2 ? (
@@ -1882,7 +1882,7 @@ export default function ChatApp() {
                   >
                     <strong>Vasuki AI</strong>
                     <small>
-                      Normal Â· Web Â· Memory Â· Documents
+                      Normal · Web · Memory · Documents
                     </small>
                   </button>
 
@@ -1896,7 +1896,7 @@ export default function ChatApp() {
                   >
                     <strong>Vasuki Pro</strong>
                     <small>
-                      Smart answers Â· Complete coding Â· 100 images/day
+                      Smart answers · Complete coding · 100 images/day
                     </small>
                   </button>
 
@@ -2073,7 +2073,7 @@ export default function ChatApp() {
                                   disabled={busy}
                                   onClick={() => void regenerateAssistant(message.id)}
                                 >
-                                  <span aria-hidden="true">â†»</span>
+                                  <Icon name="regenerate" />
                                 </button>
                               )}
                           </div>
@@ -2104,7 +2104,7 @@ export default function ChatApp() {
                               disabled={busy}
                               onClick={() => beginEditMessage(message)}
                             >
-                              <span aria-hidden="true">âœŽ</span>
+                              <Icon name="edit" />
                             </button>
                           </div>
                         </div>
@@ -2133,7 +2133,7 @@ export default function ChatApp() {
               <div className="pv-composer-dock-inner">
                 {editingMessageId && (
                   <div className="pv-editing-banner">
-                    <span>Editing an earlier prompt Â· resend creates a new branch</span>
+                    <span>Editing an earlier prompt · resend creates a new branch</span>
                     <button type="button" onClick={cancelEditMessage}>Cancel</button>
                   </div>
                 )}
@@ -2181,6 +2181,7 @@ export default function ChatApp() {
 }
 
 function Logo({ className }: { className: string }) {
+  const [source, setSource] = useState(VASUKI_LOGO_URL);
   const [failed, setFailed] = useState(false);
 
   if (failed) {
@@ -2190,10 +2191,16 @@ function Logo({ className }: { className: string }) {
   return (
     <img
       className={className}
-      src={VASUKI_LOGO_URL}
+      src={source}
       alt="Vasuki AI logo"
       referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      onError={() => {
+        if (source !== "/vasuki-pwa.svg") {
+          setSource("/vasuki-pwa.svg");
+          return;
+        }
+        setFailed(true);
+      }}
     />
   );
 }
@@ -2450,7 +2457,7 @@ function Composer({
           <span className="pv-attachment-copy">
             <strong>{attachment.file.name}</strong>
             <small>
-              {attachment.kind === "image" ? "Image" : "Document"} Â·{" "}
+              {attachment.kind === "image" ? "Image" : "Document"} ·{" "}
               {fileSizeLabel(attachment.file.size)}
             </small>
           </span>
@@ -2496,7 +2503,7 @@ function Composer({
           role="status"
           aria-live="polite"
         >
-          {speechError || "Listeningâ€¦ Speak now"}
+          {speechError || "Listening… Speak now"}
         </div>
       )}
 
@@ -2557,7 +2564,7 @@ function Composer({
                     <Icon name={action.icon} />
                     <span>{action.label}</span>
                     {mode === action.mode ? (
-                      <span className="pv-plus-menu-check" aria-hidden="true">âœ“</span>
+                      <span className="pv-plus-menu-check" aria-hidden="true"><Icon name="check" /></span>
                     ) : null}
                   </button>
                 ))}
@@ -2701,12 +2708,12 @@ function InlineArtifactDownloads({
             aria-label={`Download ${artifact.name}`}
           >
             <span className="pv-smart-download-icon" aria-hidden="true">
-              â†“
+              <Icon name="download" />
             </span>
             <span className="pv-smart-download-copy">
               <strong>{artifact.name}</strong>
               <small>
-                {label} Â· {fileSizeLabel(artifact.size_bytes)}
+                {label} · {fileSizeLabel(artifact.size_bytes)}
               </small>
             </span>
             <span className="pv-smart-download-action">Download</span>
@@ -2757,7 +2764,7 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
               title={source.title || "Your document"}
             >
               <span className="pv-source-number">{index + 1}</span>
-              <span aria-hidden="true">ðŸ“„</span>
+              <span aria-hidden="true"><Icon name="file" /></span>
               <span>{source.title || "Your document"}</span>
             </span>
           ),
@@ -2790,11 +2797,11 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
                   <small>
                     {sourceDomain(source)}
                     {source.published_date
-                      ? ` Â· ${source.published_date}`
+                      ? ` · ${source.published_date}`
                       : ""}
                   </small>
                 </span>
-                <span className="pv-source-open" aria-hidden="true">â†—</span>
+                <span className="pv-source-open" aria-hidden="true"><Icon name="external" /></span>
               </a>
             ) : (
               <div
@@ -2803,7 +2810,7 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
               >
                 <span className="pv-source-card-number">{index + 1}</span>
                 <span className="pv-document-source-icon" aria-hidden="true">
-                  ðŸ“„
+                  <Icon name="file" />
                 </span>
                 <span className="pv-source-card-copy">
                   <strong>{source.title || "Your document"}</strong>
@@ -2865,7 +2872,15 @@ function Icon({
     | "thumbDown"
     | "trash"
     | "file"
-    | "logout";
+    | "logout"
+    | "project"
+    | "code"
+    | "analytics"
+    | "regenerate"
+    | "check"
+    | "download"
+    | "external"
+    | "edit";
 }) {
   const common = {
     viewBox: "0 0 24 24",
@@ -2974,6 +2989,54 @@ function Icon({
         <path d="M6 3h8l4 4v14H6z" />
         <path d="M14 3v5h5" />
         <path d="M9 13h6M9 17h6" />
+      </>
+    ),
+    project: (
+      <>
+        <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+        <path d="M3 10h18" />
+      </>
+    ),
+    code: (
+      <>
+        <path d="m8 8-4 4 4 4" />
+        <path d="m16 8 4 4-4 4" />
+        <path d="m14 5-4 14" />
+      </>
+    ),
+    analytics: (
+      <>
+        <path d="M4 20V10" />
+        <path d="M10 20V4" />
+        <path d="M16 20v-7" />
+        <path d="M22 20H2" />
+      </>
+    ),
+    regenerate: (
+      <>
+        <path d="M20 7v5h-5" />
+        <path d="M18.5 16A8 8 0 1 1 20 12" />
+      </>
+    ),
+    edit: (
+      <>
+        <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+        <path d="m14 8 3 3" />
+      </>
+    ),
+    check: <path d="m5 12.5 4.2 4.2L19 7" />,
+    download: (
+      <>
+        <path d="M12 4v11" />
+        <path d="m7.5 11 4.5 4.5 4.5-4.5" />
+        <path d="M5 20h14" />
+      </>
+    ),
+    external: (
+      <>
+        <path d="M14 5h5v5" />
+        <path d="m19 5-9 9" />
+        <path d="M18 13v6H5V6h6" />
       </>
     ),
     logout: (

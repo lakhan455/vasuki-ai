@@ -29,7 +29,7 @@ button,
 textarea,
 input {
   font-family:
-    "SÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¶hne",
+    "Söhne",
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -3699,3 +3699,19 @@ button {
 /* VASUKI_V9_PHASE6_CSS_START */
 .pv-v9-security-page{min-height:100vh;background:#171717;color:#f5f5f5;padding:32px}.pv-v9-security-head{max-width:1240px;margin:0 auto 22px;display:flex;justify-content:space-between;gap:20px;align-items:flex-end}.pv-v9-security-head h1{margin:4px 0 7px;font-size:clamp(2rem,5vw,3.2rem)}.pv-v9-security-head p{color:#aaa;margin:0;max-width:760px}.pv-v9-security-head nav{display:flex;gap:8px;flex-wrap:wrap}.pv-v9-security-head a{color:#eee;text-decoration:none;border:1px solid #3d3d3d;border-radius:999px;padding:9px 13px;background:#222}.pv-v9-security-alert,.pv-v9-security-success{max-width:1240px;margin:0 auto 14px;border-radius:13px;padding:11px 13px}.pv-v9-security-success{border:1px solid #3e6854;background:#1c3428;color:#d9ffea}.pv-v9-security-summary{max-width:1240px;margin:0 auto 16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.pv-v9-security-summary article{border:1px solid #353535;border-radius:18px;padding:17px;background:#202020;display:grid;gap:5px}.pv-v9-security-summary span,.pv-v9-security-summary em{color:#979797;font-style:normal;font-size:.84rem}.pv-v9-security-summary strong{font-size:2rem;line-height:1.05}.pv-v9-security-summary strong small{font-size:.8rem;color:#888;margin-left:3px}.pv-v9-security-summary .pv-v9-security-word{font-size:1.4rem;text-transform:capitalize}.pv-v9-security-grid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}.pv-v9-security-card{border:1px solid #353535;background:#202020;border-radius:20px;padding:19px;min-width:0}.pv-v9-security-wide{grid-column:1/-1}.pv-v9-security-card h2{margin:3px 0 12px}.pv-v9-security-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.pv-v9-security-card button{border:1px solid #484848;border-radius:10px;background:#f1f1f1;color:#111;padding:8px 11px;font-weight:700}.pv-v9-security-card button:disabled{opacity:.45}.pv-v9-security-card .pv-v9-danger-button{background:#3a1d1d;border-color:#784747;color:#ffdede;margin-left:6px}.pv-v9-security-muted{color:#999;line-height:1.5}.pv-v9-security-card label{display:grid;gap:6px;margin:10px 0}.pv-v9-security-card input,.pv-v9-security-card select{border:1px solid #414141;background:#151515;color:#fff;border-radius:11px;padding:10px 11px;width:100%}.pv-v9-security-list{display:grid;gap:8px}.pv-v9-security-list>div{display:grid;grid-template-columns:76px 1fr;gap:9px;border-top:1px solid #303030;padding-top:9px}.pv-v9-security-list b{text-transform:uppercase;font-size:.72rem;color:#bbb}.pv-v9-security-list span{display:grid;gap:3px}.pv-v9-security-list small{color:#969696;line-height:1.4}.pv-v9-security-table-wrap{overflow:auto;border:1px solid #303030;border-radius:13px}.pv-v9-security-card table{width:100%;border-collapse:collapse;min-width:720px}.pv-v9-security-card th,.pv-v9-security-card td{padding:10px 11px;border-bottom:1px solid #303030;text-align:left;vertical-align:top;font-size:.86rem}.pv-v9-security-card th{color:#929292;font-weight:600;background:#1b1b1b}.pv-v9-security-message{max-width:620px;color:#bbb}@media(max-width:900px){.pv-v9-security-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.pv-v9-security-grid{grid-template-columns:1fr}.pv-v9-security-wide{grid-column:auto}}@media(max-width:620px){.pv-v9-security-page{padding:18px 12px 90px}.pv-v9-security-head{flex-direction:column;align-items:flex-start}.pv-v9-security-summary{grid-template-columns:1fr 1fr}}
 /* VASUKI_V9_PHASE6_CSS_END */
+
+/* VASUKI_UI_ICON_FIX_START */
+.pv-sidebar-nav .pv-nav-button > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.pv-message-actions button > svg,
+.pv-plus-menu-check svg,
+.pv-smart-download-icon svg,
+.pv-source-open svg,
+.pv-document-source-icon svg {
+  display: block;
+}
+/* VASUKI_UI_ICON_FIX_END */

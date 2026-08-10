@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -57,7 +57,7 @@ button {
 
 const DEFAULT_JS = `console.log("Sandbox started");
 document.querySelector("#demo")?.addEventListener("click", () => {
-  document.querySelector("h1").textContent = "JavaScript is working ðŸš€";
+  document.querySelector("h1").textContent = "JavaScript is working 🚀";
   console.log("Demo button clicked");
 });`;
 
@@ -270,12 +270,12 @@ ${js}
     <main className="pv-code-shell">
       <header className="pv-code-head">
         <div>
-          <p className="pv-phase5-kicker">V9 Â· Phase 2</p>
+          <p className="pv-phase5-kicker">V9 · Phase 2</p>
           <h1>Project Coding Agent</h1>
           <p>Project KB V2, cross-file understanding, multi-file patches, tests, debug and browser sandbox.</p>
         </div>
         <div className="pv-code-head-actions">
-          <Link className="pv-phase5-ghost" href="/">â† Chat</Link>
+          <Link className="pv-phase5-ghost" href="/">&larr; Chat</Link>
           <Link className="pv-phase5-ghost" href="/projects">Projects</Link>
         </div>
       </header>
@@ -305,7 +305,7 @@ ${js}
             {kbFiles.map((file) => (
               <div key={file.id}>
                 <span><b>{file.path}</b><small>{file.language || "text"}</small></span>
-                <button type="button" onClick={() => void removeKbFile(file.path)} disabled={agentBusy}>Ã—</button>
+                <button type="button" onClick={() => void removeKbFile(file.path)} disabled={agentBusy}>×</button>
               </div>
             ))}
             {projectId && kbFiles.length === 0 ? <p>No Project KB files yet.</p> : null}
@@ -336,7 +336,7 @@ ${js}
               Auto debug
             </button>
           </div>
-          {agentBusy ? <p>Vasuki Coding Agent is workingâ€¦</p> : null}
+          {agentBusy ? <p>Vasuki Coding Agent is working…</p> : null}
           {error ? <div className="pv-v8-error">{error}</div> : null}
         </div>
       </section>
