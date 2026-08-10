@@ -41,6 +41,9 @@ jobs:
       - name: Compile backend
         run: python -m compileall app
 
+      - name: Run security scan
+        run: python scripts/security_scan_v9.py --root ..
+
       - name: Run backend tests
         run: python -m pytest -q
 

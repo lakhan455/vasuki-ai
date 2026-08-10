@@ -28,3 +28,6 @@ Items 23-30 implemented: persistent jobs, progress UI, notifications, usage dash
 
 ## V9 Phase 5 implementation
 Items 32-42 implemented: exports, account deletion, storage quota/cleanup, PWA, Web Push foundation, offline shell, shortcuts, command palette and accessibility.
+
+## V9 Phase 6 implementation
+Items 43-47 plus hardening 48-50 implemented: security audit, audit logs, secret rotation workflow, application backup/restore, error tracking, release health, CI secret scan and persisted Eval Score.

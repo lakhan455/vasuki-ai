@@ -43,8 +43,21 @@ def main():
             lats.append((time.perf_counter()-t)*1000); groups[row["category"]].append(value)
             print(f"[{i}/{len(rows)}] {row['id']} {value:.2f}")
     scores={k:round(100*sum(v)/max(1,len(v))) for k,v in groups.items()}
-    result={"version":"v9-phase1","questions":len(rows),"scores":scores,"overall":round(sum(scores.values())/max(1,len(scores))),"average_latency_ms":round(sum(lats)/max(1,len(lats)))}
+    result={"version":"v9-phase6","questions":len(rows),"scores":scores,"overall":round(sum(scores.values())/max(1,len(scores))),"average_latency_ms":round(sum(lats)/max(1,len(lats)))}
     OUT.write_text(json.dumps(result,indent=2),encoding="utf-8")
+    try:
+        with httpx.Client(timeout=15.0) as upload_client:
+            upload_response = upload_client.post(
+                base + "/api/owner/evals/v9",
+                headers={"Authorization": f"Bearer {token}"},
+                json=result,
+            )
+        if upload_response.is_success:
+            print("Eval score persisted to Vasuki Security Center.")
+        else:
+            print(f"Eval score upload skipped ({upload_response.status_code}). Owner token is required.")
+    except Exception as exc:
+        print(f"Eval score upload skipped: {type(exc).__name__}")
     print(json.dumps(result,indent=2)); return 0
 if __name__ == "__main__":
     raise SystemExit(main())

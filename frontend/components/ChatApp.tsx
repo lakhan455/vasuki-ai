@@ -2598,6 +2598,18 @@ function Composer({
                   <Icon name="file" />
                   <span>Account & privacy</span>
                 </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachmentMenuOpen(false);
+                    window.location.assign("/security");
+                  }}
+                >
+                  <Icon name="file" />
+                  <span>Security Center</span>
+                </button>
               </div>
             )}
           </div>

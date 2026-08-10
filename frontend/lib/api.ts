@@ -1648,3 +1648,12 @@ export async function deleteAccountV9(
   return readResponse(response);
 }
 /* VASUKI_V9_PHASE5_API_END */
+
+/* VASUKI_V9_PHASE6_API_START */
+export type SecurityCenterV9 = { ok?: boolean; security?: { score?: number; grade?: string; findings?: Array<{ severity?: string; check?: string; detail?: string }>; secret_inventory?: Array<{ name?: string; configured?: boolean; fingerprint?: string | null }> }; audit_logs?: Array<Record<string, unknown>>; errors?: { total?: number; unresolved?: number; recent?: Array<Record<string, unknown>> }; backups?: Array<Record<string, unknown>>; evals?: Array<Record<string, unknown>>; release_health?: Record<string, unknown> };
+export async function fetchSecurityCenterV9(accessToken: string): Promise<SecurityCenterV9> { return await getAt(DIRECT_API_URL, "/api/owner/security-center/v9?days=7", accessToken) as SecurityCenterV9; }
+export async function createBackupV9(accessToken: string, note = "") { return postJsonAt(DIRECT_API_URL, "/api/owner/backups/v9", { note }, 120000, 1, accessToken); }
+export async function restoreBackupV9(accessToken: string, backupId: string, apply: boolean, confirmation = "") { return postJsonAt(DIRECT_API_URL, `/api/owner/backups/v9/${encodeURIComponent(backupId)}/restore`, { apply, confirmation }, 120000, 1, accessToken); }
+export async function resolveErrorV9(accessToken: string, errorId: number) { return patchJsonAt(DIRECT_API_URL, `/api/owner/errors/v9/${errorId}/resolve`, {}, accessToken); }
+export async function recordSecretRotationV9(accessToken: string, secretName: string, previousFingerprint: string, note = "") { return postJsonAt(DIRECT_API_URL, "/api/owner/secrets/v9/rotation", { secret_name: secretName, previous_fingerprint: previousFingerprint, note }, 30000, 1, accessToken); }
+/* VASUKI_V9_PHASE6_API_END */
