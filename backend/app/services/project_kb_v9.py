@@ -13,6 +13,7 @@ from app.config import Settings
 from app.services.analytics_v8 import _base, _headers, configured
 from app.services.project_memory_v8 import get_project, list_project_memories
 from app.services.rag import extract_document_pages
+from app.services.storage_v9 import ensure_storage_quota
 
 TEXT_EXTENSIONS = {
     ".txt", ".md", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".csv",
@@ -261,6 +262,31 @@ async def upsert_project_files(
             "content_sha256": hashlib.sha256(content).hexdigest(),
             "metadata": {"signals": extract_code_signals(path, text)},
         })
+
+    existing_rows = await list_project_files(
+        settings,
+        user_id=user_id,
+        project_id=project_id,
+        include_content=False,
+        limit=500,
+    )
+    existing_sizes = {
+        str(row.get("path") or ""): int(row.get("size_bytes") or 0)
+        for row in existing_rows
+    }
+    incoming_delta = sum(
+        max(
+            0,
+            int(item.get("size_bytes") or 0)
+            - existing_sizes.get(str(item.get("path") or ""), 0),
+        )
+        for item in payloads
+    )
+    await ensure_storage_quota(
+        settings,
+        user_id,
+        incoming_bytes=incoming_delta,
+    )
 
     headers = {
         **_headers(settings, representation=True),

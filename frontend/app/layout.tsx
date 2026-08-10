@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ProductivityShellV9 from "@/components/ProductivityShellV9";
 
 export const metadata: Metadata = {
   title: "Vasuki AI",
   description:
     "Vasuki AI — chat, live research, coding and image generation.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/vasuki-pwa-192.png", apple: "/vasuki-pwa-192.png" },
 };
 
 export default function RootLayout({
@@ -26,7 +29,11 @@ export default function RootLayout({
         />
         <script src="https://js.puter.com/v2/" defer />
       </head>
-      <body>{children}</body>
+      <body>
+        <a className="pv-skip-link" href="#main-content">Skip to main content</a>
+        <ProductivityShellV9 />
+        <div id="main-content" tabIndex={-1}>{children}</div>
+      </body>
     </html>
   );
 }

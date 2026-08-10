@@ -25,3 +25,6 @@ Items 14-22 implemented: image presets, aspect ratio, variations, image edit UI,
 
 ## V9 Phase 4 implementation
 Items 23-30 implemented: persistent jobs, progress UI, notifications, usage dashboard, owner cost/quota observability, Plan Policy V3, Feature Flags V3 and A/B testing.
+
+## V9 Phase 5 implementation
+Items 32-42 implemented: exports, account deletion, storage quota/cleanup, PWA, Web Push foundation, offline shell, shortcuts, command palette and accessibility.

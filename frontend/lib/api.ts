@@ -1503,3 +1503,148 @@ export async function updateOwnerFeatureFlagV9(
   );
 }
 /* VASUKI_V9_PHASE4_API_END */
+
+/* VASUKI_V9_PHASE5_API_START */
+export type AccountChatV9 = {
+  id: string;
+  title?: string;
+  updated_at?: string;
+  project_id?: string | null;
+};
+
+export type StorageSnapshotV9 = {
+  ok?: boolean;
+  plan?: string;
+  quota_bytes?: number;
+  used_bytes?: number;
+  remaining_bytes?: number;
+  percent_used?: number;
+  breakdown?: {
+    generated_artifacts?: number;
+    knowledge_documents?: number;
+    project_files?: number;
+  };
+};
+
+export type PushConfigV9 = {
+  ok?: boolean;
+  configured?: boolean;
+  public_key?: string;
+  subject?: string;
+};
+
+export async function fetchAccountChatsV9(
+  accessToken: string,
+): Promise<{ chats?: AccountChatV9[] }> {
+  return await getAt(
+    DIRECT_API_URL,
+    "/api/account/v9/chats?limit=300",
+    accessToken,
+  ) as { chats?: AccountChatV9[] };
+}
+
+export async function exportChatV9(
+  accessToken: string,
+  chatId: string,
+  format: "markdown" | "json",
+): Promise<{ filename?: string; mime_type?: string; content?: string }> {
+  return await getAt(
+    DIRECT_API_URL,
+    `/api/account/v9/export/chat/${encodeURIComponent(chatId)}?format=${encodeURIComponent(format)}`,
+    accessToken,
+  ) as { filename?: string; mime_type?: string; content?: string };
+}
+
+export async function exportFullAccountV9(
+  accessToken: string,
+): Promise<{ filename?: string; mime_type?: string; data?: Record<string, unknown> }> {
+  return await getAt(
+    DIRECT_API_URL,
+    "/api/account/v9/export/full",
+    accessToken,
+  ) as { filename?: string; mime_type?: string; data?: Record<string, unknown> };
+}
+
+export async function fetchStorageV9(
+  accessToken: string,
+): Promise<StorageSnapshotV9> {
+  return await getAt(
+    DIRECT_API_URL,
+    "/api/storage/v9",
+    accessToken,
+  ) as StorageSnapshotV9;
+}
+
+export async function cleanupStorageV9(
+  accessToken: string,
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    "/api/storage/v9/cleanup",
+    {},
+    30000,
+    1,
+    accessToken,
+  );
+}
+
+export async function fetchPushConfigV9(
+  accessToken: string,
+): Promise<PushConfigV9> {
+  return await getAt(
+    DIRECT_API_URL,
+    "/api/push/v9/config",
+    accessToken,
+  ) as PushConfigV9;
+}
+
+export async function subscribePushV9(
+  accessToken: string,
+  subscription: unknown,
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    "/api/push/v9/subscribe",
+    { subscription },
+    30000,
+    1,
+    accessToken,
+  );
+}
+
+export async function unsubscribePushV9(
+  accessToken: string,
+  endpoint: string,
+) {
+  const response = await fetch(
+    `${DIRECT_API_URL}/api/push/v9/subscribe`,
+    {
+      method: "DELETE",
+      headers: authHeaders(accessToken, true),
+      body: JSON.stringify({ endpoint }),
+      cache: "no-store",
+    },
+  );
+  return readResponse(response);
+}
+
+export async function deleteAccountV9(
+  accessToken: string,
+  confirmEmail: string,
+  confirmation: string,
+) {
+  const response = await fetch(
+    `${DIRECT_API_URL}/api/account/v9`,
+    {
+      method: "DELETE",
+      headers: authHeaders(accessToken, true),
+      body: JSON.stringify({
+        confirm_email: confirmEmail,
+        confirmation,
+      }),
+      cache: "no-store",
+    },
+  );
+  return readResponse(response);
+}
+/* VASUKI_V9_PHASE5_API_END */

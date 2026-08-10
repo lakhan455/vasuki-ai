@@ -360,7 +360,20 @@ async def create_notification(
             )
         response.raise_for_status()
         rows = response.json()
-        return rows[0] if isinstance(rows, list) and rows else payload
+        result = rows[0] if isinstance(rows, list) and rows else payload
+        try:
+            from app.services.push_v9 import send_push_notification
+            await send_push_notification(
+                settings,
+                user_id=user_id,
+                title=title,
+                body=body,
+                action_url=action_url,
+                kind=kind,
+            )
+        except Exception:
+            pass
+        return result
     except Exception:
         return None
 

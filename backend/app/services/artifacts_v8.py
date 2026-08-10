@@ -12,6 +12,7 @@ import httpx
 
 from app.config import Settings
 from app.services.analytics_v8 import _base, _headers, configured
+from app.services.storage_v9 import StorageQuotaExceeded, ensure_storage_quota
 
 BUCKET = "vasuki-artifacts"
 
@@ -80,6 +81,26 @@ async def save_artifact(
     storage_path = None
     size_bytes = None
     decoded = _decode_data_url(data_url or "")
+    if decoded:
+        try:
+            await ensure_storage_quota(
+                settings,
+                user_id,
+                incoming_bytes=len(decoded[1]),
+            )
+        except StorageQuotaExceeded as exc:
+            return {
+                "id": None,
+                "name": str(name or "Vasuki AI file")[:240],
+                "artifact_type": str(artifact_type or "file")[:50],
+                "mime_type": str(mime_type or "application/octet-stream")[:150],
+                "storage_path": None,
+                "external_url": external_url if external_url and external_url.startswith("http") else None,
+                "size_bytes": None,
+                "stored": False,
+                "quota_exceeded": True,
+                "detail": str(exc),
+            }
     if decoded:
         decoded_mime, content = decoded
         mime_type = decoded_mime or mime_type

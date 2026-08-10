@@ -2586,6 +2586,18 @@ function Composer({
                   <Icon name="file" />
                   <span>Operations Center</span>
                 </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setAttachmentMenuOpen(false);
+                    window.location.assign("/account");
+                  }}
+                >
+                  <Icon name="file" />
+                  <span>Account & privacy</span>
+                </button>
               </div>
             )}
           </div>

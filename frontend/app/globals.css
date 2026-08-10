@@ -3441,3 +3441,257 @@ button {
   .pv-v9-cost-grid { grid-template-columns: 1fr; }
 }
 /* VASUKI_V9_PHASE4_CSS_END */
+
+/* VASUKI_V9_PHASE5_CSS_START */
+.pv-skip-link {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 10000;
+  transform: translateY(-180%);
+  background: #fff;
+  color: #111;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+.pv-skip-link:focus { transform: translateY(0); }
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+.pv-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.pv-v9-command-trigger {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 800;
+  border: 1px solid #444;
+  background: #252525;
+  color: #f5f5f5;
+  border-radius: 999px;
+  min-width: 48px;
+  min-height: 42px;
+  padding: 0 13px;
+  font-weight: 750;
+  box-shadow: 0 12px 36px rgba(0,0,0,.3);
+}
+.pv-v9-offline-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 900;
+  transform: translateX(-50%);
+  background: #f5f5f5;
+  color: #111;
+  border-radius: 999px;
+  padding: 9px 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.35);
+  font-size: .84rem;
+}
+.pv-v9-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: grid;
+  place-items: start center;
+  padding: min(14vh, 110px) 14px 30px;
+  background: rgba(0,0,0,.66);
+}
+.pv-v9-palette {
+  width: min(680px, 100%);
+  max-height: 72vh;
+  overflow: hidden;
+  border: 1px solid #444;
+  background: #202020;
+  color: #f5f5f5;
+  border-radius: 22px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.55);
+  padding: 16px;
+}
+.pv-v9-palette-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.pv-v9-palette-head h2 { margin: 2px 0 0; }
+.pv-v9-palette-head button {
+  border: 1px solid #444;
+  background: #2b2b2b;
+  color: #ddd;
+  border-radius: 9px;
+  padding: 7px 10px;
+}
+.pv-v9-palette > input {
+  width: 100%;
+  border: 1px solid #444;
+  background: #151515;
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 1rem;
+}
+.pv-v9-command-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  max-height: 46vh;
+  overflow: auto;
+}
+.pv-v9-command-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #eee;
+  text-align: left;
+  border-radius: 12px;
+  padding: 11px 12px;
+}
+.pv-v9-command-list button:hover { background: #303030; }
+.pv-v9-command-list small { color: #8f8f8f; }
+.pv-v9-command-empty { color: #9b9b9b; padding: 18px 10px; text-align: center; }
+.pv-v9-palette footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  border-top: 1px solid #333;
+  padding-top: 11px;
+  margin-top: 10px;
+  color: #858585;
+  font-size: .78rem;
+}
+.pv-v9-account-page,
+.pv-v9-offline-page {
+  min-height: 100vh;
+  background: #171717;
+  color: #f5f5f5;
+  padding: 32px;
+}
+.pv-v9-account-head {
+  max-width: 1180px;
+  margin: 0 auto 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+.pv-v9-account-head h1 { margin: 4px 0 8px; font-size: clamp(2rem, 5vw, 3.1rem); }
+.pv-v9-account-head p { margin: 0; color: #aaa; max-width: 760px; }
+.pv-v9-account-head nav { display: flex; gap: 9px; flex-wrap: wrap; }
+.pv-v9-account-head a,
+.pv-v9-offline-page a {
+  border: 1px solid #3c3c3c;
+  background: #242424;
+  color: #f2f2f2;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 9px 13px;
+}
+.pv-v9-account-grid {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.pv-v9-account-card {
+  border: 1px solid #353535;
+  background: #202020;
+  border-radius: 22px;
+  padding: 20px;
+}
+.pv-v9-account-card h2 { margin: 3px 0 12px; }
+.pv-v9-account-card p { color: #aaa; line-height: 1.55; }
+.pv-v9-account-card label { display: grid; gap: 7px; margin: 12px 0; }
+.pv-v9-account-card input,
+.pv-v9-account-card select {
+  width: 100%;
+  border: 1px solid #414141;
+  background: #151515;
+  color: #fff;
+  border-radius: 12px;
+  padding: 11px 12px;
+}
+.pv-v9-account-card button {
+  border: 1px solid #484848;
+  background: #f1f1f1;
+  color: #111;
+  border-radius: 12px;
+  padding: 10px 13px;
+  font-weight: 700;
+}
+.pv-v9-account-card button:disabled { opacity: .45; cursor: not-allowed; }
+.pv-v9-account-divider { height: 1px; background: #383838; margin: 20px 0; }
+.pv-v9-storage-numbers { display: grid; gap: 4px; }
+.pv-v9-storage-numbers strong { font-size: 2rem; }
+.pv-v9-storage-numbers span { color: #999; }
+.pv-v9-storage-bar {
+  height: 11px;
+  border-radius: 999px;
+  background: #333;
+  overflow: hidden;
+  margin: 14px 0;
+}
+.pv-v9-storage-bar span { display: block; height: 100%; border-radius: inherit; background: #eee; }
+.pv-v9-account-card dl { display: grid; gap: 8px; margin: 12px 0 18px; }
+.pv-v9-account-card dl > div { display: flex; justify-content: space-between; gap: 16px; }
+.pv-v9-account-card dt { color: #aaa; }
+.pv-v9-account-card dd { margin: 0; }
+.pv-v9-account-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pv-v9-account-note { font-size: .8rem; }
+.pv-v9-danger-card { border-color: #6f3939; }
+.pv-v9-danger-card button { background: #3a1d1d; border-color: #7a4444; color: #ffdede; }
+.pv-v9-account-alert,
+.pv-v9-account-success { max-width: 1180px; margin: 0 auto 15px; }
+.pv-v9-account-success {
+  border: 1px solid #3c6652;
+  background: #1d3329;
+  color: #d9ffea;
+  border-radius: 13px;
+  padding: 11px 13px;
+}
+.pv-v9-offline-page {
+  display: grid;
+  place-content: center;
+  max-width: none;
+  text-align: center;
+}
+.pv-v9-offline-page h1 { font-size: clamp(2.2rem, 7vw, 4rem); margin: 6px 0 12px; }
+.pv-v9-offline-page p { color: #aaa; max-width: 650px; line-height: 1.6; }
+.pv-v9-offline-page a { justify-self: center; margin-top: 10px; }
+@media (max-width: 760px) {
+  .pv-v9-account-page { padding: 18px 12px 90px; }
+  .pv-v9-account-head { flex-direction: column; align-items: flex-start; }
+  .pv-v9-account-grid { grid-template-columns: 1fr; }
+  .pv-v9-command-trigger { right: 12px; bottom: 86px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+@media (forced-colors: active) {
+  .pv-v9-palette,
+  .pv-v9-account-card,
+  .pv-v9-command-trigger { border: 1px solid CanvasText; }
+}
+/* VASUKI_V9_PHASE5_CSS_END */

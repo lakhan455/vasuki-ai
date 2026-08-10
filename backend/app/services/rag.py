@@ -13,6 +13,7 @@ from docx import Document as DocxDocument
 from pypdf import PdfReader
 
 from app.config import Settings
+from app.services.storage_v9 import ensure_storage_quota
 
 
 ALLOWED_DOCUMENT_TYPES = {
@@ -283,6 +284,12 @@ async def ingest_user_document(
         raise RuntimeError(
             "Supabase server credentials and GOOGLE_GEMINI_API are required."
         )
+
+    await ensure_storage_quota(
+        settings,
+        user_id,
+        incoming_bytes=len(content),
+    )
 
     max_bytes = int(settings.document_max_mb) * 1024 * 1024
     if len(content) > max_bytes:
