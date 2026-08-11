@@ -491,7 +491,7 @@ self.onmessage = async (event) => {
         <section className="v11-card">
           <h2>Autonomous Coding Agent V2</h2>
           <textarea value={codeInstruction} onChange={(e) => setCodeInstruction(e.target.value)} placeholder="What should change?" />
-          <label>Project snapshot JSON: path -> complete file content</label>
+          <label>Project snapshot JSON: path → complete file content</label>
           <textarea className="tall" value={codeSnapshot} onChange={(e) => setCodeSnapshot(e.target.value)} />
           <button disabled={busy === "code"} onClick={() => void doCode()}>{busy === "code" ? "Analyze -> plan -> patch -> repair..." : "Run coding loop"}</button>
           {codeResult ? <pre>{pretty(codeResult)}</pre> : null}
@@ -535,7 +535,7 @@ self.onmessage = async (event) => {
 
       {tab === "video" ? (
         <section className="v11-card">
-          <h2>Text / Image -> Video Provider Gateway</h2>
+          <h2>Text / Image → Video Provider Gateway</h2>
           <textarea value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)} placeholder="Cinematic video prompt" />
           <button disabled={busy === "video"} onClick={() => void doVideo()}>{busy === "video" ? "Generating..." : "Generate video"}</button>
           <p className="v11-note">This activates only when the backend has an OpenAI-compatible video provider configured.</p>
