@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
-      - run: pytest -q tests/test_v11_core.py
+      - run: python -m pytest -q tests/test_v11_core.py
       - run: python scripts/run_v11_eval.py --mode contract --release "${GITHUB_SHA}" --limit 400 --output v11-eval-report.json
       - uses: actions/upload-artifact@v4
         with:
