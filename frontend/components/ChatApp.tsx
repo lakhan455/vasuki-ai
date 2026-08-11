@@ -586,6 +586,16 @@ function extractInlineCode(markdown: string): InlineCodeSnapshot | null {
 }
 /* VASUKI_INLINE_CODE_WORKSPACE_END */
 
+
+/* VASUKI_HIDE_CODE_FROM_CHAT_START */
+function chatTextWithoutCodeBlocks(value: string) {
+  return value
+    .replace(/```[^\n`]*\n[\s\S]*?(?:```|$)/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+/* VASUKI_HIDE_CODE_FROM_CHAT_END */
+
 export default function ChatApp() {
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -2180,9 +2190,13 @@ export default function ChatApp() {
                     <div className="pv-message-body">
                       {message.role === "assistant" ? (
                         <>
-                          <div className="pv-markdown">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
-                          </div>
+                          {chatTextWithoutCodeBlocks(message.content) ? (
+                            <div className="pv-markdown">
+                              <ReactMarkdown>
+                                {chatTextWithoutCodeBlocks(message.content)}
+                              </ReactMarkdown>
+                            </div>
+                          ) : null}
 
                           <SourceStrip sources={message.sources} />
 
@@ -2204,7 +2218,7 @@ export default function ChatApp() {
                               aria-label="Copy response"
                               onClick={() =>
                                 navigator.clipboard?.writeText(
-                                  message.content,
+                                  chatTextWithoutCodeBlocks(message.content),
                                 )
                               }
                             >
