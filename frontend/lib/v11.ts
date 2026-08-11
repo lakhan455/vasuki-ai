@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
-const API = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "/backend-api").replace(/\/$/, "");
 
 async function accessToken() {
   const { data } = await supabase.auth.getSession();

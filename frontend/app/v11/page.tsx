@@ -419,7 +419,7 @@ self.onmessage = async (event) => {
       {tab === "overview" ? (
         <section className="v11-card">
           <h2>Runtime Capability Registry</h2>
-          {!capabilities ? <p>Loading capabilitiesâ€¦</p> : (
+          {!capabilities ? <p>Loading capabilities...</p> : (
             <>
               <div className="v11-status-grid">
                 <article><strong>Embedded Knowledge</strong><span>{capabilities.omniroute?.embedded_knowledge}</span></article>
@@ -430,11 +430,11 @@ self.onmessage = async (event) => {
               </div>
               <h3>Reliability SLO</h3>
               <div className="v11-status-grid">
-                <article><strong>p50 latency</strong><span>{health?.slo?.p50_latency_ms ?? "â€”"} ms</span></article>
-                <article><strong>p95 latency</strong><span>{health?.slo?.p95_latency_ms ?? "â€”"} ms</span></article>
-                <article><strong>p95 first token</strong><span>{health?.slo?.p95_first_token_ms ?? "â€”"} ms</span></article>
-                <article><strong>Success</strong><span>{health?.slo?.success_pct ?? "â€”"}%</span></article>
-                <article><strong>Fallback</strong><span>{health?.slo?.fallback_pct ?? "â€”"}%</span></article>
+                <article><strong>p50 latency</strong><span>{health?.slo?.p50_latency_ms ?? "-"} ms</span></article>
+                <article><strong>p95 latency</strong><span>{health?.slo?.p95_latency_ms ?? "-"} ms</span></article>
+                <article><strong>p95 first token</strong><span>{health?.slo?.p95_first_token_ms ?? "-"} ms</span></article>
+                <article><strong>Success</strong><span>{health?.slo?.success_pct ?? "-"}%</span></article>
+                <article><strong>Fallback</strong><span>{health?.slo?.fallback_pct ?? "-"}%</span></article>
               </div>
               <pre>{pretty(capabilities)}</pre>
             </>
@@ -448,7 +448,7 @@ self.onmessage = async (event) => {
           <textarea value={voicePrompt} onChange={(e) => setVoicePrompt(e.target.value)} placeholder="Speak or type a question" />
           <div className="v11-actions">
             <button onClick={toggleListening}>{listening ? "Stop microphone" : "Start microphone"}</button>
-            <button disabled={busy === "voice"} onClick={() => void askVoice()}>{busy === "voice" ? "Thinkingâ€¦" : "Ask and speak answer"}</button>
+            <button disabled={busy === "voice"} onClick={() => void askVoice()}>{busy === "voice" ? "Thinking..." : "Ask and speak answer"}</button>
           </div>
           {voiceAnswer ? <div className="v11-answer">{voiceAnswer}</div> : null}
         </section>
@@ -482,7 +482,7 @@ self.onmessage = async (event) => {
         <section className="v11-card">
           <h2>Research Planner V3</h2>
           <textarea value={researchQuery} onChange={(e) => setResearchQuery(e.target.value)} placeholder="Difficult research question" />
-          <button disabled={busy === "research"} onClick={() => void doResearch()}>{busy === "research" ? "Planning + searchingâ€¦" : "Run research"}</button>
+          <button disabled={busy === "research"} onClick={() => void doResearch()}>{busy === "research" ? "Planning + searching..." : "Run research"}</button>
           {researchResult ? <pre>{pretty(researchResult)}</pre> : null}
         </section>
       ) : null}
@@ -491,9 +491,9 @@ self.onmessage = async (event) => {
         <section className="v11-card">
           <h2>Autonomous Coding Agent V2</h2>
           <textarea value={codeInstruction} onChange={(e) => setCodeInstruction(e.target.value)} placeholder="What should change?" />
-          <label>Project snapshot JSON: path â†’ complete file content</label>
+          <label>Project snapshot JSON: path -> complete file content</label>
           <textarea className="tall" value={codeSnapshot} onChange={(e) => setCodeSnapshot(e.target.value)} />
-          <button disabled={busy === "code"} onClick={() => void doCode()}>{busy === "code" ? "Analyze â†’ plan â†’ patch â†’ repairâ€¦" : "Run coding loop"}</button>
+          <button disabled={busy === "code"} onClick={() => void doCode()}>{busy === "code" ? "Analyze -> plan -> patch -> repair..." : "Run coding loop"}</button>
           {codeResult ? <pre>{pretty(codeResult)}</pre> : null}
         </section>
       ) : null}
@@ -512,7 +512,7 @@ self.onmessage = async (event) => {
           <input type="file" accept="image/*" onChange={(e) => setImageReference(e.target.files?.[0] || null)} />
           <label>Reference strength: {imageStrength.toFixed(2)}</label>
           <input type="range" min="0" max="1" step="0.05" value={imageStrength} onChange={(e) => setImageStrength(Number(e.target.value))} />
-          <button disabled={busy === "image"} onClick={() => void doConsistentImage()}>{busy === "image" ? "Generatingâ€¦" : "Generate consistent image"}</button>
+          <button disabled={busy === "image"} onClick={() => void doConsistentImage()}>{busy === "image" ? "Generating..." : "Generate consistent image"}</button>
           {imageResult ? <pre>{pretty(imageResult)}</pre> : null}
 
           <div className="v11-divider" />
@@ -527,17 +527,17 @@ self.onmessage = async (event) => {
             onPointerUp={() => { drawingRef.current = false; }}
             onPointerCancel={() => { drawingRef.current = false; }}
           />
-          <textarea value={maskPrompt} onChange={(e) => setMaskPrompt(e.target.value)} placeholder="Replace/remove/edit the brushed areaâ€¦" />
-          <button disabled={busy === "mask" || !maskFile} onClick={() => void doMaskedEdit()}>{busy === "mask" ? "Editing masked areaâ€¦" : "Apply masked edit"}</button>
+          <textarea value={maskPrompt} onChange={(e) => setMaskPrompt(e.target.value)} placeholder="Replace/remove/edit the brushed area..." />
+          <button disabled={busy === "mask" || !maskFile} onClick={() => void doMaskedEdit()}>{busy === "mask" ? "Editing masked area..." : "Apply masked edit"}</button>
           {maskResult?.url ? <img className="v11-result-image" src={maskResult.url} alt="Masked edit result" /> : null}
         </section>
       ) : null}
 
       {tab === "video" ? (
         <section className="v11-card">
-          <h2>Text / Image â†’ Video Provider Gateway</h2>
+          <h2>Text / Image -> Video Provider Gateway</h2>
           <textarea value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)} placeholder="Cinematic video prompt" />
-          <button disabled={busy === "video"} onClick={() => void doVideo()}>{busy === "video" ? "Generatingâ€¦" : "Generate video"}</button>
+          <button disabled={busy === "video"} onClick={() => void doVideo()}>{busy === "video" ? "Generating..." : "Generate video"}</button>
           <p className="v11-note">This activates only when the backend has an OpenAI-compatible video provider configured.</p>
           {videoResult ? <pre>{pretty(videoResult)}</pre> : null}
         </section>
@@ -548,7 +548,7 @@ self.onmessage = async (event) => {
           <h2>Multimodal Request</h2>
           <textarea value={multiPrompt} onChange={(e) => setMultiPrompt(e.target.value)} placeholder="Ask across all selected files" />
           <input type="file" multiple accept="image/*,audio/*,.pdf,.docx,.txt,.md,.json,.csv" onChange={(e) => setMultiFiles(Array.from(e.target.files || []))} />
-          <button disabled={busy === "multi"} onClick={() => void doMultimodal()}>{busy === "multi" ? "Reasoningâ€¦" : "Analyze together"}</button>
+          <button disabled={busy === "multi"} onClick={() => void doMultimodal()}>{busy === "multi" ? "Reasoning..." : "Analyze together"}</button>
           {multiResult ? <pre>{pretty(multiResult)}</pre> : null}
         </section>
       ) : null}
