@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt pytest
       - run: pytest -q tests/test_v11_core.py
       - run: python scripts/run_v11_eval.py --mode contract --release "${GITHUB_SHA}" --limit 400 --output v11-eval-report.json
       - uses: actions/upload-artifact@v4
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt pytest
       - run: python scripts/run_v11_eval.py --mode live --release "${GITHUB_SHA}" --limit 400 --output v11-live-eval-report.json
       - uses: actions/upload-artifact@v4
         with:
@@ -54,6 +54,9 @@ jobs:
 
   v11-frontend-quality:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-key' }}
     defaults:
       run:
         working-directory: frontend
