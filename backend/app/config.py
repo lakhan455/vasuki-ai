@@ -75,6 +75,41 @@ class Settings(BaseSettings):
     omniroute_embedding_model: str = ""
     # VASUKI_V10_OMNI_BRAIN_END
 
+
+    # VASUKI_V11_ALL_IN_ONE_START
+    v11_eval_concurrency: int = 3
+    v11_research_max_subquestions: int = 6
+    v11_canary_percent: int = 5
+    v11_abuse_requests_per_minute: int = 120
+
+    v11_scheduler_enabled: bool = True
+    v11_scheduler_poll_seconds: int = 60
+
+    v11_auto_rollback_enabled: bool = False
+    v11_rollback_min_samples: int = 50
+    v11_rollback_error_pct: float = 12.0
+    v11_rollback_webhook_url: str = ""
+
+    v11_mcp_enabled: bool = False
+    v11_a2a_enabled: bool = False
+
+    # Backend-only GitHub token. Use the least privilege needed.
+    v11_github_token: str | None = None
+
+    # Optional OpenAI-compatible video provider.
+    v11_video_api_base_url: str = ""
+    v11_video_api_key: str | None = None
+    v11_video_model: str = "auto"
+
+    # Optional OpenAI-compatible server TTS/STT. Browser voice works without these.
+    v11_tts_api_base_url: str = ""
+    v11_tts_api_key: str | None = None
+    v11_tts_model: str = "tts-1"
+    v11_stt_api_base_url: str = ""
+    v11_stt_api_key: str | None = None
+    v11_stt_model: str = "whisper-1"
+    # VASUKI_V11_ALL_IN_ONE_END
+
     global_learning_enabled: bool = True
     global_memory_direct_answer_score: float = 0.58
     global_memory_max_results: int = 3

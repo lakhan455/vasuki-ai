@@ -1,0 +1,72 @@
+name: Vasuki V11 Quality Gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  v11-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pytest -q tests/test_v11_core.py
+      - run: python scripts/run_v11_eval.py --mode contract --release "${GITHUB_SHA}" --limit 400 --output v11-eval-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v11-eval-report
+          path: backend/v11-eval-report.json
+
+  v11-live-eval:
+    if: ${{ vars.V11_LIVE_EVAL_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: test
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+      CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+      GOOGLE_GEMINI_API: ${{ secrets.GOOGLE_GEMINI_API }}
+      OPENROUTER_API: ${{ secrets.OPENROUTER_API }}
+      MISTRAL_AI_API: ${{ secrets.MISTRAL_AI_API }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      EXA_API: ${{ secrets.EXA_API }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/run_v11_eval.py --mode live --release "${GITHUB_SHA}" --limit 400 --output v11-live-eval-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v11-live-eval-report
+          path: backend/v11-live-eval-report.json
+
+  v11-frontend-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - name: Accessibility audit
+        run: npm run a11y
+        continue-on-error: true
+      - run: npm run build
