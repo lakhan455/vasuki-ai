@@ -465,6 +465,127 @@ function initials(user: User) {
     .join("");
 }
 
+
+/* VASUKI_INLINE_CODE_WORKSPACE_START */
+type CodeWorkspaceTab = "code" | "preview";
+
+type InlineCodeSnapshot = {
+  code: string;
+  language: string;
+  previewDoc: string;
+};
+
+function isLikelyCodeRequest(value: string) {
+  const text = value.toLowerCase();
+  const explicitCode =
+    /\b(code|coding|html|css|javascript|typescript|jsx|tsx|react|next\.?js|python|java|c\+\+|c#|php|sql|program|script)\b/i.test(
+      text,
+    );
+  const webBuild =
+    /\b(website|webpage|web page|landing page|frontend|component)\b/i.test(
+      text,
+    );
+  const action =
+    /\b(write|create|build|make|generate|fix|debug|refactor|implement|develop|likh|likho|bana|banao|banado|karo)\b/i.test(
+      text,
+    ) || /kar\s+do/i.test(text);
+
+  return /\bcode\b/i.test(text) || ((explicitCode || webBuild) && action);
+}
+
+function normaliseInlineCodeLanguage(value: string) {
+  const language = value.trim().toLowerCase().split(/\s+/)[0] || "code";
+  if (["html", "htm"].includes(language)) return "html";
+  if (language === "css") return "css";
+  if (["js", "javascript", "jsx"].includes(language)) return "javascript";
+  if (["ts", "typescript", "tsx"].includes(language)) return language;
+  return language;
+}
+
+function buildInlinePreviewDoc(html: string, css: string, javascript: string) {
+  const style = css ? `<style>\n${css}\n</style>` : "";
+  const safeJavascript = javascript.replace(/<\/script/gi, "<\\/script");
+  const script = javascript
+    ? `<script>\n${safeJavascript}\n<\\/script>`
+    : "";
+
+  if (html && /<!doctype|<html[\s>]/i.test(html)) {
+    let documentText = html;
+
+    if (style) {
+      documentText = /<\/head>/i.test(documentText)
+        ? documentText.replace(/<\/head>/i, `${style}\n</head>`)
+        : `${style}\n${documentText}`;
+    }
+
+    if (script) {
+      documentText = /<\/body>/i.test(documentText)
+        ? documentText.replace(/<\/body>/i, `${script}\n</body>`)
+        : `${documentText}\n${script}`;
+    }
+
+    return documentText;
+  }
+
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+${style}
+</head>
+<body>
+${html || '<div id="app"></div>'}
+${script}
+</body>
+</html>`;
+}
+
+function extractInlineCode(markdown: string): InlineCodeSnapshot | null {
+  const blocks: Array<{ language: string; code: string }> = [];
+  const fencePattern = /```([^\n`]*)\n([\s\S]*?)(?:```|$)/g;
+
+  let match: RegExpExecArray | null;
+  while ((match = fencePattern.exec(markdown)) !== null) {
+    const code = (match[2] || "").replace(/\s+$/, "");
+    if (!code.trim()) continue;
+    blocks.push({
+      language: normaliseInlineCodeLanguage(match[1] || ""),
+      code,
+    });
+  }
+
+  if (blocks.length === 0) return null;
+
+  const html = blocks.find((block) => block.language === "html")?.code || "";
+  const css = blocks.find((block) => block.language === "css")?.code || "";
+  const javascript =
+    blocks.find((block) => block.language === "javascript")?.code || "";
+
+  const primary = blocks[0];
+  const displayCode =
+    blocks.length === 1
+      ? primary.code
+      : blocks
+          .map(
+            (block) =>
+              `/* ${block.language || "code"} */\n${block.code}`,
+          )
+          .join("\n\n");
+
+  const previewDoc =
+    html || css || javascript
+      ? buildInlinePreviewDoc(html, css, javascript)
+      : "";
+
+  return {
+    code: displayCode,
+    language: primary.language || "code",
+    previewDoc,
+  };
+}
+/* VASUKI_INLINE_CODE_WORKSPACE_END */
+
 export default function ChatApp() {
   const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -502,12 +623,16 @@ export default function ChatApp() {
   const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [historySearchResults, setHistorySearchResults] = useState<ChatSearchResult[]>([]);
   const [historySearchBusy, setHistorySearchBusy] = useState(false);
+  const [codeWorkspaceOpen, setCodeWorkspaceOpen] = useState(false);
+  const [codeWorkspaceTab, setCodeWorkspaceTab] = useState<CodeWorkspaceTab>("code");
+  const [codeWorkspaceSnapshot, setCodeWorkspaceSnapshot] = useState<InlineCodeSnapshot | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historySearchInputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const chatLoadTokenRef = useRef("");
+  const codeIntentRef = useRef(false);
 
   useEffect(() => {
     const wakeBackend = () => {
@@ -795,6 +920,10 @@ export default function ChatApp() {
     setMode("chat");
     setWebEnabled(false);
     setEditingMessageId(null);
+    setCodeWorkspaceOpen(false);
+    setCodeWorkspaceTab("code");
+    setCodeWorkspaceSnapshot(null);
+    codeIntentRef.current = false;
     setMobileSidebarOpen(false);
 
     void (async () => {
@@ -926,6 +1055,10 @@ export default function ChatApp() {
     setMode("chat");
     setWebEnabled(false);
     setEditingMessageId(null);
+    setCodeWorkspaceOpen(false);
+    setCodeWorkspaceTab("code");
+    setCodeWorkspaceSnapshot(null);
+    codeIntentRef.current = false;
     setMobileSidebarOpen(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
@@ -1051,6 +1184,14 @@ export default function ChatApp() {
       (selectedAttachment?.kind === "document"
         ? "Analyze this document in detail. If it is a question paper, answer every question in the correct order."
         : "Analyze this image in detail and explain all important information.");
+
+    const codingRequest = isLikelyCodeRequest(effectiveText);
+    codeIntentRef.current = codingRequest;
+    if (codingRequest) {
+      setCodeWorkspaceOpen(true);
+      setCodeWorkspaceTab("code");
+      setCodeWorkspaceSnapshot(null);
+    }
 
     const userMessage: UiMessage = {
       id: makeId(),
@@ -1278,6 +1419,12 @@ export default function ChatApp() {
 
         const onStreamToken = (token: string) => {
           streamedAnswer += token;
+          const inlineCodeSnapshot = extractInlineCode(streamedAnswer);
+          if (inlineCodeSnapshot) {
+            codeIntentRef.current = true;
+            setCodeWorkspaceSnapshot(inlineCodeSnapshot);
+            setCodeWorkspaceOpen(true);
+          }
           setStreamingStarted(true);
           setMessages((current) =>
             current.map((message) =>
@@ -1520,6 +1667,12 @@ export default function ChatApp() {
         },
         (token) => {
           streamedAnswer += token;
+          const inlineCodeSnapshot = extractInlineCode(streamedAnswer);
+          if (inlineCodeSnapshot) {
+            codeIntentRef.current = true;
+            setCodeWorkspaceSnapshot(inlineCodeSnapshot);
+            setCodeWorkspaceOpen(true);
+          }
           setStreamingStarted(true);
           setMessages((current) =>
             current.map((message) =>
@@ -1630,7 +1783,7 @@ export default function ChatApp() {
         : "FREE";
 
   return (
-    <main className="pv-app">
+    <main className={codeWorkspaceOpen ? "pv-app pv-app--code-open" : "pv-app"}>
       {mobileSidebarOpen && (
         <button
           type="button"
@@ -1735,7 +1888,6 @@ export default function ChatApp() {
           <a className="pv-nav-button" href="/projects"><Icon name="project" /><span>Projects</span></a>
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
-          <a className="pv-nav-button" href="/code"><Icon name="code" /><span>Code Lab</span></a>
           {accountPlan?.plan === "owner" && (
             <a className="pv-nav-button" href="/owner"><Icon name="analytics" /><span>Owner Analytics</span></a>
           )}
@@ -2008,7 +2160,18 @@ export default function ChatApp() {
                 {messages.map((message) => (
                   <article
                     key={message.id}
-                    className={`pv-message pv-message--${message.role}`}
+                    className={[
+                      "pv-message",
+                      `pv-message--${message.role}`,
+                      message.role === "assistant" &&
+                      !message.content.trim() &&
+                      busy &&
+                      !streamingStarted
+                        ? "pv-message--pending-placeholder"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     {message.role === "assistant" && (
                       <Logo className="pv-assistant-logo" />
@@ -2161,6 +2324,15 @@ export default function ChatApp() {
         )}
       </section>
 
+      <InlineCodeWorkspace
+        open={codeWorkspaceOpen}
+        tab={codeWorkspaceTab}
+        snapshot={codeWorkspaceSnapshot}
+        busy={busy && codeIntentRef.current}
+        onTabChange={setCodeWorkspaceTab}
+        onClose={() => setCodeWorkspaceOpen(false)}
+      />
+
       <SmartFileWorkspace
         open={smartFilesOpen}
         onClose={() => setSmartFilesOpen(false)}
@@ -2179,6 +2351,115 @@ export default function ChatApp() {
     </main>
   );
 }
+
+
+/* VASUKI_INLINE_CODE_WORKSPACE_COMPONENT_START */
+function InlineCodeWorkspace({
+  open,
+  tab,
+  snapshot,
+  busy,
+  onTabChange,
+  onClose,
+}: {
+  open: boolean;
+  tab: CodeWorkspaceTab;
+  snapshot: InlineCodeSnapshot | null;
+  busy: boolean;
+  onTabChange: (tab: CodeWorkspaceTab) => void;
+  onClose: () => void;
+}) {
+  const codeRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (tab !== "code") return;
+    const node = codeRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [snapshot?.code, tab]);
+
+  if (!open) return null;
+
+  return (
+    <aside className="pv-inline-code-workspace" aria-label="Vasuki code workspace">
+      <header className="pv-inline-code-head">
+        <div className="pv-inline-code-title">
+          <span className={busy ? "is-live" : ""} aria-hidden="true" />
+          <div>
+            <strong>Vasuki Code</strong>
+            <small>
+              {busy
+                ? "Writing live…"
+                : snapshot?.language
+                  ? snapshot.language.toUpperCase()
+                  : "Ready"}
+            </small>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="pv-inline-code-close"
+          aria-label="Close code workspace"
+          title="Close code workspace"
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </header>
+
+      <div className="pv-inline-code-tabs" role="tablist" aria-label="Code workspace view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "code"}
+          className={tab === "code" ? "is-active" : ""}
+          onClick={() => onTabChange("code")}
+        >
+          Code
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "preview"}
+          className={tab === "preview" ? "is-active" : ""}
+          onClick={() => onTabChange("preview")}
+        >
+          Preview
+        </button>
+      </div>
+
+      <div className="pv-inline-code-body">
+        {tab === "code" ? (
+          <pre ref={codeRef} className="pv-inline-code-editor">
+            <code>
+              {snapshot?.code ||
+                (busy
+                  ? "Vasuki AI is preparing your code…"
+                  : "Ask Vasuki AI to write code and it will appear here automatically.")}
+            </code>
+          </pre>
+        ) : snapshot?.previewDoc ? (
+          <iframe
+            className="pv-inline-code-preview"
+            title="Vasuki code preview"
+            sandbox="allow-scripts"
+            srcDoc={snapshot.previewDoc}
+          />
+        ) : (
+          <div className="pv-inline-code-empty">
+            <strong>Preview will appear here</strong>
+            <p>
+              HTML, CSS and JavaScript output gets a live sandbox preview.
+              Other languages still stay available in the Code tab.
+            </p>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+/* VASUKI_INLINE_CODE_WORKSPACE_COMPONENT_END */
 
 function Logo({ className }: { className: string }) {
   const [source, setSource] = useState(VASUKI_LOGO_URL);
