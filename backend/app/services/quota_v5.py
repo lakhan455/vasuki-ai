@@ -104,7 +104,7 @@ async def check_chat_quota(
 
     if not allowed:
         raise QuotaExceeded(
-            "Aaj ka free AI message quota poora ho gaya hai. Kal dobara try karein.",
+            "Today's free AI message quota has been reached. Please try again tomorrow.",
             retry_after_seconds=_seconds_until_india_midnight(),
         )
 

@@ -60,7 +60,7 @@ class InMemoryChatQuota:
             if len(events) >= safe_minute_limit:
                 retry_after = max(1, int(60.0 - (now_monotonic - events[0])))
                 raise QuotaExceeded(
-                    "Bahut zyada requests aa rahi hain. Thodi der baad dobara try karein.",
+                    "Too many requests are being received. Please try again shortly.",
                     retry_after_seconds=retry_after,
                 )
 
@@ -74,7 +74,7 @@ class InMemoryChatQuota:
                 )
                 retry_after = max(1, int((tomorrow - now_india).total_seconds()))
                 raise QuotaExceeded(
-                    "Aaj ka free AI message quota poora ho gaya hai. Kal dobara try karein.",
+                    "Today's free AI message quota has been reached. Please try again tomorrow.",
                     retry_after_seconds=retry_after,
                 )
 

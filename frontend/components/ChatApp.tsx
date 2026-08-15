@@ -1929,7 +1929,7 @@ export default function ChatApp() {
               ))
             )
           ) : chatRecords.length === 0 && !historyBusy ? (
-            <p className="pv-empty-history">Abhi koi saved chat nahi hai.</p>
+            <p className="pv-empty-history">No saved chats yet.</p>
           ) : (
             chatRecords.map((chat) => (
               <div className="pv-recent-row" key={chat.id}>

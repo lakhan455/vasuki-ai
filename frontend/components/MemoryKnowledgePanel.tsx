@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 
@@ -272,7 +272,7 @@ export default function MemoryKnowledgePanel({
             onClick={onClose}
             aria-label="Close"
           >
-            ×
+            Ã—
           </button>
         </header>
 
@@ -282,14 +282,14 @@ export default function MemoryKnowledgePanel({
             className={tab === "memory" ? "active" : ""}
             onClick={() => setTab("memory")}
           >
-            🧠 Personal memory
+            ðŸ§  Personal memory
           </button>
           <button
             type="button"
             className={tab === "documents" ? "active" : ""}
             onClick={() => setTab("documents")}
           >
-            📚 Documents
+            ðŸ“š Documents
           </button>
         </div>
 
@@ -320,7 +320,7 @@ export default function MemoryKnowledgePanel({
                   value={memoryText}
                   maxLength={600}
                   onChange={(event) => setMemoryText(event.target.value)}
-                  placeholder="Example: Mujhe Hindi me short answers pasand hain."
+                  placeholder="Example: I prefer short, concise answers."
                 />
                 <button
                   type="button"
@@ -332,14 +332,14 @@ export default function MemoryKnowledgePanel({
               </div>
 
               <p className="pv-panel-note">
-                Password, API key, OTP, Aadhaar or other sensitive information
-                memory me save nahi hoti.
+                Passwords, API keys, OTPs, Aadhaar numbers, and other sensitive information
+                are not saved to memory.
               </p>
 
               <div className="pv-memory-list">
                 {memories.length === 0 && !busy ? (
                   <p className="pv-panel-empty">
-                    Abhi koi personal memory save nahi hai.
+                    No personal memories saved yet.
                   </p>
                 ) : (
                   memories.map((memory) => (
@@ -390,7 +390,7 @@ export default function MemoryKnowledgePanel({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy}
               >
-                {busy ? "Processing…" : "Upload PDF, DOCX, TXT or MD"}
+                {busy ? "Processingâ€¦" : "Upload PDF, DOCX, TXT or MD"}
               </button>
 
               <p className="pv-panel-note">
@@ -411,7 +411,7 @@ export default function MemoryKnowledgePanel({
               <div className="pv-document-list">
                 {documents.length === 0 && !busy ? (
                   <p className="pv-panel-empty">
-                    Knowledge base me abhi koi document nahi hai.
+                    No documents in the knowledge base yet.
                   </p>
                 ) : (
                   documents.map((document) => {
@@ -433,8 +433,8 @@ export default function MemoryKnowledgePanel({
                         <span className="pv-document-copy">
                           <strong>{document.name}</strong>
                           <small>
-                            {formatBytes(document.size_bytes)} ·{" "}
-                            {document.status || "processing"} ·{" "}
+                            {formatBytes(document.size_bytes)} Â·{" "}
+                            {document.status || "processing"} Â·{" "}
                             {document.chunk_count || 0} chunks
                           </small>
                         </span>
@@ -456,7 +456,7 @@ export default function MemoryKnowledgePanel({
 
         <footer className="pv-knowledge-footer">
           <span>
-            {busy ? "Please wait…" : "Changes save automatically."}
+            {busy ? "Please waitâ€¦" : "Changes save automatically."}
           </span>
           <button type="button" onClick={onClose}>
             Done

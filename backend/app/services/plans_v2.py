@@ -49,7 +49,7 @@ async def require_puter_access(
     if not status.puter_access:
         raise HTTPException(
             status_code=403,
-            detail="Puter access locked hai.",
+            detail="Puter access is locked.",
         )
     return status
 
@@ -61,6 +61,6 @@ async def create_razorpay_order(
     if settings.puter_free_for_all:
         raise HTTPException(
             status_code=400,
-            detail="Puter plan abhi sabhi users ke liye free hai.",
+            detail="The Puter plan is currently free for all users.",
         )
     return await paid.create_razorpay_order(user, settings)

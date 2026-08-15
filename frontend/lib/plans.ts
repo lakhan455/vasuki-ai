@@ -164,7 +164,7 @@ function loadRazorpay() {
       existing.addEventListener("load", () => resolve(), { once: true });
       existing.addEventListener(
         "error",
-        () => reject(new Error("Razorpay checkout load nahi hua.")),
+        () => reject(new Error("Razorpay checkout failed to load.")),
         { once: true },
       );
       return;
@@ -175,7 +175,7 @@ function loadRazorpay() {
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () =>
-      reject(new Error("Razorpay checkout load nahi hua."));
+      reject(new Error("Razorpay checkout failed to load."));
     document.head.appendChild(script);
   });
 }
@@ -219,7 +219,7 @@ export async function buyVasukiPro(
       },
       modal: {
         ondismiss: () =>
-          reject(new Error("Payment window close kar diya gaya.")),
+          reject(new Error("Payment window was closed.")),
       },
     });
 
@@ -227,7 +227,7 @@ export async function buyVasukiPro(
       reject(
         new Error(
           response.error?.description ||
-            "Payment failed. Dobara try karein.",
+            "Payment failed. Please try again.",
         ),
       );
     });
