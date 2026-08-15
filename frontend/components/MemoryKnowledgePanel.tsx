@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 
@@ -272,7 +272,7 @@ export default function MemoryKnowledgePanel({
             onClick={onClose}
             aria-label="Close"
           >
-            Ã—
+            ×
           </button>
         </header>
 
@@ -282,14 +282,14 @@ export default function MemoryKnowledgePanel({
             className={tab === "memory" ? "active" : ""}
             onClick={() => setTab("memory")}
           >
-            ðŸ§  Personal memory
+            🧠 Personal memory
           </button>
           <button
             type="button"
             className={tab === "documents" ? "active" : ""}
             onClick={() => setTab("documents")}
           >
-            ðŸ“š Documents
+            📚 Documents
           </button>
         </div>
 
@@ -390,7 +390,7 @@ export default function MemoryKnowledgePanel({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy}
               >
-                {busy ? "Processingâ€¦" : "Upload PDF, DOCX, TXT or MD"}
+                {busy ? "Processing…" : "Upload PDF, DOCX, TXT or MD"}
               </button>
 
               <p className="pv-panel-note">
@@ -433,8 +433,8 @@ export default function MemoryKnowledgePanel({
                         <span className="pv-document-copy">
                           <strong>{document.name}</strong>
                           <small>
-                            {formatBytes(document.size_bytes)} Â·{" "}
-                            {document.status || "processing"} Â·{" "}
+                            {formatBytes(document.size_bytes)} ·{" "}
+                            {document.status || "processing"} ·{" "}
                             {document.chunk_count || 0} chunks
                           </small>
                         </span>
@@ -456,7 +456,7 @@ export default function MemoryKnowledgePanel({
 
         <footer className="pv-knowledge-footer">
           <span>
-            {busy ? "Please waitâ€¦" : "Changes save automatically."}
+            {busy ? "Please wait…" : "Changes save automatically."}
           </span>
           <button type="button" onClick={onClose}>
             Done
