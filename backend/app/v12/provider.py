@@ -1,4 +1,3 @@
-\
 from __future__ import annotations
 
 from typing import Any
@@ -8,13 +7,17 @@ from app.v11.capabilities import PROVIDER_FIELDS
 from app.v11.quality import learned_quality
 
 
+def _benchmark_task(task: str) -> str:
+    return "coding" if task == "code" else task
+
+
 def provider_score_v12(provider: str, task_type: str = "general") -> float:
     task = str(task_type or "general").strip().lower()
     runtime = runtime_metrics(provider, task)
     feedback_quality = float(runtime.get("quality", 0.72))
     reliability = float(runtime.get("reliability", 1.0))
     speed = float(runtime.get("speed", 0.78))
-    benchmark = float(learned_quality(provider, task))
+    benchmark = float(learned_quality(provider, _benchmark_task(task)))
     availability = 1.0 if reliability > 0.0 else 0.0
 
     score = (
@@ -58,7 +61,10 @@ def provider_snapshot_v12(settings) -> dict[str, Any]:
             output[provider]["tasks"][task] = {
                 "score": provider_score_v12(provider, task),
                 "feedback_quality": round(float(runtime.get("quality", 0.0)), 4),
-                "benchmark_quality": round(float(learned_quality(provider, task)), 4),
+                "benchmark_quality": round(
+                    float(learned_quality(provider, _benchmark_task(task))),
+                    4,
+                ),
                 "success_rate": round(float(runtime.get("reliability", 0.0)), 4),
                 "speed": round(float(runtime.get("speed", 0.0)), 4),
             }

@@ -26,12 +26,14 @@ export default function OwnerPage() {
   async function load() {
     try {
       const accessToken = await token();
-      const [platform, reliability] = await Promise.all([
-        fetchOwnerPlatformV9(accessToken, 30),
-        fetchOwnerReliabilityV12(accessToken),
-      ]);
+      const platform = await fetchOwnerPlatformV9(accessToken, 30);
       setData(platform);
-      setV12(reliability);
+
+      try {
+        setV12(await fetchOwnerReliabilityV12(accessToken));
+      } catch {
+        setV12(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Owner dashboard could not be loaded.");
     }
