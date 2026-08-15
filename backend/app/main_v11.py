@@ -32,6 +32,9 @@ from app.v11.research import run_research, save_to_research_kb
 from app.v11.retention import cleanup_v11_tables, policies as retention_policies, set_policy as set_retention_policy
 from app.v11.scheduler import create_task, runtime_note, scheduler_tick
 from app.v11 import store
+from app.v12.api import router as v12_router
+from app.v12.memory import resolve_conflicts_v12
+from app.v12.provider import rank_for_task_v12
 
 app = v10.app
 settings = v10.settings
@@ -85,6 +88,9 @@ async def v11_shutdown():
 
 # V11 provider quality learning becomes part of Vasuki's existing V7/V10 router.
 chat_v7.rank_for_task = rank_for_task_v11
+# V12 keeps V11 benchmark learning and adds task-specific runtime
+# quality/reliability/speed ranking.
+chat_v7.rank_for_task = rank_for_task_v12
 
 async def route_chat_stream_v11(
     provider: str,
@@ -388,7 +394,7 @@ async def memory_write(payload: MemoryWriteRequest, user: AuthUser = Depends(get
 @app.get("/api/v11/memory")
 async def memory_read(project_id: str|None=None,user: AuthUser=Depends(get_current_user)):
     rows=await active_memory(settings,user_id=user.id,project_id=project_id)
-    return {"ok":True,"memory":resolve_conflicts(rows)}
+    return {"ok":True,"memory":resolve_conflicts_v12(rows)}
 
 @app.post("/api/v11/permissions/grant")
 async def permission_grant(payload: PermissionRequest,user: AuthUser=Depends(get_current_user)):
@@ -629,3 +635,7 @@ async def _scheduled_executor(row: dict[str,Any])->dict[str,Any]:
 async def scheduler_manual_tick(user: AuthUser=Depends(get_current_user)):
     await require_owner(user)
     return {"ok":True,"tick":await scheduler_tick(settings,_scheduled_executor),"note":runtime_note()}
+
+
+# VASUKI_V12_CORE_RELIABILITY
+app.include_router(v12_router)

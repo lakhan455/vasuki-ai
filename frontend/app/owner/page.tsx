@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   fetchOwnerPlatformV9,
+  fetchOwnerReliabilityV12,
   updateOwnerFeatureFlagV9,
   type OwnerPlatformV9,
+  type V12ReliabilitySnapshot,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -17,13 +19,19 @@ async function token() {
 
 export default function OwnerPage() {
   const [data, setData] = useState<OwnerPlatformV9 | null>(null);
+  const [v12, setV12] = useState<V12ReliabilitySnapshot | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
 
   async function load() {
     try {
       const accessToken = await token();
-      setData(await fetchOwnerPlatformV9(accessToken, 30));
+      const [platform, reliability] = await Promise.all([
+        fetchOwnerPlatformV9(accessToken, 30),
+        fetchOwnerReliabilityV12(accessToken),
+      ]);
+      setData(platform);
+      setV12(reliability);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Owner dashboard could not be loaded.");
     }
@@ -83,6 +91,50 @@ export default function OwnerPage() {
             <article><span>429 / quota</span><strong>{usage?.quota_429 ?? 0}</strong></article>
             <article><span>Background jobs</span><strong>{data.jobs?.total ?? 0}</strong></article>
           </section>
+
+          {v12 ? (
+            <>
+              <section className="pv-v9-ops-stats">
+                <article>
+                  <span>V12 success</span>
+                  <strong>{(v12.slo?.success_pct ?? 0).toFixed(1)}%</strong>
+                </article>
+                <article>
+                  <span>P50 latency</span>
+                  <strong>{v12.slo?.p50_latency_ms ?? 0} ms</strong>
+                </article>
+                <article>
+                  <span>P95 latency</span>
+                  <strong>{v12.slo?.p95_latency_ms ?? 0} ms</strong>
+                </article>
+                <article>
+                  <span>Fallback rate</span>
+                  <strong>{(v12.slo?.fallback_pct ?? 0).toFixed(1)}%</strong>
+                </article>
+                <article>
+                  <span>Error rate</span>
+                  <strong>{(v12.slo?.error_pct ?? 0).toFixed(1)}%</strong>
+                </article>
+              </section>
+
+              <section className="pv-v9-owner-grid">
+                <article className="pv-v9-ops-card">
+                  <h2>V12 Capability Status</h2>
+                  <pre>{JSON.stringify(v12.capabilities || {}, null, 2)}</pre>
+                </article>
+
+                <article className="pv-v9-ops-card">
+                  <h2>Safe Code Sandbox</h2>
+                  <pre>{JSON.stringify(v12.sandbox || {}, null, 2)}</pre>
+                </article>
+
+                <article className="pv-v9-ops-card">
+                  <h2>Provider Quality Learning</h2>
+                  <pre>{JSON.stringify(v12.providers || {}, null, 2)}</pre>
+                </article>
+              </section>
+            </>
+          ) : null}
 
           <section className="pv-v9-owner-grid">
             <article className="pv-v9-ops-card">
