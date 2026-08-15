@@ -3,7 +3,7 @@ export type V11Locale = "en" | "hi" | "es" | "fr" | "de" | "ja";
 
 const messages: Record<V11Locale, Record<string, string>> = {
   en: { title: "Reliability + Agent Control Center", overview: "Overview", voice: "Voice", sandbox: "Sandbox", research: "Research", code: "Coding Agent", video: "Video", multimodal: "Multimodal", privacy: "Privacy" },
-  hi: { title: "विश्वसनीयता + एजेंट नियंत्रण केंद्र", overview: "अवलोकन", voice: "आवाज़", sandbox: "सैंडबॉक्स", research: "रिसर्च", code: "कोडिंग एजेंट", video: "वीडियो", multimodal: "मल्टीमोडल", privacy: "गोपनीयता" },
+  hi: { title: "Reliability + Agent Control Center", overview: "Overview", voice: "Voice", sandbox: "Sandbox", research: "Research", code: "Coding Agent", video: "Video", multimodal: "Multimodal", privacy: "Privacy" },
   es: { title: "Centro de fiabilidad y agentes", overview: "Resumen", voice: "Voz", sandbox: "Entorno aislado", research: "Investigación", code: "Agente de código", video: "Video", multimodal: "Multimodal", privacy: "Privacidad" },
   fr: { title: "Centre de fiabilité et d’agents", overview: "Aperçu", voice: "Voix", sandbox: "Bac à sable", research: "Recherche", code: "Agent de code", video: "Vidéo", multimodal: "Multimodal", privacy: "Confidentialité" },
   de: { title: "Zuverlässigkeits- und Agentenzentrale", overview: "Übersicht", voice: "Sprache", sandbox: "Sandbox", research: "Recherche", code: "Coding-Agent", video: "Video", multimodal: "Multimodal", privacy: "Datenschutz" },

@@ -113,7 +113,7 @@ async def request_diagnostics(request: Request, call_next):
             status_code=500,
             content={
                 "detail": (
-                    "AI server me temporary problem aayi. "
+                    "The AI server encountered a temporary problem. "
                     f"Request ID: {request_id}"
                 ),
                 "request_id": request_id,
@@ -289,7 +289,7 @@ async def chat_stream_v4(
                 settings,
                 user_jwt=current_user.access_token,
             )
-            answer = f"Yaad rakh liya: {explicit_memory}"
+            answer = f"Saved to memory: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
         except Exception as exc:
@@ -299,7 +299,7 @@ async def chat_stream_v4(
                 error=safe_error(exc),
             )
             answer = (
-                "Memory abhi save nahi ho paayi. "
+                "Memory could not be saved right now. "
                 f"Request ID: {request_id}"
             )
         return legacy._direct_stream(
@@ -337,8 +337,8 @@ async def chat_stream_v4(
     if require_current and not web_sources and not strong_hits:
         return legacy._direct_stream(
             (
-                "Live verification service abhi available nahi hai. "
-                "Kuch seconds baad retry karein, taaki purani information guess na ho."
+                "The live verification service is currently unavailable. "
+                "Please try again in a few seconds so outdated information is not guessed."
             ),
             provider="truth-guard",
             sources=document_sources,
@@ -348,7 +348,7 @@ async def chat_stream_v4(
     if missing:
         return legacy._direct_stream(
             (
-                "Complete list safely verify nahi ho paayi. Missing evidence: "
+                "The complete list could not be safely verified. Missing evidence: "
                 + ", ".join(missing)
             ),
             provider="truth-guard",
@@ -457,8 +457,8 @@ async def chat_stream_v4(
                 "error",
                 {
                     "detail": (
-                        "AI provider response fail hua. "
-                        f"Request ID: {request_id}. Dobara try karein."
+                        "The AI provider failed to return a response. "
+                        f"Request ID: {request_id}. Please try again."
                     ),
                     "request_id": request_id,
                 },

@@ -120,7 +120,7 @@ async def get_plan_status(user: AuthUser, settings: Settings) -> PlanStatus:
 async def require_puter_access(user: AuthUser, settings: Settings) -> PlanStatus:
     status = await get_plan_status(user, settings)
     if not status.puter_access:
-        raise HTTPException(status_code=403, detail="Puter Pro locked hai. ₹99 ka 30-day plan activate karein.")
+        raise HTTPException(status_code=403, detail="Puter Pro is locked. Activate the ₹99 30-day plan to continue.")
     return status
 
 
@@ -169,9 +169,9 @@ async def activate_pro(user_id: str, settings: Settings, *, payment_id: str, ord
 
 async def create_razorpay_order(user: AuthUser, settings: Settings) -> dict[str, Any]:
     if is_owner(user, settings):
-        raise HTTPException(status_code=400, detail="Owner account ko payment ki zarurat nahi hai.")
+        raise HTTPException(status_code=400, detail="The owner account does not require payment.")
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
-        raise HTTPException(status_code=503, detail="Razorpay keys abhi configure nahi hain.")
+        raise HTTPException(status_code=503, detail="Razorpay keys are not configured yet.")
 
     amount = int(settings.razorpay_plan_amount_paise)
     payload = {
@@ -187,7 +187,7 @@ async def create_razorpay_order(user: AuthUser, settings: Settings) -> dict[str,
             json=payload,
         )
     if response.is_error:
-        raise HTTPException(status_code=502, detail="Razorpay order create nahi ho paya.")
+        raise HTTPException(status_code=502, detail="The Razorpay order could not be created.")
     order = response.json()
     order_id = str(order.get("id") or "")
     if not order_id:
@@ -251,7 +251,7 @@ async def verify_razorpay_payment(
             auth=httpx.BasicAuth(settings.razorpay_key_id or "", secret),
         )
     if response.is_error:
-        raise HTTPException(status_code=502, detail="Payment status verify nahi ho paya.")
+        raise HTTPException(status_code=502, detail="The payment status could not be verified.")
     payment = response.json()
     if str(payment.get("order_id") or "") != order_id:
         raise HTTPException(status_code=400, detail="Payment order mismatch.")
@@ -260,7 +260,7 @@ async def verify_razorpay_payment(
     if str(payment.get("currency") or "") != "INR":
         raise HTTPException(status_code=400, detail="Payment currency mismatch.")
     if str(payment.get("status") or "") != "captured":
-        raise HTTPException(status_code=409, detail="Payment capture hone ka wait karein aur refresh karein.")
+        raise HTTPException(status_code=409, detail="Wait for the payment to be captured, then refresh.")
 
     expires = await activate_pro(user.id, settings, payment_id=payment_id, order_id=order_id)
     await _patch(

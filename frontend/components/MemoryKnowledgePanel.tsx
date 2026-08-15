@@ -320,7 +320,7 @@ export default function MemoryKnowledgePanel({
                   value={memoryText}
                   maxLength={600}
                   onChange={(event) => setMemoryText(event.target.value)}
-                  placeholder="Example: Mujhe Hindi me short answers pasand hain."
+                  placeholder="Example: I prefer short, concise answers."
                 />
                 <button
                   type="button"
@@ -332,14 +332,14 @@ export default function MemoryKnowledgePanel({
               </div>
 
               <p className="pv-panel-note">
-                Password, API key, OTP, Aadhaar or other sensitive information
-                memory me save nahi hoti.
+                Passwords, API keys, OTPs, Aadhaar numbers, and other sensitive information
+                are not saved to memory.
               </p>
 
               <div className="pv-memory-list">
                 {memories.length === 0 && !busy ? (
                   <p className="pv-panel-empty">
-                    Abhi koi personal memory save nahi hai.
+                    No personal memories saved yet.
                   </p>
                 ) : (
                   memories.map((memory) => (
@@ -411,7 +411,7 @@ export default function MemoryKnowledgePanel({
               <div className="pv-document-list">
                 {documents.length === 0 && !busy ? (
                   <p className="pv-panel-empty">
-                    Knowledge base me abhi koi document nahi hai.
+                    No documents in the knowledge base yet.
                   </p>
                 ) : (
                   documents.map((document) => {

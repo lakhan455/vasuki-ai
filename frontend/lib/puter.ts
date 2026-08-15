@@ -37,7 +37,7 @@ declare global {
 function requirePuter() {
   if (!window.puter) {
     throw new Error(
-      "Vasuki Pro load nahi hua. Page refresh karke dobara try karein.",
+      "Vasuki Pro failed to load. Refresh the page and try again.",
     );
   }
   return window.puter;
@@ -75,8 +75,8 @@ function readableError(error: unknown) {
   }
 
   return (
-    "Vasuki Pro request fail hui. Puter login aur account allowance " +
-    "check karke dobara try karein."
+    "Vasuki Pro request failed. Check your Puter login and account allowance, " +
+    "then try again."
   );
 }
 
@@ -218,7 +218,7 @@ export async function streamPuterChat(
 
   if (!puter.auth.isSignedIn()) {
     throw new Error(
-      "Vasuki Pro use karne ke liye Puter account connect karein.",
+      "Connect your Puter account to use Vasuki Pro.",
     );
   }
 
@@ -263,7 +263,7 @@ export async function streamPuterChat(
 
   throw new Error(
     lastError ||
-      "Vasuki Pro ke AI providers ne response nahi diya. Dobara try karein.",
+      "No Vasuki Pro AI provider returned a response. Please try again.",
   );
 }
 
@@ -290,7 +290,7 @@ export async function generatePuterImage4K(prompt: string) {
 
   if (!puter.auth.isSignedIn()) {
     throw new Error(
-      "Vasuki Pro image ke liye Puter account connect karein.",
+      "Connect your Puter account to generate images with Vasuki Pro.",
     );
   }
 
@@ -328,7 +328,7 @@ export async function generatePuterImage4K(prompt: string) {
     throw new Error(
       readableError(error) ||
         firstError ||
-        "Vasuki Pro image generation fail hui.",
+        "Vasuki Pro image generation failed.",
     );
   }
 }

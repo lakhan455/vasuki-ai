@@ -288,8 +288,8 @@ async def chat_stream_v5(
                 "error",
                 {
                     "detail": (
-                        "AI provider response fail hua. "
-                        f"Request ID: {request_id}. Dobara try karein."
+                        "The AI provider failed to return a response. "
+                        f"Request ID: {request_id}. Please try again."
                     ),
                     "request_id": request_id,
                 },

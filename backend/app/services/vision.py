@@ -80,7 +80,7 @@ def _looks_like_edit(prompt: str) -> bool:
 
 
 def _analysis_prompt(user_prompt: str) -> str:
-    prompt = user_prompt.strip() or "Is image/file ko detail me analyze karo."
+    prompt = user_prompt.strip() or "Analyze this image or file in detail."
     return (
         f"{prompt}\n\n"
         "Apply the Vasuki Vision accuracy rules. If this is a question paper, "
