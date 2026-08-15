@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import time
@@ -47,7 +47,13 @@ class InMemoryChatQuota:
         daily_limit: int,
     ) -> QuotaStatus:
         safe_minute_limit = max(1, int(minute_limit))
-        safe_daily_limit = max(1, int(daily_limit))
+        raw_daily_limit = int(daily_limit)
+        unlimited_daily = raw_daily_limit <= 0
+        safe_daily_limit = (
+            0
+            if unlimited_daily
+            else max(1, raw_daily_limit)
+        )
         now_monotonic = time.monotonic()
         day_key = self._day_key()
 
@@ -66,7 +72,10 @@ class InMemoryChatQuota:
 
             daily_key = (day_key, user_id)
             current_daily = self._daily_counts[daily_key]
-            if current_daily >= safe_daily_limit:
+            if (
+                not unlimited_daily
+                and current_daily >= safe_daily_limit
+            ):
                 now_india = datetime.now(INDIA_TIMEZONE)
                 tomorrow = (
                     now_india.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -79,16 +88,32 @@ class InMemoryChatQuota:
                 )
 
             events.append(now_monotonic)
-            self._daily_counts[daily_key] = current_daily + 1
-            self._cleanup(now_monotonic, day_key)
+
+            if not unlimited_daily:
+                self._daily_counts[daily_key] = (
+                    current_daily + 1
+                )
+
+            self._cleanup(
+                now_monotonic,
+                day_key,
+            )
 
             return QuotaStatus(
                 minute_limit=safe_minute_limit,
-                minute_remaining=max(0, safe_minute_limit - len(events)),
-                daily_limit=safe_daily_limit,
-                daily_remaining=max(
+                minute_remaining=max(
                     0,
-                    safe_daily_limit - self._daily_counts[daily_key],
+                    safe_minute_limit - len(events),
+                ),
+                daily_limit=safe_daily_limit,
+                daily_remaining=(
+                    -1
+                    if unlimited_daily
+                    else max(
+                        0,
+                        safe_daily_limit
+                        - self._daily_counts[daily_key],
+                    )
                 ),
             )
 
@@ -119,4 +144,3 @@ class InMemoryChatQuota:
 
 
 CHAT_QUOTA = InMemoryChatQuota()
-

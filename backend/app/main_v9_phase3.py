@@ -14,6 +14,11 @@ from app.services.document_intelligence_v9 import (
     compare_with_citations,
     extract_uploads,
 )
+from app.services.image_quota_guard import (
+    quota_payload,
+    release_image_slots,
+    reserve_image_slots,
+)
 from app.services.image_studio_v9 import (
     ASPECT_RATIOS,
     IMAGE_PRESETS,
@@ -86,6 +91,12 @@ async def image_studio_generate(
     payload: ImageStudioRequest,
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
+    reserved, quota = await reserve_image_slots(
+        current_user.id,
+        settings,
+        count=1,
+    )
+
     try:
         result = await generate_studio_image(
             settings,
@@ -99,11 +110,44 @@ async def image_studio_generate(
             prompt=payload.prompt,
             name=f"Vasuki {normalize_preset(payload.preset)} image",
         )
-        return {"ok": True, **result, "artifact": artifact}
+        return {
+            "ok": True,
+            **result,
+            "artifact": artifact,
+            "image_quota": quota_payload(quota),
+        }
+
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except HTTPException:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+        raise
+
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)[:1400]) from exc
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:1400],
+        ) from exc
 
 
 @app.post("/api/image/v3/variations")
@@ -111,6 +155,12 @@ async def image_studio_variations(
     payload: ImageVariationRequest,
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
+    reserved, quota = await reserve_image_slots(
+        current_user.id,
+        settings,
+        count=payload.count,
+    )
+
     try:
         result = await generate_variations(
             settings,
@@ -127,11 +177,63 @@ async def image_studio_variations(
                     prompt=payload.prompt,
                     name=f"Vasuki variation {item.get('index')}",
                 )
-        return {"ok": result.get("succeeded", 0) > 0, **result}
+        succeeded = max(
+            0,
+            min(
+                reserved,
+                int(result.get("succeeded") or 0),
+            ),
+        )
+
+        unused = reserved - succeeded
+
+        if unused:
+            released_quota = await release_image_slots(
+                current_user.id,
+                settings,
+                count=unused,
+            )
+
+            if released_quota is not None:
+                quota = released_quota
+
+        return {
+            "ok": succeeded > 0,
+            **result,
+            "image_quota": quota_payload(quota),
+        }
+
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except HTTPException:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+        raise
+
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)[:1400]) from exc
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:1400],
+        ) from exc
 
 
 @app.post("/api/image/v3/edit")
@@ -147,7 +249,17 @@ async def image_studio_edit(
         raise HTTPException(status_code=400, detail="Upload an image up to 15 MB.")
     mime = (file.content_type or "").split(";", 1)[0].casefold()
     if not mime.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Image Edit accepts image files only.")
+        raise HTTPException(
+            status_code=400,
+            detail="Image Edit accepts image files only.",
+        )
+
+    reserved, quota = await reserve_image_slots(
+        current_user.id,
+        settings,
+        count=1,
+    )
+
     try:
         result = await edit_studio_image(
             settings,
@@ -164,9 +276,32 @@ async def image_studio_edit(
             prompt=prompt,
             name="Vasuki edited image",
         )
-        return {"ok": True, **result, "artifact": artifact}
+        return {
+            "ok": True,
+            **result,
+            "artifact": artifact,
+            "image_quota": quota_payload(quota),
+        }
+
+    except HTTPException:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+        raise
+
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=str(exc)[:1400]) from exc
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:1400],
+        ) from exc
 
 
 @app.post("/api/image/v3/enhance")
@@ -177,7 +312,17 @@ async def image_studio_enhance(
 ) -> dict[str, Any]:
     content = await file.read()
     if not content or len(content) > 15 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Upload an image up to 15 MB.")
+        raise HTTPException(
+            status_code=400,
+            detail="Upload an image up to 15 MB.",
+        )
+
+    reserved, quota = await reserve_image_slots(
+        current_user.id,
+        settings,
+        count=1,
+    )
+
     try:
         output, metadata = upscale_image_bytes(content, scale=scale)
         url = "data:image/png;base64," + base64.b64encode(output).decode("ascii")

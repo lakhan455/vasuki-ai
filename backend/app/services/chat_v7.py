@@ -43,7 +43,7 @@ async def route_chat_stream_v7(
     started=time.perf_counter()
     d=classify_route(messages,require_current=require_current)
     q=last_user_query(messages)
-    max_attempts=max(1,min(3,int(getattr(settings,"max_provider_attempts",3))))
+    max_attempts=max(1,min(7,int(getattr(settings,"max_provider_attempts",7))))
     excluded_family=_provider_family(exclude_provider)
     base=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and legacy._provider_is_available(n)]
     healthy=[n for n in base if available(n)]

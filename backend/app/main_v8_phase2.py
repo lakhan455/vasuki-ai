@@ -19,6 +19,11 @@ from app.services.artifacts_v8 import (
 from app.services.cache_v7 import RESPONSE_CACHE, WEB_CACHE
 from app.services.file_artifacts import process_smart_file_request
 from app.services.image_health_v8 import snapshot as image_health_snapshot
+from app.services.image_quota_guard import (
+    quota_payload,
+    release_image_slots,
+    reserve_image_slots,
+)
 from app.services.image_v8 import route_image_v8
 from app.services.plans_v2 import get_plan_status
 from app.services.telemetry_v7 import snapshot as chat_health_snapshot
@@ -71,7 +76,17 @@ async def generate_image_v2(
     current_user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
     started = time.perf_counter()
-    status = await get_plan_status(current_user, settings)
+    status = await get_plan_status(
+        current_user,
+        settings,
+    )
+
+    reserved, quota = await reserve_image_slots(
+        current_user.id,
+        settings,
+        count=1,
+    )
+
     try:
         result = await asyncio.wait_for(
             route_image_v8(payload.provider, payload.prompt, settings, max_attempts=2),
@@ -103,10 +118,39 @@ async def generate_image_v2(
                 "artifact_id": (artifact or {}).get("id"),
             },
         )
-        return {**result, "artifact": artifact, "plan": status.plan}
+        return {
+            **result,
+            "artifact": artifact,
+            "plan": status.plan,
+            "image_quota": quota_payload(quota),
+        }
+
     except asyncio.TimeoutError as exc:
-        raise HTTPException(status_code=504, detail="Image generation timed out.") from exc
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
+        raise HTTPException(
+            status_code=504,
+            detail="Image generation timed out.",
+        ) from exc
+
+    except HTTPException:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+        raise
+
     except Exception as exc:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
         await log_usage(
             settings,
             feature="image_generation",

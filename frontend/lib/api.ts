@@ -425,34 +425,99 @@ export async function streamChat(
   options: StreamOptions,
   onToken: (token: string) => void,
 ): Promise<StreamChatMeta> {
+  let emittedToken = false;
+
+  const trackedToken = (token: string) => {
+    if (token) {
+      emittedToken = true;
+    }
+    onToken(token);
+  };
+
   try {
     return await streamAt(
       DIRECT_API_URL,
       messages,
       options,
-      onToken,
+      trackedToken,
     );
-  } catch (error) {
+  } catch (firstError) {
     if (
       options.signal?.aborted ||
-      (error instanceof DOMException && error.name === "AbortError")
+      (
+        firstError instanceof DOMException &&
+        firstError.name === "AbortError"
+      )
     ) {
-      throw error;
+      throw firstError;
     }
 
-    const message =
-      error instanceof Error ? error.message : "Streaming connection failed.";
+    const firstMessage =
+      firstError instanceof Error
+        ? firstError.message
+        : "Streaming connection failed.";
 
-    if (/failed to fetch|network|connection/i.test(message)) {
-      return streamAt(
+    const retryable =
+      /failed to fetch|network|connection|provider failed|provider.*unavailable|temporarily busy|temporarily failed|empty response|streaming failed/i.test(
+        firstMessage,
+      );
+
+    if (!retryable || emittedToken) {
+      throw firstError;
+    }
+
+    // The backend marks failed providers unhealthy before
+    // this retry, so a fresh request prefers another provider.
+    await delay(650);
+
+    try {
+      return await streamAt(
         PROXY_API_URL,
         messages,
-        options,
-        onToken,
+        {
+          ...options,
+          cacheBypass: true,
+        },
+        trackedToken,
       );
-    }
+    } catch (secondError) {
+      if (
+        options.signal?.aborted ||
+        (
+          secondError instanceof DOMException &&
+          secondError.name === "AbortError"
+        )
+      ) {
+        throw secondError;
+      }
 
-    throw error;
+      const secondMessage =
+        secondError instanceof Error
+          ? secondError.message
+          : "AI providers are temporarily unavailable.";
+
+      const providerFailure =
+        /provider failed|provider.*unavailable|temporarily busy|temporarily failed|all.*providers|empty response|streaming failed/i.test(
+          secondMessage,
+        );
+
+      if (!emittedToken && providerFailure) {
+        trackedToken(
+          "Vasuki AI ne available AI providers automatically try kiye, " +
+          "lekin is waqt upstream providers temporarily busy hain. " +
+          "Aapka chat quota unlimited hai aur message safe hai. " +
+          "Please send the message again in a few seconds.",
+        );
+
+        return {
+          provider: "vasuki-resilience",
+          daily_limit: 0,
+          daily_remaining: -1,
+        };
+      }
+
+      throw secondError;
+    }
   }
 }
 
