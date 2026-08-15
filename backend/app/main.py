@@ -31,6 +31,11 @@ from app.schemas import (
 from app.services.chat import route_chat, route_chat_stream
 from app.services.context import compact_messages
 from app.services.image import route_image
+from app.services.image_quota_guard import (
+    quota_payload,
+    release_image_slots,
+    reserve_image_slots,
+)
 from app.services.identity import fixed_identity_reply
 from app.services.knowledge import (
     extract_correction,
@@ -934,23 +939,69 @@ async def image_status() -> dict:
 @app.post("/api/image")
 async def generate_image(
     request: ImageRequest,
-    _current_user: AuthUser = Depends(get_current_user),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> dict:
+    reserved, quota = await reserve_image_slots(
+        current_user.id,
+        settings,
+        count=1,
+    )
+
     try:
-        return await asyncio.wait_for(
-            route_image(request.provider, request.prompt, settings),
-            timeout=float(settings.total_image_timeout_seconds),
+        result = await asyncio.wait_for(
+            route_image(
+                request.provider,
+                request.prompt,
+                settings,
+            ),
+            timeout=float(
+                settings.total_image_timeout_seconds
+            ),
         )
+
+        return {
+            **result,
+            "image_quota": quota_payload(quota),
+        }
+
     except asyncio.TimeoutError as exc:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
         raise HTTPException(
             status_code=504,
-            detail="Image generation timed out after automatic provider retries.",
+            detail=(
+                "Image generation timed out after "
+                "automatic provider retries."
+            ),
         ) from exc
+
+    except HTTPException:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+        raise
+
     except Exception as exc:
+        await release_image_slots(
+            current_user.id,
+            settings,
+            count=reserved,
+        )
+
         detail = str(exc)[:1200]
+
         raise HTTPException(
             status_code=503,
-            detail=detail or "All image providers failed.",
+            detail=(
+                detail
+                or "All image providers failed."
+            ),
         ) from exc
 
 

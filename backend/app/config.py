@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # Vasuki Pro / owner access. Secrets stay only on Render.
     vasuki_owner_emails: str = ""
     puter_free_for_all: bool = True
-    puter_image_daily_limit: int = 100
+    puter_image_daily_limit: int = 50
     razorpay_key_id: str | None = None
     razorpay_key_secret: str | None = None
     razorpay_webhook_secret: str | None = None
@@ -118,16 +118,16 @@ class Settings(BaseSettings):
 
     request_timeout_seconds: int = 12
     chat_timeout_seconds: int = 25
-    fast_provider_timeout_seconds: int = 7
-    first_token_timeout_seconds: int = 4
+    fast_provider_timeout_seconds: int = 4
+    first_token_timeout_seconds: float = 1.6
     large_provider_timeout_seconds: int = 45
-    rate_limit_per_minute: int = 15
-    daily_message_limit: int = 250
+    rate_limit_per_minute: int = 60
+    daily_message_limit: int = 0
     error_alert_webhook_url: str | None = None
     error_alert_min_interval_seconds: int = 300
     provider_timeout_seconds: int = 14
     provider_cooldown_seconds: int = 120
-    max_provider_attempts: int = 3
+    max_provider_attempts: int = 7
     response_cache_enabled: bool = True
     response_cache_ttl_seconds: int = 900
     web_cache_current_ttl_seconds: int = 60

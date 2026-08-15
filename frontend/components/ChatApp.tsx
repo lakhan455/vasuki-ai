@@ -1373,13 +1373,51 @@ export default function ChatApp() {
             }
           }
         } else {
-          const data = (await generateImage(
-            effectiveText,
-            accessToken,
-          )) as ImageResponse;
-          imageUrl =
-            typeof data.url === "string" ? data.url.trim() : "";
-          imageProvider = data.provider || "";
+          const quota =
+            await consumePuterImageQuota(
+              accessToken,
+            );
+
+          setPuterImageQuota(quota);
+
+          if (!quota.allowed) {
+            throw new Error(
+              `Daily image limit reached (${quota.daily_limit}/day).`,
+            );
+          }
+
+          imageQuotaText =
+            ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
+
+          try {
+            const data = (await generateImage(
+              effectiveText,
+              accessToken,
+            )) as ImageResponse;
+
+            imageUrl =
+              typeof data.url === "string"
+                ? data.url.trim()
+                : "";
+
+            imageProvider =
+              data.provider || "";
+          } catch (nativeImageError) {
+            try {
+              const restored =
+                await releasePuterImageQuota(
+                  accessToken,
+                );
+
+              setPuterImageQuota(
+                restored,
+              );
+            } catch {
+              // Persistent quota resets automatically.
+            }
+
+            throw nativeImageError;
+          }
         }
 
         if (!imageUrl) {
@@ -1496,7 +1534,7 @@ export default function ChatApp() {
               dailyLimit:
                 typeof meta.daily_limit === "number"
                   ? meta.daily_limit
-                  : 250,
+                  : 0,
               dailyRemaining: meta.daily_remaining,
             });
           }
@@ -2058,7 +2096,7 @@ export default function ChatApp() {
                   >
                     <strong>Vasuki Pro</strong>
                     <small>
-                      Smart answers · Complete coding · 100 images/day
+                      Smart answers · Complete coding · 50 images/day
                     </small>
                   </button>
 
@@ -2100,10 +2138,10 @@ export default function ChatApp() {
             >
               {planLabel}
             </span>
-            {aiEngine === "puter" && puterImageQuota && (
+            {puterImageQuota && (
               <span
                 className="pv-quota-indicator"
-                title="Vasuki Pro image quota resets daily"
+                title="Image quota resets daily"
               >
                 Images: {puterImageQuota.daily_remaining}/
                 {puterImageQuota.daily_limit}
@@ -2114,7 +2152,9 @@ export default function ChatApp() {
                 className="pv-quota-indicator"
                 title={`${quotaStatus.minuteRemaining}/${quotaStatus.minuteLimit} requests available this minute`}
               >
-                Today: {quotaStatus.dailyRemaining}/{quotaStatus.dailyLimit}
+                {quotaStatus.dailyLimit <= 0
+                  ? "Chat: Unlimited"
+                  : `Today: ${quotaStatus.dailyRemaining}/${quotaStatus.dailyLimit}`}
               </span>
             )}
             <span className="pv-saved-indicator">

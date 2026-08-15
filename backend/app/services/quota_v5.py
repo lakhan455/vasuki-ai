@@ -72,6 +72,12 @@ async def check_chat_quota(
         daily_limit=daily_limit,
     )
 
+    # A zero/negative daily limit means unlimited chat.
+    # Keep the per-minute abuse guard, but do not consume
+    # the persistent Supabase daily counter.
+    if int(daily_limit) <= 0:
+        return local_status
+
     if not _configured(settings):
         return local_status
 

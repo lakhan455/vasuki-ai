@@ -29,6 +29,29 @@ def _provider_family(name: str | None) -> str:
         return "groq"
     return value
 
+
+def _reaction_priority(
+    names: list[str],
+    tier: str,
+) -> list[str]:
+    ordered = list(dict.fromkeys(names))
+
+    # The small Groq route exists specifically for low-latency
+    # first-token responses.
+    if tier == "fast" and "groq_fast" in ordered:
+        ordered.remove("groq_fast")
+        ordered.insert(0, "groq_fast")
+
+    # Gemini currently uses a non-streaming adapter in this
+    # router, therefore keep it as a fallback when streaming
+    # alternatives exist.
+    if "gemini" in ordered and len(ordered) > 1:
+        ordered.remove("gemini")
+        ordered.append("gemini")
+
+    return ordered
+
+
 async def route_chat_stream_v7(
     provider: str,
     messages: list[dict[str,Any]],
@@ -43,17 +66,26 @@ async def route_chat_stream_v7(
     started=time.perf_counter()
     d=classify_route(messages,require_current=require_current)
     q=last_user_query(messages)
-    max_attempts=max(1,min(3,int(getattr(settings,"max_provider_attempts",3))))
+    max_attempts=max(1,min(7,int(getattr(settings,"max_provider_attempts",7))))
     excluded_family=_provider_family(exclude_provider)
     base=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and legacy._provider_is_available(n)]
     healthy=[n for n in base if available(n)]
     alternatives=[n for n in healthy if not excluded_family or _provider_family(n)!=excluded_family]
-    candidates=rank_for_task(alternatives,d.task_type)[:max_attempts]
+    candidates=_reaction_priority(
+        rank_for_task(alternatives,d.task_type),
+        d.tier,
+    )[:max_attempts]
     if not candidates:
         alternatives=[n for n in base if not excluded_family or _provider_family(n)!=excluded_family]
-        candidates=rank_for_task(alternatives,d.task_type)[:max_attempts]
+        candidates=_reaction_priority(
+            rank_for_task(alternatives,d.task_type),
+            d.tier,
+        )[:max_attempts]
     if not candidates:
-        candidates=rank_for_task(healthy or base,d.task_type)[:max_attempts]
+        candidates=_reaction_priority(
+            rank_for_task(healthy or base,d.task_type),
+            d.tier,
+        )[:max_attempts]
     if not candidates: raise RuntimeError("No healthy AI provider is currently available.")
 
     ckey=None
@@ -92,7 +124,16 @@ async def route_chat_stream_v7(
                     segment=""; finish=""
                     it=_stream_provider_segment(name=name,messages=working,settings=settings,web_context=web_context,require_current=require_current,as_of=as_of,large_request=d.tier=="strong")
                     try:
-                        ev=await asyncio.wait_for(anext(it),timeout=max(2.0,float(getattr(settings,"first_token_timeout_seconds",4))))
+                        ev=await asyncio.wait_for(anext(it),timeout=max(
+                            1.25,
+                            float(
+                                getattr(
+                                    settings,
+                                    "first_token_timeout_seconds",
+                                    1.6,
+                                )
+                            ),
+                        ))
                         pending=[ev]
                         while pending:
                             e=pending.pop(0)
