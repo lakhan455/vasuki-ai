@@ -43,8 +43,8 @@ def classify_image_request(prompt: str) -> ImageDecision:
         kind = "general"
 
     preferred = {
-        "realistic": ("huggingface", "cloudflare", "deepai"),
-        "anime": ("huggingface", "cloudflare", "deepai"),
+        "realistic": ("cloudflare", "huggingface", "deepai"),
+        "anime": ("cloudflare", "huggingface", "deepai"),
         "poster": ("cloudflare", "huggingface", "deepai"),
         "logo": ("cloudflare", "huggingface", "deepai"),
         "illustration": ("cloudflare", "huggingface", "deepai"),
@@ -88,7 +88,14 @@ def enhance_image_prompt(prompt: str, image_type: str) -> str:
         ),
     }
     suffix = (
-        " Avoid accidental text, watermarks, duplicate limbs/objects, malformed geometry, "
+        " STRICT SUBJECT FIDELITY: treat every explicitly named subject, brand, "
+        "vehicle model, product, fictional character, color, count, pose and relationship "
+        "as identity-critical. Preserve the exact requested identity and its canonical "
+        "distinctive visual features. Never replace a named vehicle model with a similar "
+        "model and never replace a named character with another or generic character. "
+        "Interpret obvious common spelling variants as the intended canonical name while "
+        "preserving the user's intended subject. "
+        "Avoid accidental text, watermarks, duplicate limbs/objects, malformed geometry, "
         "low-resolution artifacts and clutter unless explicitly requested."
     )
     if len(base) > 1200:

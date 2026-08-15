@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import random
 from io import BytesIO
 from typing import Awaitable, Callable
 
@@ -146,7 +145,6 @@ async def image_cloudflare(prompt: str, settings: Settings) -> dict:
     body = {
         "prompt": prompt[:2048],
         "steps": 4,
-        "seed": random.randint(1, 2_147_483_647),
     }
 
     response = await _post_with_retry(
