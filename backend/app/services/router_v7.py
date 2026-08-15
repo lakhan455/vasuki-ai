@@ -47,11 +47,37 @@ def classify_route(messages: list[dict[str, Any]], *, require_current: bool=Fals
     elif research: task = "research"
     elif any(q.startswith(x) for x in _SIMPLE): task = "simple"
     else: task = "general"
-    simple = task == "simple" and len(q0) <= 180 and not require_current and not large
+    simple = (
+        task == "simple"
+        and len(q0) <= 180
+        and not require_current
+        and not large
+    )
+
+    fast_general = (
+        task == "general"
+        and len(q0) <= 900
+        and len(messages) <= 12
+        and not require_current
+        and not large
+    )
+
     return RoutingDecision(
         task_type=task,
-        difficulty="low" if simple else ("high" if code or reasoning or large else "medium"),
-        tier="fast" if simple else "strong",
+        difficulty=(
+            "low"
+            if simple or fast_general
+            else (
+                "high"
+                if code or reasoning or large
+                else "medium"
+            )
+        ),
+        tier=(
+            "fast"
+            if simple or fast_general
+            else "strong"
+        ),
         language=detect_language(q0),
         needs_web=research,
     )
@@ -66,7 +92,16 @@ def configured_provider(name: str, s: Settings) -> bool:
 
 def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
     if provider != "auto": return [provider]
-    if d.tier == "fast": return ["groq_fast","mistral","openrouter"]
+    if d.tier == "fast":
+        return [
+            "groq_fast",
+            "cerebras",
+            "mistral",
+            "openrouter",
+            "groq",
+            "sambanova",
+            "gemini",
+        ]
     if d.task_type == "code": return ["groq","openrouter","gemini","cerebras","sambanova"]
     if d.task_type in {"research","reasoning"}: return ["groq","gemini","sambanova","cerebras","openrouter"]
     return ["groq","gemini","openrouter","sambanova","cerebras"]

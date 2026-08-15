@@ -468,7 +468,7 @@ export async function streamChat(
 
     // The backend marks failed providers unhealthy before
     // this retry, so a fresh request prefers another provider.
-    await delay(650);
+    await delay(120);
 
     try {
       return await streamAt(

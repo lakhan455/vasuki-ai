@@ -21,10 +21,10 @@ def provider_score_v12(provider: str, task_type: str = "general") -> float:
     availability = 1.0 if reliability > 0.0 else 0.0
 
     score = (
-        feedback_quality * 0.45
-        + benchmark * 0.20
+        feedback_quality * 0.35
+        + benchmark * 0.15
         + reliability * 0.15
-        + speed * 0.10
+        + speed * 0.25
         + availability * 0.10
     )
     return round(max(0.0, min(1.0, score)), 6)

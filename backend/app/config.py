@@ -118,8 +118,8 @@ class Settings(BaseSettings):
 
     request_timeout_seconds: int = 12
     chat_timeout_seconds: int = 25
-    fast_provider_timeout_seconds: int = 7
-    first_token_timeout_seconds: int = 4
+    fast_provider_timeout_seconds: int = 4
+    first_token_timeout_seconds: float = 1.6
     large_provider_timeout_seconds: int = 45
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0
