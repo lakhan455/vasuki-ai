@@ -1657,3 +1657,51 @@ export async function restoreBackupV9(accessToken: string, backupId: string, app
 export async function resolveErrorV9(accessToken: string, errorId: number) { return patchJsonAt(DIRECT_API_URL, `/api/owner/errors/v9/${errorId}/resolve`, {}, accessToken); }
 export async function recordSecretRotationV9(accessToken: string, secretName: string, previousFingerprint: string, note = "") { return postJsonAt(DIRECT_API_URL, "/api/owner/secrets/v9/rotation", { secret_name: secretName, previous_fingerprint: previousFingerprint, note }, 30000, 1, accessToken); }
 /* VASUKI_V9_PHASE6_API_END */
+
+
+/* VASUKI_V12_CORE_API */
+export type V12ReliabilitySnapshot = {
+  ok?: boolean;
+  version?: string;
+  slo?: {
+    samples?: number;
+    chat_samples?: number;
+    p50_latency_ms?: number | null;
+    p95_latency_ms?: number | null;
+    p50_first_token_ms?: number | null;
+    p95_first_token_ms?: number | null;
+    success_pct?: number;
+    fallback_pct?: number;
+    error_pct?: number;
+  };
+  capabilities?: Record<string, string>;
+  sandbox?: {
+    available?: boolean;
+    engine?: string | null;
+    network?: string;
+    filesystem?: string;
+    memory_mb?: number;
+    cpu_limit?: number;
+    pids_limit?: number;
+  };
+  providers?: Record<string, {
+    configured?: boolean;
+    tasks?: Record<string, {
+      score?: number;
+      feedback_quality?: number;
+      benchmark_quality?: number;
+      success_rate?: number;
+      speed?: number;
+    }>;
+  }>;
+};
+
+export async function fetchOwnerReliabilityV12(
+  accessToken: string,
+): Promise<V12ReliabilitySnapshot> {
+  return await getAt(
+    DIRECT_API_URL,
+    "/api/owner/v12/reliability",
+    accessToken,
+  ) as V12ReliabilitySnapshot;
+}
