@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import time
+import zipfile
 from typing import Any
 
 from fastapi import Body, Depends, File, Form, HTTPException, Query, UploadFile
@@ -44,6 +45,16 @@ from app.v13.incidents import recovery_plan
 from app.v13.orchestrator import orchestrate_request
 from app.v13.project_brain import project_snapshot
 from app.v14.runtime import prepare_quality_messages, runtime_health
+from app.v15.coding_agent import (
+    V15_PROJECT_SYSTEM_PROMPT,
+    build_project_prompt,
+    coder_health,
+    extract_zip_text_files,
+    merge_existing_files,
+    normalize_project_payload,
+    package_project_response,
+    parse_project_response,
+)
 
 app = v10.app
 settings = v10.settings
@@ -891,3 +902,143 @@ async def v14_runtime_inspect(
         require_current=payload.require_current,
     )
     return {"ok": True, "runtime": decision.to_dict()}
+
+# VASUKI_V15_AUTONOMOUS_CODER
+class V15CodeProjectRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=30000)
+
+
+class V15CodePackageRequest(BaseModel):
+    project_name: str = Field(default="vasuki-project", max_length=120)
+    summary: str = Field(default="", max_length=5000)
+    language: str = Field(default="mixed", max_length=120)
+    framework: str = Field(default="custom", max_length=160)
+    files: list[dict[str, Any]] = Field(default_factory=list)
+    powershell: list[str] = Field(default_factory=list)
+    run_commands: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+async def _v15_generate_project(
+    user_prompt: str,
+    *,
+    existing_files: list[dict[str, str]] | None = None,
+) -> tuple[dict[str, Any], str]:
+    planner = build_execution_plan(
+        [{"role": "user", "content": user_prompt}],
+        require_current=False,
+    ).to_dict()
+    generation_prompt = build_project_prompt(
+        user_prompt,
+        planner_context=planner,
+        existing_files=existing_files,
+    )
+    messages = [
+        {"role": "system", "content": V15_PROJECT_SYSTEM_PROMPT},
+        {"role": "user", "content": generation_prompt},
+    ]
+
+    last_error = ""
+    for attempt in range(3):
+        try:
+            raw, provider_name = await route_chat_v11(
+                "auto",
+                messages,
+                settings,
+                "",
+                require_current=False,
+            )
+            project = parse_project_response(raw)
+            if existing_files:
+                project = merge_existing_files(
+                    existing_files, project
+                )
+            return project, provider_name
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt < 2:
+                await asyncio.sleep((0.8, 1.8)[attempt])
+
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "V15 coding providers are temporarily unavailable after "
+            f"automatic retries. {last_error[:500]}"
+        ),
+    )
+
+
+@app.get("/health/v15")
+async def health_v15():
+    return {
+        "ok": True,
+        **coder_health(),
+        "provider_health": provider_health_summary(
+            provider_snapshot_v12(settings)
+        ),
+    }
+
+
+@app.post("/api/v15/code/project")
+async def v15_code_project(
+    payload: V15CodeProjectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    project, provider_name = await _v15_generate_project(
+        payload.prompt
+    )
+    return package_project_response(
+        project,
+        provider=provider_name or "vasuki-v15",
+    )
+
+
+@app.post("/api/v15/code/package")
+async def v15_code_package(
+    payload: V15CodePackageRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    try:
+        project = normalize_project_payload(
+            payload.model_dump()
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail=str(exc)
+        ) from exc
+    return package_project_response(
+        project, provider="vasuki-v15-packager"
+    )
+
+
+@app.post("/api/v15/code/modify")
+async def v15_code_modify(
+    prompt: str = Form(...),
+    file: UploadFile = File(...),
+    _user: AuthUser = Depends(get_current_user),
+):
+    filename = file.filename or "project.zip"
+    if not filename.lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                "V15 project modification currently accepts "
+                "a .zip project."
+            ),
+        )
+    data = await file.read()
+    try:
+        existing_files = extract_zip_text_files(data)
+    except (ValueError, zipfile.BadZipFile) as exc:
+        raise HTTPException(
+            status_code=422, detail=str(exc)
+        ) from exc
+
+    project, provider_name = await _v15_generate_project(
+        prompt,
+        existing_files=existing_files,
+    )
+    return package_project_response(
+        project,
+        provider=provider_name or "vasuki-v15",
+    )

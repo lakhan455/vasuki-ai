@@ -18,6 +18,10 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
+  buildCodeProject,
+  modifyCodeProject,
+  packageCodeProject,
+  parseCodeProjectSpec,
   createConversationBranch,
   extractProjectMemories,
   fetchProjects,
@@ -57,6 +61,8 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/gif",
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/zip",
+  "application/x-zip-compressed",
   "text/plain",
   "text/markdown",
 ]);
@@ -71,6 +77,7 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   ".docx",
   ".txt",
   ".md",
+  ".zip",
 ]);
 
 type SourceInfo = {
@@ -517,6 +524,27 @@ function isLikelyCodeRequest(value: string) {
 
   return /\bcode\b/i.test(text) || ((explicitCode || webBuild) && action);
 }
+
+/* VASUKI_V15_PROJECT_INTENT_START */
+function isLikelyProjectBuildRequest(value: string) {
+  const text = value.toLowerCase();
+  const buildAction =
+    /\b(create|build|make|generate|develop|bana|banao|banado|create\s+karo|bana\s+do)\b/i.test(
+      text,
+    );
+  const projectNoun =
+    /\b(website|web\s*app|mobile\s*app|android\s*app|ios\s*app|desktop\s*app|software|project|dashboard|admin\s*panel|saas|ecommerce|e-commerce|marketplace|api|backend|frontend|full\s*stack|ai\s*(?:app|tool|assistant|agent)|jarvis|chatbot|automation)\b/i.test(
+      text,
+    );
+  const completeness =
+    /\b(complete|fully|full|production|end[-\s]?to[-\s]?end|all\s*files|zip|download|file\s*de|files\s*de|ready\s*project|working\s*app)\b/i.test(
+      text,
+    );
+
+  return (buildAction && projectNoun) ||
+    (projectNoun && completeness);
+}
+/* VASUKI_V15_PROJECT_INTENT_END */
 
 function normaliseInlineCodeLanguage(value: string) {
   const language = value.trim().toLowerCase().split(/\s+/)[0] || "code";
@@ -1149,7 +1177,7 @@ export default function ChatApp() {
       !ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)
     ) {
       setError(
-        "Only JPG, PNG, WEBP, GIF, PDF, DOCX, TXT and MD files are supported.",
+        "Only JPG, PNG, WEBP, GIF, PDF, DOCX, TXT, MD and ZIP project files are supported.",
       );
       return;
     }
@@ -1221,6 +1249,10 @@ export default function ChatApp() {
         : "Analyze this image in detail and explain all important information.");
 
     const codingRequest = isLikelyCodeRequest(effectiveText);
+    const projectBuildRequest = isLikelyProjectBuildRequest(effectiveText);
+    const zipProjectAttachment = Boolean(
+      selectedAttachment && /\.zip$/i.test(selectedAttachment.file.name),
+    );
     codeIntentRef.current = codingRequest;
     if (codingRequest) {
       setCodeWorkspaceOpen(true);
@@ -1270,12 +1302,148 @@ export default function ChatApp() {
 
       let finalMessages: UiMessage[];
 
-      const requestedDownload = wantsDownloadableArtifact(effectiveText);
+const requestedDownload =
+        wantsDownloadableArtifact(effectiveText);
+      const shouldUseCodeProject =
+        codingRequest &&
+        (
+          projectBuildRequest ||
+          zipProjectAttachment ||
+          requestedDownload
+        );
       const shouldUseSmartFiles =
-        requestedDownload ||
-        selectedAttachment?.kind === "document";
+        !shouldUseCodeProject &&
+        (
+          requestedDownload ||
+          selectedAttachment?.kind === "document"
+        );
 
-      if (shouldUseSmartFiles) {
+      if (shouldUseCodeProject) {
+        let data;
+        let nativeError: unknown = null;
+        const usePuterFirst =
+          aiEngine === "puter" && !zipProjectAttachment;
+
+        if (!usePuterFirst) {
+          try {
+            data =
+              zipProjectAttachment && selectedAttachment
+                ? await modifyCodeProject(
+                    selectedAttachment.file,
+                    effectiveText,
+                    accessToken,
+                  )
+                : await buildCodeProject(
+                    effectiveText,
+                    accessToken,
+                  );
+          } catch (projectError) {
+            nativeError = projectError;
+          }
+        }
+
+        if (!data && !zipProjectAttachment) {
+          if (!accountPlan?.puter_access) {
+            throw nativeError instanceof Error
+              ? nativeError
+              : new Error(
+                  "V15 coding providers are busy and " +
+                  "Vasuki Pro fallback is not enabled.",
+                );
+          }
+
+          const puterContext = await fetchPuterContext(
+            accessToken,
+            memoryEnabled,
+          );
+          const projectContract = `
+You are Vasuki V15 emergency coding engine.
+Return ONE valid JSON object only:
+{
+  "project_name":"safe-name",
+  "summary":"short summary",
+  "language":"primary language",
+  "framework":"framework/runtime",
+  "files":[
+    {"path":"relative/path.ext","content":"complete contents"}
+  ],
+  "powershell":["Windows PowerShell install/run/test command"],
+  "run_commands":["optional command"],
+  "notes":["important note"]
+}
+No TODOs, placeholders, omitted code or real secrets.
+Include README.md and every required config/bootstrap file.
+If huge, build the smallest COMPLETE functional MVP.
+`.trim();
+
+          let rawProject = "";
+          const usedModel = await streamPuterChat(
+            [{
+              role: "user",
+              content: effectiveText,
+            }],
+            {
+              systemContext:
+                `${puterContext.system_prompt}\n\n` +
+                projectContract,
+            },
+            (token) => {
+              rawProject += token;
+            },
+          );
+          const spec =
+            parseCodeProjectSpec(rawProject);
+          const packaged =
+            await packageCodeProject(
+              spec,
+              accessToken,
+            );
+          data = {
+            ...packaged,
+            provider:
+              `vasuki-pro:${usedModel}+v15-packager`,
+          };
+        }
+
+        if (!data) {
+          throw nativeError instanceof Error
+            ? nativeError
+            : new Error(
+                "V15 project generation failed.",
+              );
+        }
+
+        const primaryCode =
+          data.primary_code?.trim() || "";
+        if (primaryCode) {
+          setCodeWorkspaceSnapshot({
+            code: primaryCode,
+            language:
+              data.primary_language || "code",
+            previewDoc:
+              data.preview_doc || "",
+          });
+          setCodeWorkspaceOpen(true);
+          setCodeWorkspaceTab(
+            data.preview_doc ? "preview" : "code",
+          );
+        }
+
+        finalMessages = [
+          ...nextMessages,
+          {
+            id: makeId(),
+            role: "assistant",
+            content:
+              data.answer.trim() ||
+              `Your ${
+                data.project_name || "project"
+              } is ready.`,
+            provider: data.provider,
+            artifacts: data.files,
+          },
+        ];
+      } else if (shouldUseSmartFiles) {
         const data = await analyzeSmartFiles(
           selectedAttachment ? [selectedAttachment.file] : [],
           effectiveText,
@@ -2831,7 +2999,7 @@ function Composer({
         ref={fileInputRef}
         className="pv-file-input"
         type="file"
-        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,.pdf,.docx,.txt,.md"
+        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed,text/plain,text/markdown,.pdf,.docx,.txt,.md,.zip"
         onChange={handleFileChange}
       />
 
