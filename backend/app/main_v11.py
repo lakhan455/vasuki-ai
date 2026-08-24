@@ -1835,3 +1835,107 @@ async def v18_mind_experience(
         "remembered": True,
         "experience": row,
     }
+# VASUKI_V19_INTENT_CONTEXT_BRAIN_INTEGRATION
+from app.v19.context_brain import (
+    build_context_brain_context,
+    context_brain_health,
+    decide_context,
+)
+
+_v19_base_private_context = v10.legacy._private_context
+_v19_base_web_context = v10.legacy._web_context
+
+
+def _v19_request_messages(request) -> list[dict[str, Any]]:
+    return [
+        item.model_dump() if hasattr(item, "model_dump") else dict(item)
+        for item in getattr(request, "messages", [])
+    ]
+
+
+async def _v19_private_context(*, user_id: str, access_token: str, query: str, request):
+    base_context, document_sources = await _v19_base_private_context(
+        user_id=user_id,
+        access_token=access_token,
+        query=query,
+        request=request,
+    )
+    try:
+        brain_context = build_context_brain_context(
+            _v19_request_messages(request),
+            explicit_web=bool(getattr(request, "use_web", False)),
+            research_mode=bool(getattr(request, "research_mode", False)),
+            project_id=str(getattr(request, "project_id", "") or ""),
+        )
+    except Exception:
+        brain_context = ""
+    return (
+        v10.legacy._join_context(base_context, brain_context),
+        document_sources,
+    )
+
+
+async def _v19_web_context(*, query: str, current_date: str, request):
+    try:
+        decision = decide_context(
+            _v19_request_messages(request),
+            explicit_web=bool(getattr(request, "use_web", False)),
+            research_mode=bool(getattr(request, "research_mode", False)),
+            project_id=str(getattr(request, "project_id", "") or ""),
+        )
+    except Exception:
+        return await _v19_base_web_context(
+            query=query,
+            current_date=current_date,
+            request=request,
+        )
+
+    if not decision.allow_web:
+        return False, [], ""
+
+    require_current, sources, live_pack = await _v19_base_web_context(
+        query=query,
+        current_date=current_date,
+        request=request,
+    )
+    return bool(require_current or decision.require_current), sources, live_pack
+
+
+# main_v4/main_v5 production streaming resolves these attributes dynamically.
+v10.legacy._private_context = _v19_private_context
+v10.legacy._web_context = _v19_web_context
+
+
+class V19ContextInspectRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    use_web: bool = False
+    research_mode: bool = False
+    project_id: str = Field(default="", max_length=80)
+
+
+@app.get("/health/v19")
+async def health_v19():
+    return {
+        "ok": True,
+        **context_brain_health(),
+        "production_stream_integration": True,
+        "v18_living_mind_preserved": True,
+        "v18_2_memory_continue_preserved": True,
+        "v18_2_1_stream_compat_preserved": True,
+    }
+
+
+@app.post("/api/v19/context/inspect")
+async def v19_context_inspect(
+    payload: V19ContextInspectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(status_code=422, detail="At least one message is required.")
+    decision = decide_context(
+        payload.messages,
+        explicit_web=payload.use_web,
+        research_mode=payload.research_mode,
+        project_id=payload.project_id,
+    )
+    return {"ok": True, "context": decision.to_dict()}
