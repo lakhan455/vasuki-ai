@@ -69,6 +69,7 @@ from app.services.research import (
     search_web,
 )
 from app.services.vision import process_vision_request
+from app.v14.runtime import decide_runtime, try_fast_calculation
 
 
 settings = get_settings()
@@ -198,8 +199,20 @@ async def _web_context(
     request: ChatRequest,
 ) -> tuple[bool, list[dict[str, Any]], str]:
     research_mode = bool(getattr(request, "research_mode", False))
-    require_current = needs_live_web(query) or research_mode
-    should_search = request.use_web or require_current
+    runtime = decide_runtime(
+        [{"role": "user", "content": query}],
+        require_current=research_mode,
+    )
+    require_current = (
+        needs_live_web(query)
+        or research_mode
+        or runtime.intelligence.needs_current
+    )
+    should_search = (
+        request.use_web
+        or require_current
+        or runtime.auto_web
+    )
 
     if not should_search:
         return require_current, [], ""
@@ -572,6 +585,17 @@ async def chat(
             used_context_chars=len(query),
         )
 
+    fast_calc = try_fast_calculation(query)
+    if fast_calc:
+        return ChatResponse(
+            answer=str(fast_calc["answer"]),
+            provider="vasuki-calculator",
+            sources=[],
+            context_trimmed=False,
+            original_context_chars=original_chars,
+            used_context_chars=len(query),
+        )
+
     strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
 
     if (
@@ -722,6 +746,13 @@ async def chat_stream(
         return _direct_stream(
             answer,
             provider="vasuki-personal-memory",
+        )
+
+    fast_calc = try_fast_calculation(query)
+    if fast_calc:
+        return _direct_stream(
+            str(fast_calc["answer"]),
+            provider="vasuki-calculator",
         )
 
     strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)

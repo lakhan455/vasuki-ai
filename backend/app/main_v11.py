@@ -43,6 +43,7 @@ from app.v13.deployment import check_deployment
 from app.v13.incidents import recovery_plan
 from app.v13.orchestrator import orchestrate_request
 from app.v13.project_brain import project_snapshot
+from app.v14.runtime import prepare_quality_messages, runtime_health
 
 app = v10.app
 settings = v10.settings
@@ -111,6 +112,11 @@ async def route_chat_stream_v11(
     cache_bypass: bool = False,
     exclude_provider: str | None = None,
 ):
+    messages=prepare_quality_messages(
+        messages,
+        require_current=require_current,
+        web_context=web_context,
+    )
     complete=""
     final_provider=""
     async for event in route_chat_stream_v10(
@@ -180,6 +186,51 @@ async def route_chat_v11(
         elif event.get("type")=="token": answer+=str(event.get("token") or "")
     if not answer.strip():
         raise RuntimeError("Vasuki V11 routing returned an empty answer.")
+
+    # V14 selective repair: only severe quality failures are retried, and only
+    # for automatic routing. This avoids adding latency to normal good answers.
+    if provider == "auto":
+        try:
+            query=last_user_query(messages)
+            review=critic_review(
+                query,
+                answer,
+                sources=[{"type":"provided_context"}] if web_context.strip() else [],
+                current_required=require_current,
+            )
+            issue_text=" ".join(review.issues).casefold()
+            severe_issue=any(
+                token in issue_text
+                for token in ("placeholder", "empty answer", "incomplete content")
+            )
+            if review.needs_repair and (review.score < 60.0 or severe_issue):
+                repair_messages=[
+                    *messages,
+                    {"role":"assistant","content":answer.strip()},
+                    {"role":"user","content":review.repair_instruction},
+                ]
+                repaired=""
+                repair_provider=""
+                async for event in route_chat_stream_v11(
+                    "auto",
+                    repair_messages,
+                    settings_arg,
+                    web_context,
+                    require_current=require_current,
+                    as_of=as_of,
+                    cache_bypass=True,
+                    exclude_provider=provider_name or None,
+                ):
+                    if event.get("type")=="provider":
+                        repair_provider=str(event.get("provider") or "")
+                    elif event.get("type")=="token":
+                        repaired+=str(event.get("token") or "")
+                if repaired.strip():
+                    answer=repaired.strip()
+                    provider_name=repair_provider or provider_name
+        except Exception:
+            pass
+
     return answer.strip(),provider_name or "auto"
 
 # Existing production chat endpoints now flow through V11's transparent judge/learning layer.
@@ -807,3 +858,36 @@ async def v13_provider_health(
         "health": provider_health_summary(provider_snapshot_v12(settings)),
     }
 
+# VASUKI_V14_RUNTIME_QUALITY
+@app.get("/health/v14")
+async def health_v14():
+    return {
+        "ok": True,
+        **runtime_health(),
+        "v13_provider_health": provider_health_summary(
+            provider_snapshot_v12(settings)
+        ),
+    }
+
+
+class V14RuntimeInspectRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    require_current: bool = False
+
+
+@app.post("/api/v14/runtime/inspect")
+async def v14_runtime_inspect(
+    payload: V14RuntimeInspectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(
+            status_code=422,
+            detail="At least one message is required.",
+        )
+    from app.v14.runtime import decide_runtime
+    decision = decide_runtime(
+        payload.messages,
+        require_current=payload.require_current,
+    )
+    return {"ok": True, "runtime": decision.to_dict()}

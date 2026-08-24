@@ -11,6 +11,7 @@ from app.services.router_v7 import base_candidates, classify_route, configured_p
 from app.services.telemetry_v7 import available, attempt, success, failure, record
 from app.services.quality_v9 import rank_for_task
 from app.v13.context import compress_messages
+from app.v13.incidents import recovery_plan
 
 def _chunks(s,size=80): return [s[i:i+size] for i in range(0,len(s),size)]
 
@@ -186,6 +187,20 @@ async def route_chat_stream_v7(
             failure(name,exc); legacy._mark_provider_failure(name,exc,settings)
             clean=safe_error(exc); errors.append(f"{name}: {clean}")
             yield {"type":"diagnostic","provider":name,"status":"failed","error":clean}
+            remaining=candidates[attempts:]
+            recovery=recovery_plan(name,clean,remaining)
+            yield {
+                "type":"diagnostic",
+                "provider":name,
+                "status":f"v14_recovery:{recovery.incident_type}",
+                "error":clean,
+            }
+            # Never turn cross-provider fallback into a moderation bypass.
+            if recovery.incident_type=="moderation":
+                complete=""
+                raise RuntimeError(
+                    "Provider blocked this request under its moderation policy."
+                )
             if emitted: yield {"type":"diagnostic","provider":name,"status":"resuming_same_tier"}
 
     if complete.strip(): return
