@@ -1919,6 +1919,7 @@ async def health_v19():
         "ok": True,
         **context_brain_health(),
         "production_stream_integration": True,
+        "phase2_project_coding_brain": True,
         "v18_living_mind_preserved": True,
         "v18_2_memory_continue_preserved": True,
         "v18_2_1_stream_compat_preserved": True,
@@ -1939,3 +1940,155 @@ async def v19_context_inspect(
         project_id=payload.project_id,
     )
     return {"ok": True, "context": decision.to_dict()}
+
+# VASUKI_V19_PHASE2_PROJECT_CODING_BRAIN_INTEGRATION
+from app.services.project_kb_v9 import (
+    get_project_file as get_project_file_v19,
+    list_project_files as list_project_files_v19,
+)
+from app.v19.project_coding_brain import (
+    build_project_coding_context,
+    decide_project_coding,
+    project_coding_health,
+    rank_project_files,
+)
+
+_v19_phase2_base_private_context = v10.legacy._private_context
+
+
+async def _v19_phase2_private_context(
+    *,
+    user_id: str,
+    access_token: str,
+    query: str,
+    request,
+):
+    base_context, document_sources = await _v19_phase2_base_private_context(
+        user_id=user_id,
+        access_token=access_token,
+        query=query,
+        request=request,
+    )
+    project_id = str(getattr(request, "project_id", "") or "").strip()
+    if not project_id:
+        return base_context, document_sources
+
+    try:
+        decision = decide_project_coding(
+            _v19_request_messages(request),
+            project_id=project_id,
+        )
+    except Exception:
+        return base_context, document_sources
+
+    if not decision.needs_project_files:
+        return base_context, document_sources
+
+    try:
+        rows = await asyncio.wait_for(
+            list_project_files_v19(
+                settings,
+                user_id=user_id,
+                project_id=project_id,
+                include_content=False,
+                limit=500,
+            ),
+            timeout=3.5,
+        )
+        paths = rank_project_files(
+            query + "\n" + str(decision.reference_text or ""),
+            rows,
+            decision=decision,
+            limit=5,
+        )
+        file_results = await asyncio.gather(
+            *[
+                asyncio.wait_for(
+                    get_project_file_v19(
+                        settings,
+                        user_id=user_id,
+                        project_id=project_id,
+                        path=path,
+                    ),
+                    timeout=2.8,
+                )
+                for path in paths
+            ],
+            return_exceptions=True,
+        )
+        selected = [item for item in file_results if isinstance(item, dict)]
+        coding_context = build_project_coding_context(decision, selected)
+    except Exception:
+        coding_context = ""
+
+    return (
+        v10.legacy._join_context(base_context, coding_context),
+        document_sources,
+    )
+
+
+v10.legacy._private_context = _v19_phase2_private_context
+
+
+class V19ProjectCodingInspectRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    project_id: str = Field(default="", max_length=80)
+
+
+@app.get("/health/v19-phase2")
+async def health_v19_phase2():
+    return {
+        "ok": True,
+        **project_coding_health(),
+        "production_stream_integration": True,
+        "phase1_context_brain_preserved": True,
+        "v18_memory_and_living_mind_preserved": True,
+        "frontend_header_noise_removed": True,
+    }
+
+
+@app.post("/api/v19/coding/inspect")
+async def v19_project_coding_inspect(
+    payload: V19ProjectCodingInspectRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(status_code=422, detail="At least one message is required.")
+
+    decision = decide_project_coding(
+        payload.messages,
+        project_id=payload.project_id,
+    )
+    selected_paths: list[str] = []
+
+    if decision.needs_project_files and payload.project_id:
+        try:
+            rows = await list_project_files_v19(
+                settings,
+                user_id=user.id,
+                project_id=payload.project_id,
+                include_content=False,
+                limit=500,
+            )
+            latest = next(
+                (
+                    str(item.get("content") or "")
+                    for item in reversed(payload.messages)
+                    if item.get("role") == "user"
+                ),
+                "",
+            )
+            selected_paths = rank_project_files(
+                latest,
+                rows,
+                decision=decision,
+                limit=5,
+            )
+        except Exception:
+            selected_paths = []
+
+    return {
+        "ok": True,
+        "coding": decision.to_dict(),
+        "selected_project_files": selected_paths,
+    }
