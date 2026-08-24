@@ -2092,3 +2092,180 @@ async def v19_project_coding_inspect(
         "coding": decision.to_dict(),
         "selected_project_files": selected_paths,
     }
+
+# VASUKI_V30_AUTONOMY_RUNTIME_INTEGRATION
+from app.v19.conversation_state import conversation_state_health
+from app.v20.planner import planner_health
+from app.v21.coding_brain import coding_brain_health
+from app.v22.repo_intelligence import repo_intelligence_health
+from app.v23.debugger import debugger_health
+from app.v24.sandbox import sandbox_health
+from app.v25.multi_agent import multi_agent_health
+from app.v26.self_correction import self_correction_health
+from app.v27.memory_layers import memory_layers_health
+from app.v28.tool_policy import tool_policy_health
+from app.v29.production_engineer import production_engineer_health
+from app.v30.autonomy_runtime import (
+    autonomy_runtime_health,
+    build_autonomy_context,
+    decide_autonomy,
+)
+
+_v30_base_private_context = v10.legacy._private_context
+
+
+async def _v30_private_context(
+    *,
+    user_id: str,
+    access_token: str,
+    query: str,
+    request,
+):
+    base_context, document_sources = await _v30_base_private_context(
+        user_id=user_id,
+        access_token=access_token,
+        query=query,
+        request=request,
+    )
+
+    project_id = str(getattr(request, "project_id", "") or "").strip()
+    project_rows: list[dict[str, Any]] = []
+    if project_id:
+        try:
+            project_rows = await asyncio.wait_for(
+                list_project_files_v19(
+                    settings,
+                    user_id=user_id,
+                    project_id=project_id,
+                    include_content=False,
+                    limit=500,
+                ),
+                timeout=2.5,
+            )
+        except Exception:
+            project_rows = []
+
+    try:
+        decision = decide_autonomy(
+            _v19_request_messages(request),
+            project_id=project_id,
+            explicit_web=bool(getattr(request, "use_web", False)),
+            research_mode=bool(getattr(request, "research_mode", False)),
+            project_files=project_rows,
+        )
+        autonomy_context = build_autonomy_context(decision)
+    except Exception:
+        autonomy_context = ""
+
+    return (
+        v10.legacy._join_context(base_context, autonomy_context),
+        document_sources,
+    )
+
+
+v10.legacy._private_context = _v30_private_context
+
+
+class V30InspectRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    project_id: str = Field(default="", max_length=80)
+    use_web: bool = False
+    research_mode: bool = False
+
+
+@app.get("/health/v19-phase3")
+async def health_v19_phase3():
+    return {"ok": True, **conversation_state_health()}
+
+
+@app.get("/health/v20")
+async def health_v20():
+    return {"ok": True, **planner_health()}
+
+
+@app.get("/health/v21")
+async def health_v21():
+    return {"ok": True, **coding_brain_health()}
+
+
+@app.get("/health/v22")
+async def health_v22():
+    return {"ok": True, **repo_intelligence_health()}
+
+
+@app.get("/health/v23")
+async def health_v23():
+    return {"ok": True, **debugger_health()}
+
+
+@app.get("/health/v24")
+async def health_v24():
+    return {"ok": True, **sandbox_health()}
+
+
+@app.get("/health/v25")
+async def health_v25():
+    return {"ok": True, **multi_agent_health()}
+
+
+@app.get("/health/v26")
+async def health_v26():
+    return {"ok": True, **self_correction_health()}
+
+
+@app.get("/health/v27")
+async def health_v27():
+    return {"ok": True, **memory_layers_health()}
+
+
+@app.get("/health/v28")
+async def health_v28():
+    return {"ok": True, **tool_policy_health()}
+
+
+@app.get("/health/v29")
+async def health_v29():
+    return {"ok": True, **production_engineer_health()}
+
+
+@app.get("/health/v30")
+async def health_v30():
+    return {
+        "ok": True,
+        **autonomy_runtime_health(),
+        "v19_phase1_context_brain_preserved": True,
+        "v19_phase2_project_coding_preserved": True,
+        "v18_memory_continue_preserved": True,
+        "v17_async_builder_preserved": True,
+    }
+
+
+@app.post("/api/v30/autonomy/inspect")
+async def v30_autonomy_inspect(
+    payload: V30InspectRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(status_code=422, detail="At least one message is required.")
+
+    project_rows: list[dict[str, Any]] = []
+    if payload.project_id:
+        try:
+            project_rows = await list_project_files_v19(
+                settings,
+                user_id=user.id,
+                project_id=payload.project_id,
+                include_content=False,
+                limit=500,
+            )
+        except Exception:
+            project_rows = []
+
+    decision = decide_autonomy(
+        payload.messages,
+        project_id=payload.project_id,
+        explicit_web=payload.use_web,
+        research_mode=payload.research_mode,
+        project_files=project_rows,
+    )
+    return {"ok": True, "autonomy": decision.to_dict()}

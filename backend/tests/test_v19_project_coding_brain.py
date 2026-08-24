@@ -135,4 +135,7 @@ def test_frontend_cleanup_and_smart_files_fix():
     assert "pv-saved-indicator" not in source
     duplicate = "} else if (shouldUseSmartFiles) {\n\n      } else if (shouldUseSmartFiles) {"
     assert duplicate not in source
-    assert "Vasuki Core · V19 Context Brain · online" in source
+    assert (
+        "Vasuki Core · V19 Context Brain · online" in source
+        or "Vasuki Core · V30 Autonomous Runtime · online" in source
+    )
