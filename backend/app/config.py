@@ -127,6 +127,12 @@ class Settings(BaseSettings):
     v18_reflection_enabled: bool = True
     v18_goal_memory_limit: int = 12
     v18_experience_memory_limit: int = 8
+
+    # V18.1 normal-chat provider recovery. Used only when normal shared
+    # cooldown/health filtering leaves zero candidates.
+    v18_chat_provider_recovery_enabled: bool = True
+    v18_chat_recovery_max_attempts: int = 5
+    v18_chat_recovery_first_token_seconds: float = 4.5
     # VASUKI_V18_LIVING_MIND_END
 
     # VASUKI_V16_AUTONOMOUS_BUILDER_START

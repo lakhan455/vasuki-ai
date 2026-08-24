@@ -54,6 +54,93 @@ def _reaction_priority(
     return ordered
 
 
+def _select_chat_candidates(
+    decision,
+    provider: str,
+    settings: Settings,
+    *,
+    max_attempts: int,
+    excluded_family: str,
+) -> tuple[list[str], bool]:
+    """Select normal candidates, then a configured-provider last resort.
+
+    Recovery runs only when both shared cooldown/health layers leave zero
+    normal candidates. Provider configuration/auth remains mandatory and
+    moderation still aborts cross-provider fallback.
+    """
+    configured = [
+        name
+        for name in base_candidates(decision, provider)
+        if configured_provider(name, settings)
+    ]
+    base = [
+        name
+        for name in configured
+        if legacy._provider_is_available(name)
+    ]
+    healthy = [name for name in base if available(name)]
+
+    def allowed(names: list[str]) -> list[str]:
+        return [
+            name
+            for name in names
+            if (
+                not excluded_family
+                or _provider_family(name) != excluded_family
+            )
+        ]
+
+    alternatives = allowed(healthy)
+    candidates = _reaction_priority(
+        rank_for_task(alternatives, decision.task_type),
+        decision.tier,
+    )[:max_attempts]
+
+    if not candidates:
+        alternatives = allowed(base)
+        candidates = _reaction_priority(
+            rank_for_task(alternatives, decision.task_type),
+            decision.tier,
+        )[:max_attempts]
+
+    if not candidates:
+        candidates = _reaction_priority(
+            rank_for_task(healthy or base, decision.task_type),
+            decision.tier,
+        )[:max_attempts]
+
+    if candidates:
+        return candidates, False
+
+    if not bool(
+        getattr(
+            settings,
+            "v18_chat_provider_recovery_enabled",
+            True,
+        )
+    ):
+        return [], False
+
+    recovery_limit = max(
+        1,
+        min(
+            max_attempts,
+            int(
+                getattr(
+                    settings,
+                    "v18_chat_recovery_max_attempts",
+                    5,
+                )
+            ),
+        ),
+    )
+    emergency = allowed(configured)
+    emergency = _reaction_priority(
+        rank_for_task(emergency, decision.task_type),
+        decision.tier,
+    )[:recovery_limit]
+    return emergency, bool(emergency)
+
 async def route_chat_stream_v7(
     provider: str,
     messages: list[dict[str,Any]],
@@ -75,25 +162,15 @@ async def route_chat_stream_v7(
     q=last_user_query(messages)
     max_attempts=max(1,min(7,int(getattr(settings,"max_provider_attempts",7))))
     excluded_family=_provider_family(exclude_provider)
-    base=[n for n in base_candidates(d,provider) if configured_provider(n,settings) and legacy._provider_is_available(n)]
-    healthy=[n for n in base if available(n)]
-    alternatives=[n for n in healthy if not excluded_family or _provider_family(n)!=excluded_family]
-    candidates=_reaction_priority(
-        rank_for_task(alternatives,d.task_type),
-        d.tier,
-    )[:max_attempts]
+    candidates,recovery_mode=_select_chat_candidates(
+        d,
+        provider,
+        settings,
+        max_attempts=max_attempts,
+        excluded_family=excluded_family,
+    )
     if not candidates:
-        alternatives=[n for n in base if not excluded_family or _provider_family(n)!=excluded_family]
-        candidates=_reaction_priority(
-            rank_for_task(alternatives,d.task_type),
-            d.tier,
-        )[:max_attempts]
-    if not candidates:
-        candidates=_reaction_priority(
-            rank_for_task(healthy or base,d.task_type),
-            d.tier,
-        )[:max_attempts]
-    if not candidates: raise RuntimeError("No healthy AI provider is currently available.")
+        raise RuntimeError("No configured AI provider is currently available.")
 
     ckey=None
     if (not cache_bypass) and getattr(settings,"response_cache_enabled",True) and not require_current and not web_context.strip() and d.task_type in {"simple","general"}:
@@ -109,6 +186,12 @@ async def route_chat_stream_v7(
                 return
 
     complete=""; errors=[]; first_token_ms=None; attempts=0; final_provider=""
+    if recovery_mode:
+        yield {
+            "type":"diagnostic",
+            "provider":"",
+            "status":"v18_recovery:shared-cooldown-last-resort",
+        }
     for name in candidates:
         attempts+=1; attempt(name); pstarted=time.perf_counter()
         working=build_resume_messages(messages,complete); emitted=False
@@ -131,7 +214,7 @@ async def route_chat_stream_v7(
                     segment=""; finish=""
                     it=_stream_provider_segment(name=name,messages=working,settings=settings,web_context=web_context,require_current=require_current,as_of=as_of,large_request=d.tier=="strong")
                     try:
-                        ev=await asyncio.wait_for(anext(it),timeout=max(
+                        first_token_timeout=max(
                             1.25,
                             float(
                                 getattr(
@@ -140,7 +223,22 @@ async def route_chat_stream_v7(
                                     1.6,
                                 )
                             ),
-                        ))
+                        )
+                        if recovery_mode:
+                            first_token_timeout=max(
+                                first_token_timeout,
+                                float(
+                                    getattr(
+                                        settings,
+                                        "v18_chat_recovery_first_token_seconds",
+                                        4.5,
+                                    )
+                                ),
+                            )
+                        ev=await asyncio.wait_for(
+                            anext(it),
+                            timeout=first_token_timeout,
+                        )
                         pending=[ev]
                         while pending:
                             e=pending.pop(0)
