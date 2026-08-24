@@ -49,7 +49,8 @@ from app.services.ocr import extract_text
 from app.services.personal_memory import (
     create_user_memory,
     delete_user_memory,
-    extract_explicit_memory,
+    explicit_memory_category,
+    extract_explicit_memory_command,
     get_memory_enabled,
     list_user_memories,
     personal_memory_context,
@@ -90,6 +91,18 @@ def _current_date() -> str:
 
 def _join_context(*parts: str) -> str:
     return "\n\n".join(part.strip() for part in parts if part and part.strip())
+
+
+def _replace_last_user_content(
+    messages: list[dict[str, Any]],
+    content: str,
+) -> list[dict[str, Any]]:
+    updated = [dict(item) for item in messages]
+    for index in range(len(updated) - 1, -1, -1):
+        if updated[index].get("role") == "user":
+            updated[index]["content"] = content
+            break
+    return updated
 
 
 def _sse(event: str, payload: dict[str, Any]) -> str:
@@ -535,33 +548,69 @@ async def chat(
             used_context_chars=len(query),
         )
 
-    explicit_memory = (
-        extract_explicit_memory(query)
+    explicit_memory, memory_followup = (
+        extract_explicit_memory_command(query)
         if request.use_memory
-        else None
+        else (None, "")
     )
+    memory_action_context = ""
     if explicit_memory:
+        memory_saved = False
         try:
             await create_user_memory(
                 current_user.id,
                 explicit_memory,
                 settings,
+                category=explicit_memory_category(explicit_memory),
                 user_jwt=current_user.access_token,
             )
+            memory_saved = True
             answer = f"I will remember: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
         except Exception as exc:
-            print("[memory] save failed:", type(exc).__name__, str(exc)[:500])
-            answer = "The memory could not be saved. Please try again shortly."
+            print(
+                "[memory] save failed:",
+                type(exc).__name__,
+                str(exc)[:500],
+            )
+            answer = (
+                "The memory could not be saved. "
+                "Please try again shortly."
+            )
 
-        return ChatResponse(
-            answer=answer,
-            provider="vasuki-personal-memory",
-            sources=[],
-            context_trimmed=False,
-            original_context_chars=original_chars,
-            used_context_chars=len(query),
+        if not memory_followup:
+            return ChatResponse(
+                answer=answer,
+                provider="vasuki-personal-memory",
+                sources=[],
+                context_trimmed=False,
+                original_context_chars=original_chars,
+                used_context_chars=len(query),
+            )
+
+        if memory_saved:
+            memory_action_context = (
+                "SYSTEM ACTION RESULT:\n"
+                "The user's explicit memory was saved successfully.\n"
+                f"MEMORY: {explicit_memory}\n"
+                "Continue with the remaining user request. "
+                "Do not stop at a memory acknowledgement."
+            )
+        else:
+            memory_action_context = (
+                "SYSTEM ACTION RESULT:\n"
+                "The user asked to save an explicit memory, but "
+                "persistence failed. Use it only for this turn.\n"
+                f"ATTEMPTED MEMORY: {explicit_memory}\n"
+                "Answer the remaining request and briefly mention "
+                "that persistence did not succeed."
+            )
+
+        query = memory_followup
+        raw_messages = _replace_last_user_content(
+            raw_messages,
+            memory_followup,
         )
 
     correction = extract_correction(raw_messages)
@@ -650,7 +699,12 @@ async def chat(
             ),
         )
 
-    web_context = _join_context(shared_pack, private_pack, live_pack)
+    web_context = _join_context(
+        shared_pack,
+        private_pack,
+        live_pack,
+        memory_action_context,
+    )
     available_message_chars = max(
         8000,
         settings.max_context_chars
@@ -724,28 +778,65 @@ async def chat_stream(
             provider="vasuki-identity",
         )
 
-    explicit_memory = (
-        extract_explicit_memory(query)
+    explicit_memory, memory_followup = (
+        extract_explicit_memory_command(query)
         if chat_request.use_memory
-        else None
+        else (None, "")
     )
+    memory_action_context = ""
     if explicit_memory:
+        memory_saved = False
         try:
             await create_user_memory(
                 current_user.id,
                 explicit_memory,
                 settings,
+                category=explicit_memory_category(explicit_memory),
                 user_jwt=current_user.access_token,
             )
+            memory_saved = True
             answer = f"I will remember: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
         except Exception as exc:
-            print("[memory] save failed:", type(exc).__name__, str(exc)[:500])
-            answer = "The memory could not be saved. Please try again shortly."
-        return _direct_stream(
-            answer,
-            provider="vasuki-personal-memory",
+            print(
+                "[memory] save failed:",
+                type(exc).__name__,
+                str(exc)[:500],
+            )
+            answer = (
+                "The memory could not be saved. "
+                "Please try again shortly."
+            )
+
+        if not memory_followup:
+            return _direct_stream(
+                answer,
+                provider="vasuki-personal-memory",
+            )
+
+        if memory_saved:
+            memory_action_context = (
+                "SYSTEM ACTION RESULT:\n"
+                "The user's explicit memory was saved successfully.\n"
+                f"MEMORY: {explicit_memory}\n"
+                "Continue with the remaining user request. "
+                "Do not stop at a memory acknowledgement."
+            )
+        else:
+            memory_action_context = (
+                "SYSTEM ACTION RESULT:\n"
+                "The user asked to save an explicit memory, but "
+                "persistence failed. Use it only for this turn.\n"
+                f"ATTEMPTED MEMORY: {explicit_memory}\n"
+                "Answer the remaining request and briefly mention "
+                "that persistence did not succeed."
+            )
+
+        query = memory_followup
+        raw_messages = _replace_last_user_content(
+            raw_messages,
+            memory_followup,
         )
 
     fast_calc = try_fast_calculation(query)
@@ -802,7 +893,12 @@ async def chat_stream(
             sources=web_sources,
         )
 
-    web_context = _join_context(shared_pack, private_pack, live_pack)
+    web_context = _join_context(
+        shared_pack,
+        private_pack,
+        live_pack,
+        memory_action_context,
+    )
     available_message_chars = max(
         8000,
         settings.max_context_chars

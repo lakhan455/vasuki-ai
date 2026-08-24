@@ -1630,6 +1630,14 @@ async def health_v18():
                 )
             ),
         },
+        "memory_command_continuation": {
+            "version": "v18.2",
+            "enabled": True,
+            "save_then_continue": True,
+            "separates_memory_from_followup": True,
+            "natural_goal_category": "living_goal",
+            "silent_auto_memory": False,
+        },
         "persistent_storage": (
             "existing-private-user-memory"
             if settings.supabase_url
