@@ -77,28 +77,84 @@ def clean_memory_text(value: str) -> str:
     return value
 
 
-def extract_explicit_memory(query: str) -> str | None:
-    cleaned = clean_memory_text(query)
-    if not cleaned:
-        return None
+_MEMORY_FOLLOWUP_BOUNDARY = re.compile(
+    r"(?is)(?:"
+    r"(?:\r?\n)+[ \t]*"
+    r"|(?<=[.!?;])[ \t]+"
+    r"|[ \t]+(?=now\s+(?:tell|answer|explain|analy[sz]e|show|give)\b)"
+    r"|[ \t]+(?=ab\s+(?:batao|bata|samjhao|answer|tell)\b)"
+    r")"
+    r"(?=(?:"
+    r"now\b|then\b|next\b|also\b|and\s+now\b|"
+    r"please\s+(?:tell|answer)\b|tell\s+me\b|answer\b|"
+    r"ab\b|aur\s+ab\b|अब\b|फिर\b|\d+[.)]\s+"
+    r"))"
+)
+
+
+def _split_memory_and_followup(value: str) -> tuple[str, str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return "", ""
+
+    match = _MEMORY_FOLLOWUP_BOUNDARY.search(raw)
+    if not match:
+        return clean_memory_text(raw), ""
+
+    memory_text = clean_memory_text(raw[: match.start()])
+    followup = raw[match.end() :].strip()
+    return memory_text, followup
+
+
+def extract_explicit_memory_command(query: str) -> tuple[str | None, str]:
+    raw = str(query or "").strip()
+    if not raw:
+        return None, ""
 
     for prefix in _MEMORY_PREFIXES:
-        match = re.match(prefix, cleaned, flags=re.I)
-        if match:
-            candidate = clean_memory_text(cleaned[match.end():])
-            if 3 <= len(candidate) <= 600 and not _contains_private_data(candidate):
-                return candidate
-            return None
+        match = re.match(prefix, raw, flags=re.I)
+        if not match:
+            continue
 
+        candidate, followup = _split_memory_and_followup(raw[match.end() :])
+        if (
+            3 <= len(candidate) <= 600
+            and not _contains_private_data(candidate)
+        ):
+            return candidate, followup
+        return None, followup
+
+    cleaned = clean_memory_text(raw)
     if re.search(
         r"\bmujhe\s+.+\s+(?:bolo|bulana|bulaya\s+karo)\b",
         cleaned,
         flags=re.I,
     ):
         if not _contains_private_data(cleaned):
-            return cleaned
+            return cleaned, ""
 
-    return None
+    return None, ""
+
+
+def explicit_memory_category(memory_text: str) -> str:
+    low = clean_memory_text(memory_text).casefold()
+    if re.search(
+        r"\b(?:my goal is|my objective is|"
+        r"mera goal (?:hai|he))\b",
+        low,
+    ):
+        return "living_goal"
+    if low.startswith(
+        ("experience lesson:", "lesson:", "learned:")
+    ):
+        return "living_experience"
+    return "preference"
+
+
+def extract_explicit_memory(query: str) -> str | None:
+    memory, _followup = extract_explicit_memory_command(query)
+    return memory
+
 
 
 async def get_memory_enabled(
