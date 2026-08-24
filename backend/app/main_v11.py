@@ -1042,3 +1042,233 @@ async def v15_code_modify(
         project,
         provider=provider_name or "vasuki-v15",
     )
+
+# VASUKI_V16_AUTONOMOUS_BUILDER
+from app.v16.autonomous_coder import (
+    build_autonomous_project,
+    coder_health as coder_health_v16,
+    deploy_netlify_zip,
+    publish_zip_to_github,
+    trigger_vercel_deploy_hook,
+)
+
+
+class V16CodeProjectRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=30000)
+
+
+async def _v16_chat(
+    messages: list[dict[str, Any]],
+) -> tuple[str, str]:
+    return await route_chat_v11(
+        "auto",
+        messages,
+        settings,
+        "",
+        require_current=False,
+    )
+
+
+async def _v16_build_response(
+    prompt: str,
+    *,
+    existing_files: list[dict[str, str]] | None = None,
+):
+    project, telemetry = await build_autonomous_project(
+        prompt,
+        chat=_v16_chat,
+        settings=settings,
+        existing_files=existing_files,
+    )
+    provider = ",".join(
+        telemetry.get("providers") or []
+    ) or "vasuki-v16"
+    response = package_project_response(
+        project,
+        provider=f"vasuki-v16:{provider}",
+    )
+    response["version"] = "v16"
+    response["agent"] = telemetry
+    validation = telemetry.get("validation") or {}
+    sandbox = telemetry.get("sandbox") or {}
+    warnings = list(response.get("warnings") or [])
+    if not validation.get("ok", False):
+        failed = ", ".join(
+            sorted((validation.get("failed") or {}).keys())
+        )
+        warnings.append(
+            "V16 packaged the project after repair attempts, "
+            f"but static validation still reported: {failed}"
+        )
+    docker_runs = sandbox.get("runs") or []
+    if docker_runs and not all(
+        item.get("ok") for item in docker_runs
+    ):
+        warnings.append(
+            "Restricted Docker validation reported a problem. "
+            "Review agent telemetry before deployment."
+        )
+    response["warnings"] = warnings
+    response["answer"] = (
+        str(response.get("answer") or "").rstrip()
+        + "\n\nV16 agent pipeline: plan -> batched files -> "
+        "validate -> self-repair -> sandbox -> ZIP."
+    )
+    return response
+
+
+@app.get("/health/v16")
+async def health_v16():
+    return {
+        "ok": True,
+        **coder_health_v16(settings),
+        "provider_health": provider_health_summary(
+            provider_snapshot_v12(settings)
+        ),
+    }
+
+
+@app.get("/api/v16/code/tools")
+async def v16_code_tools(
+    _user: AuthUser = Depends(get_current_user),
+):
+    return {
+        "ok": True,
+        "health": coder_health_v16(settings),
+    }
+
+
+@app.post("/api/v16/code/project")
+async def v16_code_project(
+    payload: V16CodeProjectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    return await _v16_build_response(payload.prompt)
+
+
+@app.post("/api/v16/code/modify")
+async def v16_code_modify(
+    prompt: str = Form(...),
+    file: UploadFile = File(...),
+    _user: AuthUser = Depends(get_current_user),
+):
+    filename = file.filename or "project.zip"
+    if not filename.lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=415,
+            detail=(
+                "V16 project modification accepts a .zip project."
+            ),
+        )
+    data = await file.read()
+    try:
+        existing_files = extract_zip_text_files(data)
+    except (ValueError, zipfile.BadZipFile) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+    return await _v16_build_response(
+        prompt,
+        existing_files=existing_files,
+    )
+
+
+@app.post("/api/owner/v16/deploy/github")
+async def v16_deploy_github(
+    repo: str = Form(...),
+    base: str = Form("main"),
+    branch: str = Form(""),
+    confirmation: str = Form(...),
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(get_current_user),
+):
+    await require_owner(user)
+    if confirmation.strip().upper() != "PUBLISH":
+        raise HTTPException(
+            status_code=400,
+            detail="Type PUBLISH to authorize GitHub publishing.",
+        )
+    data = await file.read()
+    if not (file.filename or "").lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=415,
+            detail="Upload the generated project ZIP.",
+        )
+    target_branch = (
+        branch.strip()
+        or f"vasuki-v16-{int(time.time())}"
+    )
+    try:
+        return await publish_zip_to_github(
+            settings,
+            zip_data=data,
+            repo=repo,
+            branch=target_branch,
+            base=base,
+            open_pr=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc)[:1200],
+        ) from exc
+
+
+@app.post("/api/owner/v16/deploy/netlify")
+async def v16_deploy_netlify(
+    confirmation: str = Form(...),
+    site_id: str = Form(""),
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(get_current_user),
+):
+    await require_owner(user)
+    if confirmation.strip().upper() != "DEPLOY":
+        raise HTTPException(
+            status_code=400,
+            detail="Type DEPLOY to authorize Netlify deployment.",
+        )
+    data = await file.read()
+    if not (file.filename or "").lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=415,
+            detail="Upload the generated static project ZIP.",
+        )
+    resolved_site = (
+        site_id.strip()
+        or str(
+            getattr(settings, "v16_netlify_site_id", "")
+            or ""
+        ).strip()
+    )
+    try:
+        return await deploy_netlify_zip(
+            settings,
+            zip_data=data,
+            site_id=resolved_site,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc)[:1200],
+        ) from exc
+
+
+@app.post("/api/owner/v16/deploy/vercel-hook")
+async def v16_deploy_vercel_hook(
+    confirmation: str = Body(..., embed=True),
+    user: AuthUser = Depends(get_current_user),
+):
+    await require_owner(user)
+    if confirmation.strip().upper() != "DEPLOY":
+        raise HTTPException(
+            status_code=400,
+            detail="Type DEPLOY to authorize the Vercel deploy hook.",
+        )
+    try:
+        return await trigger_vercel_deploy_hook(settings)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc)[:1200],
+        ) from exc
