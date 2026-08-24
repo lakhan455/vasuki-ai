@@ -35,6 +35,7 @@ from app.v11 import store
 from app.v12.api import router as v12_router
 from app.v12.memory import resolve_conflicts_v12
 from app.v12.provider import rank_for_task_v12
+from app.v13.verification import verify_answer
 
 app = v10.app
 settings = v10.settings
@@ -125,13 +126,31 @@ async def route_chat_stream_v11(
             query=last_user_query(messages)
             task=classify_route(messages,require_current=require_current).task_type
             automatic=judge_answer(query,complete,sources=[])
+            verification=verify_answer(
+                query,
+                complete,
+                sources=[],
+                current_required=require_current,
+            )
+            combined_score=min(
+                float(automatic["overall"]),
+                float(verification.score),
+            )
             await persist_provider_signal(
                 settings_arg,
                 final_provider,
                 task,
-                "automatic_judge",
-                float(automatic["overall"]),
-                {"hallucination_risk":automatic["hallucination_risk"],"chars":len(complete)},
+                "automatic_judge_v13",
+                combined_score,
+                {
+                    "hallucination_risk":max(
+                        float(automatic["hallucination_risk"]),
+                        float(verification.hallucination_risk),
+                    ),
+                    "chars":len(complete),
+                    "v13_retry_recommended":verification.needs_retry,
+                    "v13_issues":list(verification.issues),
+                },
             )
         except Exception:
             pass
