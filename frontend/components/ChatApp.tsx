@@ -2232,7 +2232,7 @@ if (shouldUseCodeProject) {
                   >
                     <strong>Vasuki AI</strong>
                     <small>
-                      Context Brain · Project Memory · Web · Documents
+                      V30 Runtime · Project Intelligence · Web · Documents
                     </small>
                   </button>
 
@@ -2277,7 +2277,7 @@ if (shouldUseCodeProject) {
             <div className="pv-welcome-inner">
               <Logo className="pv-welcome-logo" />
               <div className="pv-welcome-heading">
-                <p>Vasuki Core · V19 Context Brain · online</p>
+                <p>Vasuki Core · V30 Autonomous Runtime · online</p>
                 <h1>Turn intent into working systems.</h1>
                 <div className="pv-welcome-subline">
                   Build software, investigate the web, create media and move
