@@ -10,6 +10,7 @@ from app.services.chat_v5 import _stream_provider_segment, build_resume_messages
 from app.services.router_v7 import base_candidates, classify_route, configured_provider, last_user_query
 from app.services.telemetry_v7 import available, attempt, success, failure, record
 from app.services.quality_v9 import rank_for_task
+from app.v13.context import compress_messages
 
 def _chunks(s,size=80): return [s[i:i+size] for i in range(0,len(s),size)]
 
@@ -64,6 +65,11 @@ async def route_chat_stream_v7(
     exclude_provider: str | None=None,
 )->AsyncIterator[dict[str,str]]:
     started=time.perf_counter()
+    messages=compress_messages(
+        messages,
+        max_chars=int(getattr(settings, "max_context_chars", 45000)),
+        preserve_last=12,
+    )
     d=classify_route(messages,require_current=require_current)
     q=last_user_query(messages)
     max_attempts=max(1,min(7,int(getattr(settings,"max_provider_attempts",7))))

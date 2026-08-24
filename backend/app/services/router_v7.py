@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 from app.config import Settings
+from app.v13.intelligence import analyze_intent
 
 _CODE = ("bug","debug","traceback","exception","typeerror","syntaxerror","optimize",
          "refactor","python","javascript","typescript","react","next.js","fastapi",
@@ -34,52 +35,13 @@ def detect_language(text: str) -> str:
     return "en" if re.search(r"[A-Za-z]", text) else "other"
 
 def classify_route(messages: list[dict[str, Any]], *, require_current: bool=False) -> RoutingDecision:
-    q0 = last_user_query(messages).strip()
-    q = q0.casefold()
-    code = "```" in q0 or any(x in q for x in _CODE)
-    reasoning = any(x in q for x in _REASON) or bool(re.search(r"(?:\d|\w)\s*[=<>+\-*/^]\s*(?:\d|\w)", q0))
-    research = require_current or any(x in q for x in _RESEARCH)
-    large = len(q0) > 1800 or len(messages) > 18 or any(x in q for x in (
-        "complete code","full code","detailed report","step by step","all countries",
-        "all states","poori list","puri list","sabhi","saare"))
-    if code: task = "code"
-    elif reasoning: task = "reasoning"
-    elif research: task = "research"
-    elif any(q.startswith(x) for x in _SIMPLE): task = "simple"
-    else: task = "general"
-    simple = (
-        task == "simple"
-        and len(q0) <= 180
-        and not require_current
-        and not large
-    )
-
-    fast_general = (
-        task == "general"
-        and len(q0) <= 900
-        and len(messages) <= 12
-        and not require_current
-        and not large
-    )
-
+    plan = analyze_intent(messages, require_current=require_current)
     return RoutingDecision(
-        task_type=task,
-        difficulty=(
-            "low"
-            if simple or fast_general
-            else (
-                "high"
-                if code or reasoning or large
-                else "medium"
-            )
-        ),
-        tier=(
-            "fast"
-            if simple or fast_general
-            else "strong"
-        ),
-        language=detect_language(q0),
-        needs_web=research,
+        task_type=plan.task_type,
+        difficulty=plan.difficulty,
+        tier=plan.tier,
+        language=plan.language,
+        needs_web=plan.needs_web,
     )
 
 def configured_provider(name: str, s: Settings) -> bool:

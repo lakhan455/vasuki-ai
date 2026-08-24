@@ -34,7 +34,15 @@ from app.v11.scheduler import create_task, runtime_note, scheduler_tick
 from app.v11 import store
 from app.v12.api import router as v12_router
 from app.v12.memory import resolve_conflicts_v12
-from app.v12.provider import rank_for_task_v12
+from app.v12.provider import provider_snapshot_v12, rank_for_task_v12
+from app.v13.verification import verify_answer
+from app.v13.analytics import provider_health_summary
+from app.v13.autonomy import build_execution_plan
+from app.v13.critic import critic_review
+from app.v13.deployment import check_deployment
+from app.v13.incidents import recovery_plan
+from app.v13.orchestrator import orchestrate_request
+from app.v13.project_brain import project_snapshot
 
 app = v10.app
 settings = v10.settings
@@ -125,13 +133,31 @@ async def route_chat_stream_v11(
             query=last_user_query(messages)
             task=classify_route(messages,require_current=require_current).task_type
             automatic=judge_answer(query,complete,sources=[])
+            verification=verify_answer(
+                query,
+                complete,
+                sources=[],
+                current_required=require_current,
+            )
+            combined_score=min(
+                float(automatic["overall"]),
+                float(verification.score),
+            )
             await persist_provider_signal(
                 settings_arg,
                 final_provider,
                 task,
-                "automatic_judge",
-                float(automatic["overall"]),
-                {"hallucination_risk":automatic["hallucination_risk"],"chars":len(complete)},
+                "automatic_judge_v13",
+                combined_score,
+                {
+                    "hallucination_risk":max(
+                        float(automatic["hallucination_risk"]),
+                        float(verification.hallucination_risk),
+                    ),
+                    "chars":len(complete),
+                    "v13_retry_recommended":verification.needs_retry,
+                    "v13_issues":list(verification.issues),
+                },
             )
         except Exception:
             pass
@@ -639,3 +665,145 @@ async def scheduler_manual_tick(user: AuthUser=Depends(get_current_user)):
 
 # VASUKI_V12_CORE_RELIABILITY
 app.include_router(v12_router)
+
+# VASUKI_V13_BATCH2_AUTONOMY
+class V13MessagesRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    require_current: bool = False
+
+
+class V13CriticRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=30000)
+    answer: str = Field(min_length=1, max_length=100000)
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    current_required: bool = False
+
+
+class V13RecoveryRequest(BaseModel):
+    provider: str = Field(min_length=1, max_length=100)
+    error: str = Field(min_length=1, max_length=10000)
+    candidates: list[str] = Field(default_factory=list)
+
+
+class V13ProjectRequest(BaseModel):
+    items: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class V13DeploymentRequest(BaseModel):
+    changed_paths: list[str] = Field(default_factory=list)
+    tests_passed: bool = False
+    backup_ready: bool = False
+    pending_migrations: list[str] = Field(default_factory=list)
+    secrets_exposed: bool = False
+
+
+@app.get("/health/v13")
+async def health_v13():
+    snapshot = provider_snapshot_v12(settings)
+    return {
+        "ok": True,
+        "version": "v13",
+        "features": [
+            "intent-brain-v2",
+            "autonomous-orchestrator",
+            "multi-role-execution-planner",
+            "answer-critic",
+            "incident-recovery-planner",
+            "project-brain",
+            "provider-health-analytics",
+            "deployment-guard",
+            "image-identity-lock",
+            "context-compression",
+        ],
+        "provider_health": provider_health_summary(snapshot),
+    }
+
+
+@app.post("/api/v13/orchestrate")
+async def v13_orchestrate(
+    payload: V13MessagesRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(status_code=422, detail="At least one message is required.")
+    decision = orchestrate_request(
+        payload.messages,
+        require_current=payload.require_current,
+    )
+    return {"ok": True, "decision": decision.to_dict()}
+
+
+@app.post("/api/v13/plan")
+async def v13_plan(
+    payload: V13MessagesRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(status_code=422, detail="At least one message is required.")
+    plan = build_execution_plan(
+        payload.messages,
+        require_current=payload.require_current,
+    )
+    return {"ok": True, "plan": plan.to_dict()}
+
+
+@app.post("/api/v13/critic")
+async def v13_critic(
+    payload: V13CriticRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    result = critic_review(
+        payload.prompt,
+        payload.answer,
+        sources=payload.sources,
+        current_required=payload.current_required,
+    )
+    return {"ok": True, "critic": result.to_dict()}
+
+
+@app.post("/api/v13/incidents/recovery")
+async def v13_incident_recovery(
+    payload: V13RecoveryRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    result = recovery_plan(
+        payload.provider,
+        payload.error,
+        payload.candidates,
+    )
+    return {"ok": True, "recovery": result.to_dict()}
+
+
+@app.post("/api/v13/project/snapshot")
+async def v13_project_snapshot(
+    payload: V13ProjectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    return {"ok": True, "project": project_snapshot(payload.items)}
+
+
+@app.post("/api/v13/deployment/check")
+async def v13_deployment_check(
+    payload: V13DeploymentRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    result = check_deployment(
+        payload.changed_paths,
+        tests_passed=payload.tests_passed,
+        backup_ready=payload.backup_ready,
+        pending_migrations=payload.pending_migrations,
+        secrets_exposed=payload.secrets_exposed,
+    )
+    return {"ok": True, "deployment": result.to_dict()}
+
+
+@app.get("/api/owner/v13/providers/health")
+async def v13_provider_health(
+    user: AuthUser = Depends(get_current_user),
+):
+    await require_owner(user)
+    return {
+        "ok": True,
+        "health": provider_health_summary(provider_snapshot_v12(settings)),
+    }
+

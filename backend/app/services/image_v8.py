@@ -8,6 +8,7 @@ from typing import Any, Awaitable, Callable
 
 from app.config import Settings
 from app.services import image as legacy
+from app.v13.image_identity import build_identity_locked_prompt, extract_image_constraints
 from app.services.image_health_v8 import (
     attempt,
     available,
@@ -26,6 +27,7 @@ class ImageDecision:
 
 def classify_image_request(prompt: str) -> ImageDecision:
     low = str(prompt or "").casefold()
+    constraints = extract_image_constraints(prompt)
     requested_edit = bool(
         re.search(r"\b(edit|remove|replace|change|retouch|enhance|background|upscale)\b", low)
     )
@@ -33,9 +35,9 @@ def classify_image_request(prompt: str) -> ImageDecision:
         kind = "logo"
     elif re.search(r"\b(poster|flyer|banner|advertisement|ad creative|social media post)\b", low):
         kind = "poster"
-    elif re.search(r"\b(anime|manga|ghibli|cartoon|cel shaded)\b", low):
+    elif re.search(r"\b(anime|manga|ghibli|cartoon|cel shaded)\b", low) or constraints.character_signal:
         kind = "anime"
-    elif re.search(r"\b(photo|photoreal|realistic|portrait|cinematic|dslr|camera)\b", low):
+    elif re.search(r"\b(photo|photoreal|realistic|portrait|cinematic|dslr|camera)\b", low) or bool(constraints.vehicle_model or constraints.product_model):
         kind = "realistic"
     elif re.search(r"\b(illustration|vector|3d|render|concept art)\b", low):
         kind = "illustration"
@@ -70,38 +72,26 @@ def enhance_image_prompt(prompt: str, image_type: str) -> str:
         ),
         "poster": (
             "professional advertising poster, strong visual hierarchy, premium layout, "
-            "clear focal point, balanced negative space, brand-ready composition, "
-            "print-quality design"
+            "clear focal point, balanced negative space, brand-ready composition, print-quality design"
         ),
         "logo": (
-            "professional logo concept, simple memorable silhouette, scalable vector-like "
-            "geometry, clean negative space, balanced proportions, minimal clutter, "
-            "brand-ready presentation"
+            "professional logo concept, simple memorable silhouette, scalable vector-like geometry, "
+            "clean negative space, balanced proportions, minimal clutter, brand-ready presentation"
         ),
         "illustration": (
-            "premium digital illustration, deliberate composition, refined shapes, "
-            "cohesive lighting, detailed focal subject, production-quality finish"
+            "premium digital illustration, deliberate composition, refined shapes, cohesive lighting, "
+            "detailed focal subject, production-quality finish"
         ),
         "general": (
             "professional high-detail image, strong composition, coherent lighting, "
             "clean subject separation, polished production-quality finish"
         ),
     }
-    suffix = (
-        " STRICT SUBJECT FIDELITY: treat every explicitly named subject, brand, "
-        "vehicle model, product, fictional character, color, count, pose and relationship "
-        "as identity-critical. Preserve the exact requested identity and its canonical "
-        "distinctive visual features. Never replace a named vehicle model with a similar "
-        "model and never replace a named character with another or generic character. "
-        "Interpret obvious common spelling variants as the intended canonical name while "
-        "preserving the user's intended subject. "
-        "Avoid accidental text, watermarks, duplicate limbs/objects, malformed geometry, "
-        "low-resolution artifacts and clutter unless explicitly requested."
+    return build_identity_locked_prompt(
+        base,
+        image_type,
+        presets.get(image_type, presets["general"]),
     )
-    if len(base) > 1200:
-        return base[:1900]
-    return f"{base}. {presets.get(image_type, presets['general'])}.{suffix}"[:2048]
-
 
 def _configured(name: str, settings: Settings) -> bool:
     if name == "cloudflare":
