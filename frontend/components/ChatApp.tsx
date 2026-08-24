@@ -18,10 +18,8 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
-  buildCodeProject,
-  modifyCodeProject,
-  packageCodeProject,
-  parseCodeProjectSpec,
+  buildCodeProjectV16,
+  modifyCodeProjectV16,
   createConversationBranch,
   extractProjectMemories,
   fetchProjects,
@@ -1318,100 +1316,19 @@ const requestedDownload =
           selectedAttachment?.kind === "document"
         );
 
+      /* VASUKI_V16_PROJECT_FLOW_ACTIVE */
       if (shouldUseCodeProject) {
-        let data;
-        let nativeError: unknown = null;
-        const usePuterFirst =
-          aiEngine === "puter" && !zipProjectAttachment;
-
-        if (!usePuterFirst) {
-          try {
-            data =
-              zipProjectAttachment && selectedAttachment
-                ? await modifyCodeProject(
-                    selectedAttachment.file,
-                    effectiveText,
-                    accessToken,
-                  )
-                : await buildCodeProject(
-                    effectiveText,
-                    accessToken,
-                  );
-          } catch (projectError) {
-            nativeError = projectError;
-          }
-        }
-
-        if (!data && !zipProjectAttachment) {
-          if (!accountPlan?.puter_access) {
-            throw nativeError instanceof Error
-              ? nativeError
-              : new Error(
-                  "V15 coding providers are busy and " +
-                  "Vasuki Pro fallback is not enabled.",
-                );
-          }
-
-          const puterContext = await fetchPuterContext(
-            accessToken,
-            memoryEnabled,
-          );
-          const projectContract = `
-You are Vasuki V15 emergency coding engine.
-Return ONE valid JSON object only:
-{
-  "project_name":"safe-name",
-  "summary":"short summary",
-  "language":"primary language",
-  "framework":"framework/runtime",
-  "files":[
-    {"path":"relative/path.ext","content":"complete contents"}
-  ],
-  "powershell":["Windows PowerShell install/run/test command"],
-  "run_commands":["optional command"],
-  "notes":["important note"]
-}
-No TODOs, placeholders, omitted code or real secrets.
-Include README.md and every required config/bootstrap file.
-If huge, build the smallest COMPLETE functional MVP.
-`.trim();
-
-          let rawProject = "";
-          const usedModel = await streamPuterChat(
-            [{
-              role: "user",
-              content: effectiveText,
-            }],
-            {
-              systemContext:
-                `${puterContext.system_prompt}\n\n` +
-                projectContract,
-            },
-            (token) => {
-              rawProject += token;
-            },
-          );
-          const spec =
-            parseCodeProjectSpec(rawProject);
-          const packaged =
-            await packageCodeProject(
-              spec,
-              accessToken,
-            );
-          data = {
-            ...packaged,
-            provider:
-              `vasuki-pro:${usedModel}+v15-packager`,
-          };
-        }
-
-        if (!data) {
-          throw nativeError instanceof Error
-            ? nativeError
-            : new Error(
-                "V15 project generation failed.",
+        const data =
+          zipProjectAttachment && selectedAttachment
+            ? await modifyCodeProjectV16(
+                selectedAttachment.file,
+                effectiveText,
+                accessToken,
+              )
+            : await buildCodeProjectV16(
+                effectiveText,
+                accessToken,
               );
-        }
 
         const primaryCode =
           data.primary_code?.trim() || "";
@@ -1444,6 +1361,7 @@ If huge, build the smallest COMPLETE functional MVP.
           },
         ];
       } else if (shouldUseSmartFiles) {
+
         const data = await analyzeSmartFiles(
           selectedAttachment ? [selectedAttachment.file] : [],
           effectiveText,

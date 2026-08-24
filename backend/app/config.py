@@ -110,6 +110,25 @@ class Settings(BaseSettings):
     v11_stt_model: str = "whisper-1"
     # VASUKI_V11_ALL_IN_ONE_END
 
+    # VASUKI_V16_AUTONOMOUS_BUILDER_START
+    # V16 generates a compact manifest first and then source in small batches.
+    # This avoids large single-JSON truncation failures.
+    v16_max_project_files: int = 24
+    v16_generation_batch_size: int = 3
+    v16_generation_concurrency: int = 2
+    v16_repair_attempts: int = 2
+
+    # Restricted Docker validation is used only when Docker already exists on
+    # the host. V16 never pulls images implicitly and never enables network in
+    # its validation containers.
+    v16_docker_sandbox_enabled: bool = True
+
+    # Optional deployment integrations. Core V16 coding does not require them.
+    # Keep these backend-only.
+    v16_netlify_token: str | None = None
+    v16_netlify_site_id: str | None = None
+    v16_vercel_deploy_hook_url: str = ""
+    # VASUKI_V16_AUTONOMOUS_BUILDER_END
     global_learning_enabled: bool = True
     global_memory_direct_answer_score: float = 0.58
     global_memory_max_results: int = 3

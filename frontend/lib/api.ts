@@ -2009,3 +2009,81 @@ export async function packageCodeProject(
   return normalizeCodeProjectResponse(data);
 }
 /* VASUKI_V15_CODE_PROJECT_API_END */
+
+/* VASUKI_V16_AUTONOMOUS_BUILDER_API_START */
+export async function buildCodeProjectV16(
+  prompt: string,
+  accessToken: string,
+): Promise<CodeProjectResponse> {
+  const bases = Array.from(
+    new Set([DIRECT_API_URL, PROXY_API_URL]),
+  );
+  const errors: string[] = [];
+
+  for (const baseUrl of bases) {
+    try {
+      const data = await postJsonAt(
+        baseUrl,
+        "/api/v16/code/project",
+        { prompt },
+        360000,
+        1,
+        accessToken,
+      );
+      return normalizeCodeProjectResponse(data);
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : "V16 autonomous project build failed.",
+      );
+    }
+  }
+
+  throw new Error(
+    errors.at(-1) ||
+      "V16 autonomous project builder is temporarily unavailable.",
+  );
+}
+
+export async function modifyCodeProjectV16(
+  file: File,
+  prompt: string,
+  accessToken: string,
+): Promise<CodeProjectResponse> {
+  const bases = Array.from(
+    new Set([DIRECT_API_URL, PROXY_API_URL]),
+  );
+  const errors: string[] = [];
+
+  for (const baseUrl of bases) {
+    try {
+      const data = await postFormAt(
+        baseUrl,
+        "/api/v16/code/modify",
+        () => {
+          const form = new FormData();
+          form.append("prompt", prompt);
+          form.append("file", file, file.name);
+          return form;
+        },
+        420000,
+        1,
+        accessToken,
+      );
+      return normalizeCodeProjectResponse(data);
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : "V16 project modification failed.",
+      );
+    }
+  }
+
+  throw new Error(
+    errors.at(-1) ||
+      "V16 autonomous project modifier is temporarily unavailable.",
+  );
+}
+/* VASUKI_V16_AUTONOMOUS_BUILDER_API_END */
