@@ -1600,6 +1600,36 @@ async def health_v18():
         "reflection_enabled": bool(
             getattr(settings, "v18_reflection_enabled", True)
         ),
+        "normal_chat_provider_recovery": {
+            "version": "v18.1",
+            "enabled": bool(
+                getattr(
+                    settings,
+                    "v18_chat_provider_recovery_enabled",
+                    True,
+                )
+            ),
+            "strategy": (
+                "configured-provider-last-resort-when-shared-"
+                "cooldowns-block-all"
+            ),
+            "shared_cooldown_can_block_all_chat": False,
+            "moderation_bypass": False,
+            "max_attempts": int(
+                getattr(
+                    settings,
+                    "v18_chat_recovery_max_attempts",
+                    5,
+                )
+            ),
+            "recovery_first_token_seconds": float(
+                getattr(
+                    settings,
+                    "v18_chat_recovery_first_token_seconds",
+                    4.5,
+                )
+            ),
+        },
         "persistent_storage": (
             "existing-private-user-memory"
             if settings.supabase_url
