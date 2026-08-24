@@ -2087,3 +2087,167 @@ export async function modifyCodeProjectV16(
   );
 }
 /* VASUKI_V16_AUTONOMOUS_BUILDER_API_END */
+
+/* VASUKI_V17_ASYNC_CODE_JOBS_START */
+export type CodeBuildJobStatus = {
+  ok?: boolean;
+  job_id: string;
+  status:
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "cancelled";
+  stage: string;
+  progress: number;
+  message: string;
+  error?: string | null;
+  result?: CodeProjectResponse;
+};
+
+async function getCodeJobAt(
+  baseUrl: string,
+  jobId: string,
+  accessToken: string,
+): Promise<CodeBuildJobStatus> {
+  return (await getAt(
+    baseUrl,
+    `/api/v17/code/jobs/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as CodeBuildJobStatus;
+}
+
+export async function startCodeBuildJobV17(
+  prompt: string,
+  accessToken: string,
+): Promise<CodeBuildJobStatus> {
+  let directError: unknown = null;
+  try {
+    return (await postJsonAt(
+      DIRECT_API_URL,
+      "/api/v17/code/jobs",
+      { prompt },
+      30000,
+      2,
+      accessToken,
+    )) as CodeBuildJobStatus;
+  } catch (error) {
+    directError = error;
+  }
+
+  try {
+    return (await postJsonAt(
+      PROXY_API_URL,
+      "/api/v17/code/jobs",
+      { prompt },
+      30000,
+      1,
+      accessToken,
+    )) as CodeBuildJobStatus;
+  } catch {
+    throw directError instanceof Error
+      ? directError
+      : new Error("Vasuki Forge could not start the build.");
+  }
+}
+
+export async function startCodeModifyJobV17(
+  file: File,
+  prompt: string,
+  accessToken: string,
+): Promise<CodeBuildJobStatus> {
+  return (await postFormAt(
+    DIRECT_API_URL,
+    "/api/v17/code/jobs/modify",
+    () => {
+      const form = new FormData();
+      form.append("prompt", prompt);
+      form.append("file", file, file.name);
+      return form;
+    },
+    60000,
+    2,
+    accessToken,
+  )) as CodeBuildJobStatus;
+}
+
+export async function waitForCodeBuildJobV17(
+  jobId: string,
+  accessToken: string,
+  onProgress?: (job: CodeBuildJobStatus) => void,
+  signal?: AbortSignal,
+): Promise<CodeProjectResponse> {
+  const startedAt = Date.now();
+  const maxWaitMs = 15 * 60 * 1000;
+
+  while (Date.now() - startedAt < maxWaitMs) {
+    if (signal?.aborted) {
+      throw new DOMException("Build stopped", "AbortError");
+    }
+
+    let state: CodeBuildJobStatus;
+    try {
+      state = await getCodeJobAt(
+        DIRECT_API_URL,
+        jobId,
+        accessToken,
+      );
+    } catch (directError) {
+      try {
+        state = await getCodeJobAt(
+          PROXY_API_URL,
+          jobId,
+          accessToken,
+        );
+      } catch {
+        throw directError instanceof Error
+          ? directError
+          : new Error("Build status could not be loaded.");
+      }
+    }
+
+    onProgress?.(state);
+
+    if (state.status === "succeeded") {
+      if (!state.result) {
+        throw new Error(
+          "Build completed, but the project package was missing.",
+        );
+      }
+      return normalizeCodeProjectResponse(
+        state.result as unknown as Record<string, unknown>,
+      );
+    }
+
+    if (state.status === "failed") {
+      throw new Error(
+        state.message ||
+          state.error ||
+          `Build failed during ${state.stage}.`,
+      );
+    }
+
+    if (state.status === "cancelled") {
+      throw new DOMException("Build cancelled", "AbortError");
+    }
+
+    await delay(1200);
+  }
+
+  throw new Error(
+    "The project build is still running after 15 minutes. " +
+      "Please retry with a smaller first version, then ask Vasuki to expand it.",
+  );
+}
+
+export async function cancelCodeBuildJobV17(
+  jobId: string,
+  accessToken: string,
+) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/v17/code/jobs/${encodeURIComponent(jobId)}`,
+    accessToken,
+  );
+}
+/* VASUKI_V17_ASYNC_CODE_JOBS_END */

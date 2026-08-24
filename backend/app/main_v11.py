@@ -104,6 +104,11 @@ async def v11_startup():
 async def v11_shutdown():
     for task in _v11_background_tasks:
         task.cancel()
+    try:
+        from app.v17.jobs import shutdown_build_jobs
+        await shutdown_build_jobs()
+    except Exception:
+        pass
 
 
 # V11 provider quality learning becomes part of Vasuki's existing V7/V10 router.
@@ -1272,3 +1277,192 @@ async def v16_deploy_vercel_hook(
             status_code=502,
             detail=str(exc)[:1200],
         ) from exc
+
+# VASUKI_V17_MISSION_CONTROL
+from app.v17.jobs import (
+    cancel_build_job,
+    create_build_job,
+    get_build_job,
+    jobs_health,
+    shutdown_build_jobs,
+)
+
+
+class V17CodeJobRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=30000)
+
+
+_v17_build_semaphore = asyncio.Semaphore(
+    max(1, min(3, int(getattr(settings, "v17_max_concurrent_builds", 2))))
+)
+
+
+async def _v17_job_runner(
+    prompt: str,
+    *,
+    existing_files: list[dict[str, str]] | None = None,
+):
+    async def runner(progress):
+        async with _v17_build_semaphore:
+            project, telemetry = await build_autonomous_project(
+                prompt,
+                chat=_v16_chat,
+                settings=settings,
+                existing_files=existing_files,
+                progress=progress,
+            )
+            await progress(
+                "packaging",
+                97,
+                "Packaging source, README and PowerShell runbook",
+            )
+            provider = ",".join(
+                telemetry.get("providers") or []
+            ) or "vasuki-v17"
+            response = package_project_response(
+                project,
+                provider=f"vasuki-v17:{provider}",
+            )
+            response["version"] = "v17"
+            response["agent"] = telemetry
+            response["answer"] = (
+                str(response.get("answer") or "").rstrip()
+                + "\n\nBuild completed by Vasuki Forge: "
+                "architect -> code batches -> validate -> repair -> package."
+            )
+            await progress(
+                "ready",
+                100,
+                "Project ready",
+            )
+            return response
+    return runner
+
+
+@app.get("/health/v17")
+async def health_v17():
+    return {
+        "ok": True,
+        "version": "v17",
+        "features": [
+            "non-blocking-background-code-builds",
+            "live-build-stage-progress",
+            "cancelable-project-jobs",
+            "explicit-stage-errors",
+            "v16-batched-generation",
+            "v16-self-repair",
+            "zip-readme-powershell-artifacts",
+            "mission-control-interface",
+        ],
+        "fixes": [
+            "long-build-request-timeout",
+            "generic-project-server-error",
+            "proxy-error-masking",
+        ],
+        "db_migration_required": False,
+        "new_api_key_required": False,
+        "jobs": jobs_health(),
+        "provider_health": provider_health_summary(
+            provider_snapshot_v12(settings)
+        ),
+    }
+
+
+@app.post("/api/v17/code/jobs")
+async def v17_create_code_job(
+    payload: V17CodeJobRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    try:
+        runner = await _v17_job_runner(payload.prompt)
+        return await create_build_job(
+            user_id=user.id,
+            runner=runner,
+            ttl_seconds=int(
+                getattr(settings, "v17_job_ttl_seconds", 3600)
+            ),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+        ) from exc
+
+
+@app.post("/api/v17/code/jobs/modify")
+async def v17_create_modify_job(
+    prompt: str = Form(...),
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(get_current_user),
+):
+    if not (file.filename or "").lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=415,
+            detail="Upload a .zip project for modification.",
+        )
+    data = await file.read()
+    try:
+        existing_files = extract_zip_text_files(data)
+    except (ValueError, zipfile.BadZipFile) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    try:
+        runner = await _v17_job_runner(
+            prompt,
+            existing_files=existing_files,
+        )
+        return await create_build_job(
+            user_id=user.id,
+            runner=runner,
+            ttl_seconds=int(
+                getattr(settings, "v17_job_ttl_seconds", 3600)
+            ),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+        ) from exc
+
+
+@app.get("/api/v17/code/jobs/{job_id}")
+async def v17_get_code_job(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    state = await get_build_job(
+        user_id=user.id,
+        job_id=job_id,
+        ttl_seconds=int(
+            getattr(settings, "v17_job_ttl_seconds", 3600)
+        ),
+    )
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "This build is no longer available. "
+                "If the server restarted, submit the build again."
+            ),
+        )
+    return state
+
+
+@app.delete("/api/v17/code/jobs/{job_id}")
+async def v17_cancel_code_job(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    state = await cancel_build_job(
+        user_id=user.id,
+        job_id=job_id,
+    )
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Build job not found.",
+        )
+    return state

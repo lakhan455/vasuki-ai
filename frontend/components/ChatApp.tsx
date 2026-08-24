@@ -18,9 +18,12 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
-  buildCodeProjectV16,
-  modifyCodeProjectV16,
+  cancelCodeBuildJobV17,
   createConversationBranch,
+  startCodeBuildJobV17,
+  startCodeModifyJobV17,
+  waitForCodeBuildJobV17,
+  type CodeBuildJobStatus,
   extractProjectMemories,
   fetchProjects,
   generateImage,
@@ -180,11 +183,6 @@ declare global {
   }
 }
 /* VASUKI_VOICE_TYPES_END */
-
-type ChatResponse = {
-  answer?: string;
-  sources?: SourceInfo[];
-};
 
 type ImageResponse = {
   url?: string;
@@ -687,6 +685,7 @@ export default function ChatApp() {
   const [codeWorkspaceOpen, setCodeWorkspaceOpen] = useState(false);
   const [codeWorkspaceTab, setCodeWorkspaceTab] = useState<CodeWorkspaceTab>("code");
   const [codeWorkspaceSnapshot, setCodeWorkspaceSnapshot] = useState<InlineCodeSnapshot | null>(null);
+  const [codeBuildStatus, setCodeBuildStatus] = useState<CodeBuildJobStatus | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historySearchInputRef = useRef<HTMLInputElement>(null);
@@ -694,6 +693,10 @@ export default function ChatApp() {
   const streamAbortRef = useRef<AbortController | null>(null);
   const chatLoadTokenRef = useRef("");
   const codeIntentRef = useRef(false);
+  const activeCodeJobRef = useRef<{
+    jobId: string;
+    accessToken: string;
+  } | null>(null);
 
   useEffect(() => {
     const wakeBackend = () => {
@@ -846,16 +849,6 @@ export default function ChatApp() {
     }
   }
 
-  function selectProject(projectId: string) {
-    if (projectId === activeProjectId) return;
-    if (currentChatId || messages.length > 0) {
-      startNewChat();
-    }
-    setActiveProjectId(projectId);
-    setMobileSidebarOpen(false);
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }
-
   function openHistorySearch() {
     setHistorySearchOpen(true);
     requestAnimationFrame(() => historySearchInputRef.current?.focus());
@@ -984,6 +977,8 @@ export default function ChatApp() {
     setCodeWorkspaceOpen(false);
     setCodeWorkspaceTab("code");
     setCodeWorkspaceSnapshot(null);
+    setCodeBuildStatus(null);
+    activeCodeJobRef.current = null;
     codeIntentRef.current = false;
     setMobileSidebarOpen(false);
 
@@ -1119,6 +1114,8 @@ export default function ChatApp() {
     setCodeWorkspaceOpen(false);
     setCodeWorkspaceTab("code");
     setCodeWorkspaceSnapshot(null);
+    setCodeBuildStatus(null);
+    activeCodeJobRef.current = null;
     codeIntentRef.current = false;
     setMobileSidebarOpen(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
@@ -1256,6 +1253,7 @@ export default function ChatApp() {
       setCodeWorkspaceOpen(true);
       setCodeWorkspaceTab("code");
       setCodeWorkspaceSnapshot(null);
+      setCodeBuildStatus(null);
     }
 
     const userMessage: UiMessage = {
@@ -1298,7 +1296,7 @@ export default function ChatApp() {
         }).catch((branchError) => console.error("Branch metadata save failed", branchError));
       }
 
-      let finalMessages: UiMessage[];
+      let finalMessages: UiMessage[] = nextMessages;
 
 const requestedDownload =
         wantsDownloadableArtifact(effectiveText);
@@ -1316,50 +1314,71 @@ const requestedDownload =
           selectedAttachment?.kind === "document"
         );
 
-      /* VASUKI_V16_PROJECT_FLOW_ACTIVE */
-      if (shouldUseCodeProject) {
-        const data =
-          zipProjectAttachment && selectedAttachment
-            ? await modifyCodeProjectV16(
-                selectedAttachment.file,
-                effectiveText,
-                accessToken,
-              )
-            : await buildCodeProjectV16(
-                effectiveText,
-                accessToken,
-              );
+/* VASUKI_V17_PROJECT_JOB_FLOW */
+if (shouldUseCodeProject) {
+  const controller = new AbortController();
+  streamAbortRef.current = controller;
 
-        const primaryCode =
-          data.primary_code?.trim() || "";
-        if (primaryCode) {
-          setCodeWorkspaceSnapshot({
-            code: primaryCode,
-            language:
-              data.primary_language || "code",
-            previewDoc:
-              data.preview_doc || "",
-          });
-          setCodeWorkspaceOpen(true);
-          setCodeWorkspaceTab(
-            data.preview_doc ? "preview" : "code",
-          );
-        }
+  const started =
+    zipProjectAttachment && selectedAttachment
+      ? await startCodeModifyJobV17(
+          selectedAttachment.file,
+          effectiveText,
+          accessToken,
+        )
+      : await startCodeBuildJobV17(
+          effectiveText,
+          accessToken,
+        );
 
-        finalMessages = [
-          ...nextMessages,
-          {
-            id: makeId(),
-            role: "assistant",
-            content:
-              data.answer.trim() ||
-              `Your ${
-                data.project_name || "project"
-              } is ready.`,
-            provider: data.provider,
-            artifacts: data.files,
-          },
-        ];
+  activeCodeJobRef.current = {
+    jobId: started.job_id,
+    accessToken,
+  };
+  setCodeBuildStatus(started);
+
+  const data = await waitForCodeBuildJobV17(
+    started.job_id,
+    accessToken,
+    (status) => {
+      setCodeBuildStatus(status);
+      setStreamingStarted(true);
+    },
+    controller.signal,
+  );
+
+  const primaryCode =
+    data.primary_code?.trim() || "";
+  if (primaryCode) {
+    setCodeWorkspaceSnapshot({
+      code: primaryCode,
+      language:
+        data.primary_language || "code",
+      previewDoc:
+        data.preview_doc || "",
+    });
+    setCodeWorkspaceOpen(true);
+    setCodeWorkspaceTab(
+      data.preview_doc ? "preview" : "code",
+    );
+  }
+
+  finalMessages = [
+    ...nextMessages,
+    {
+      id: makeId(),
+      role: "assistant",
+      content:
+        data.answer.trim() ||
+        `Your ${
+          data.project_name || "project"
+        } is ready.`,
+      provider: data.provider,
+      artifacts: data.files,
+    },
+  ];
+} else if (shouldUseSmartFiles) {
+
       } else if (shouldUseSmartFiles) {
 
         const data = await analyzeSmartFiles(
@@ -1744,6 +1763,7 @@ const requestedDownload =
       );
     } finally {
       streamAbortRef.current = null;
+      activeCodeJobRef.current = null;
       setStreamingStarted(false);
       setBusy(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
@@ -1899,6 +1919,15 @@ const requestedDownload =
 
   function stopStreaming() {
     streamAbortRef.current?.abort();
+    const activeJob = activeCodeJobRef.current;
+    if (activeJob) {
+      void cancelCodeBuildJobV17(
+        activeJob.jobId,
+        activeJob.accessToken,
+      ).catch((cancelError) =>
+        console.error("Build cancellation failed", cancelError),
+      );
+    }
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -1961,15 +1990,15 @@ const requestedDownload =
     typeof user.user_metadata?.avatar_url === "string"
       ? user.user_metadata.avatar_url
       : "";
-  const welcomeName =
-    profileName.trim().split(/\s+/)[0] || "there";
-
   const planLabel =
     accountPlan?.plan === "owner"
       ? "OWNER"
       : accountPlan?.plan === "pro"
         ? "PRO"
         : "FREE";
+  const activeProject = projects.find(
+    (project) => project.id === activeProjectId,
+  );
 
   return (
     <main className={codeWorkspaceOpen ? "pv-app pv-app--code-open" : "pv-app"}>
@@ -2250,20 +2279,15 @@ const requestedDownload =
               )}
             </div>
 
-            <div className="pv-project-picker">
-              <select
-                value={activeProjectId}
-                onChange={(event) => selectProject(event.target.value)}
-                aria-label="Active project"
-                title="Active project memory and instructions"
+            {activeProject ? (
+              <div
+                className="pv-project-context pv-desktop-only"
+                title="Project memory is active"
               >
-                <option value="">General chat</option>
-                {projects.map((project) => (
-                  <option value={project.id} key={project.id}>{project.name}</option>
-                ))}
-              </select>
-              {activeProjectId ? <span className="pv-active-project-pill">Project memory on</span> : null}
-            </div>
+                <span>PROJECT</span>
+                <strong>{activeProject.name}</strong>
+              </div>
+            ) : null}
           </div>
 
           <div className="pv-header-right">
@@ -2320,8 +2344,54 @@ const requestedDownload =
             <div className="pv-welcome-inner">
               <Logo className="pv-welcome-logo" />
               <div className="pv-welcome-heading">
-                <p>Hi {welcomeName}, welcome</p>
-                <h1>How can I help you today?</h1>
+                <p>Vasuki Core · online</p>
+                <h1>Turn intent into working systems.</h1>
+                <div className="pv-welcome-subline">
+                  Build software, investigate the web, create media and move
+                  projects forward from one command surface.
+                </div>
+              </div>
+
+              <div className="pv-command-rail" aria-label="Quick starts">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInput("Build a complete production-ready web app for ")
+                  }
+                >
+                  <strong>Build software</strong>
+                  <small>Architecture · code · ZIP · runbook</small>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInput("Fix and improve this project: ")
+                  }
+                >
+                  <strong>Repair a project</strong>
+                  <small>Upload ZIP · inspect · patch · validate</small>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("research");
+                    setWebEnabled(true);
+                    setInput("Research and verify ");
+                  }}
+                >
+                  <strong>Investigate</strong>
+                  <small>Live web · evidence · synthesis</small>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("image");
+                    setInput("Create a premium visual of ");
+                  }}
+                >
+                  <strong>Create visual</strong>
+                  <small>Image studio · identity-aware</small>
+                </button>
               </div>
 
               <Composer
@@ -2524,6 +2594,7 @@ const requestedDownload =
         tab={codeWorkspaceTab}
         snapshot={codeWorkspaceSnapshot}
         busy={busy && codeIntentRef.current}
+        buildStatus={codeBuildStatus}
         onTabChange={setCodeWorkspaceTab}
         onClose={() => setCodeWorkspaceOpen(false)}
       />
@@ -2548,12 +2619,13 @@ const requestedDownload =
 }
 
 
-/* VASUKI_INLINE_CODE_WORKSPACE_COMPONENT_START */
+/* VASUKI_V17_CODE_WORKSPACE_COMPONENT */
 function InlineCodeWorkspace({
   open,
   tab,
   snapshot,
   busy,
+  buildStatus,
   onTabChange,
   onClose,
 }: {
@@ -2561,6 +2633,7 @@ function InlineCodeWorkspace({
   tab: CodeWorkspaceTab;
   snapshot: InlineCodeSnapshot | null;
   busy: boolean;
+  buildStatus: CodeBuildJobStatus | null;
   onTabChange: (tab: CodeWorkspaceTab) => void;
   onClose: () => void;
 }) {
@@ -2575,19 +2648,32 @@ function InlineCodeWorkspace({
 
   if (!open) return null;
 
+  const stageLabel = (() => {
+    const stage = buildStatus?.stage || "";
+    if (stage === "planning") return "Architecting";
+    if (stage === "building") return "Forging files";
+    if (stage === "validating") return "Validating";
+    if (stage === "repairing") return "Self-repair";
+    if (stage === "sandbox") return "Safe check";
+    if (stage === "packaging") return "Packaging";
+    if (stage === "ready") return "Ready";
+    if (stage === "cancelled") return "Stopped";
+    return busy ? "Starting" : "Ready";
+  })();
+
   return (
-    <aside className="pv-inline-code-workspace" aria-label="Vasuki code workspace">
+    <aside className="pv-inline-code-workspace" aria-label="Vasuki build forge">
       <header className="pv-inline-code-head">
         <div className="pv-inline-code-title">
           <span className={busy ? "is-live" : ""} aria-hidden="true" />
           <div>
-            <strong>Vasuki Code</strong>
+            <strong>Vasuki Forge</strong>
             <small>
               {busy
-                ? "Writing live…"
+                ? stageLabel
                 : snapshot?.language
                   ? snapshot.language.toUpperCase()
-                  : "Ready"}
+                  : "Build surface"}
             </small>
           </div>
         </div>
@@ -2595,15 +2681,37 @@ function InlineCodeWorkspace({
         <button
           type="button"
           className="pv-inline-code-close"
-          aria-label="Close code workspace"
-          title="Close code workspace"
+          aria-label="Close build forge"
+          title="Close build forge"
           onClick={onClose}
         >
           ×
         </button>
       </header>
 
-      <div className="pv-inline-code-tabs" role="tablist" aria-label="Code workspace view">
+      {buildStatus && buildStatus.status !== "succeeded" ? (
+        <div className="pv-build-monitor" aria-live="polite">
+          <div className="pv-build-monitor-top">
+            <strong>{stageLabel}</strong>
+            <span>{Math.max(0, Math.min(100, buildStatus.progress || 0))}%</span>
+          </div>
+          <div className="pv-build-track" aria-hidden="true">
+            <span
+              style={{
+                width: `${Math.max(
+                  2,
+                  Math.min(100, buildStatus.progress || 0),
+                )}%`,
+              }}
+            />
+          </div>
+          <p className="pv-build-message">
+            {buildStatus.message || "Working on your project…"}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="pv-inline-code-tabs" role="tablist" aria-label="Build output view">
         <button
           type="button"
           role="tab"
@@ -2630,23 +2738,22 @@ function InlineCodeWorkspace({
             <code>
               {snapshot?.code ||
                 (busy
-                  ? "Vasuki AI is preparing your code…"
-                  : "Ask Vasuki AI to write code and it will appear here automatically.")}
+                  ? `// Vasuki Forge · ${stageLabel}\n// ${buildStatus?.message || "Preparing project…"}`
+                  : "Your project source appears here when a build finishes.")}
             </code>
           </pre>
         ) : snapshot?.previewDoc ? (
           <iframe
             className="pv-inline-code-preview"
-            title="Vasuki code preview"
+            title="Vasuki project preview"
             sandbox="allow-scripts"
             srcDoc={snapshot.previewDoc}
           />
         ) : (
           <div className="pv-inline-code-empty">
-            <strong>Preview will appear here</strong>
+            <strong>Preview surface</strong>
             <p>
-              HTML, CSS and JavaScript output gets a live sandbox preview.
-              Other languages still stay available in the Code tab.
+              Web builds open here automatically when a safe preview is available.
             </p>
           </div>
         )}
@@ -2654,6 +2761,7 @@ function InlineCodeWorkspace({
     </aside>
   );
 }
+
 /* VASUKI_INLINE_CODE_WORKSPACE_COMPONENT_END */
 
 function Logo({ className }: { className: string }) {
