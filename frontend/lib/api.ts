@@ -1770,3 +1770,242 @@ export async function fetchOwnerReliabilityV12(
     accessToken,
   ) as V12ReliabilitySnapshot;
 }
+
+/* VASUKI_V15_CODE_PROJECT_API_START */
+export type CodeProjectSpec = {
+  project_name: string;
+  summary?: string;
+  language?: string;
+  framework?: string;
+  files: Array<{ path: string; content: string }>;
+  powershell?: string[];
+  run_commands?: string[];
+  notes?: string[];
+};
+
+export type CodeProjectResponse = SmartFileResponse & {
+  version?: string;
+  project_name: string;
+  summary?: string;
+  language?: string;
+  framework?: string;
+  tree?: string;
+  powershell?: string[];
+  primary_file?: string;
+  primary_language?: string;
+  primary_code?: string;
+  preview_doc?: string;
+};
+
+function normalizeCodeProjectResponse(
+  data: Record<string, unknown>,
+): CodeProjectResponse {
+  return {
+    answer: typeof data.answer === "string" ? data.answer : "",
+    provider:
+      typeof data.provider === "string" ? data.provider : undefined,
+    files: Array.isArray(data.files)
+      ? (data.files as SmartFileArtifact[])
+      : [],
+    processed_files: Array.isArray(data.processed_files)
+      ? data.processed_files.map(String)
+      : [],
+    warnings: Array.isArray(data.warnings)
+      ? data.warnings.map(String)
+      : [],
+    version:
+      typeof data.version === "string" ? data.version : undefined,
+    project_name:
+      typeof data.project_name === "string"
+        ? data.project_name
+        : "vasuki-project",
+    summary:
+      typeof data.summary === "string" ? data.summary : undefined,
+    language:
+      typeof data.language === "string" ? data.language : undefined,
+    framework:
+      typeof data.framework === "string"
+        ? data.framework
+        : undefined,
+    tree: typeof data.tree === "string" ? data.tree : undefined,
+    powershell: Array.isArray(data.powershell)
+      ? data.powershell.map(String)
+      : [],
+    primary_file:
+      typeof data.primary_file === "string"
+        ? data.primary_file
+        : undefined,
+    primary_language:
+      typeof data.primary_language === "string"
+        ? data.primary_language
+        : undefined,
+    primary_code:
+      typeof data.primary_code === "string"
+        ? data.primary_code
+        : undefined,
+    preview_doc:
+      typeof data.preview_doc === "string"
+        ? data.preview_doc
+        : undefined,
+  };
+}
+
+export function parseCodeProjectSpec(
+  raw: string,
+): CodeProjectSpec {
+  let text = raw.trim();
+  text = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    text = text.slice(start, end + 1);
+  }
+
+  const parsed = JSON.parse(text) as Record<string, unknown>;
+  const rawFiles = Array.isArray(parsed.files)
+    ? parsed.files
+    : [];
+  const files = rawFiles.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const value = item as Record<string, unknown>;
+    if (
+      typeof value.path !== "string" ||
+      typeof value.content !== "string" ||
+      !value.path.trim()
+    ) {
+      return [];
+    }
+    return [{
+      path: value.path.trim(),
+      content: value.content,
+    }];
+  });
+
+  if (files.length === 0) {
+    throw new Error(
+      "Vasuki Pro returned no project files.",
+    );
+  }
+
+  return {
+    project_name:
+      typeof parsed.project_name === "string"
+        ? parsed.project_name
+        : "vasuki-project",
+    summary:
+      typeof parsed.summary === "string" ? parsed.summary : "",
+    language:
+      typeof parsed.language === "string"
+        ? parsed.language
+        : "mixed",
+    framework:
+      typeof parsed.framework === "string"
+        ? parsed.framework
+        : "custom",
+    files,
+    powershell: Array.isArray(parsed.powershell)
+      ? parsed.powershell.map(String)
+      : [],
+    run_commands: Array.isArray(parsed.run_commands)
+      ? parsed.run_commands.map(String)
+      : [],
+    notes: Array.isArray(parsed.notes)
+      ? parsed.notes.map(String)
+      : [],
+  };
+}
+
+export async function buildCodeProject(
+  prompt: string,
+  accessToken: string,
+): Promise<CodeProjectResponse> {
+  const bases = Array.from(
+    new Set([DIRECT_API_URL, PROXY_API_URL]),
+  );
+  const errors: string[] = [];
+
+  for (const baseUrl of bases) {
+    try {
+      const data = await postJsonAt(
+        baseUrl,
+        "/api/v15/code/project",
+        { prompt },
+        240000,
+        1,
+        accessToken,
+      );
+      return normalizeCodeProjectResponse(data);
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : "V15 project build failed.",
+      );
+    }
+  }
+
+  throw new Error(
+    errors.at(-1) ||
+      "V15 project builder is temporarily unavailable.",
+  );
+}
+
+export async function modifyCodeProject(
+  file: File,
+  prompt: string,
+  accessToken: string,
+): Promise<CodeProjectResponse> {
+  const bases = Array.from(
+    new Set([DIRECT_API_URL, PROXY_API_URL]),
+  );
+  const errors: string[] = [];
+
+  for (const baseUrl of bases) {
+    try {
+      const data = await postFormAt(
+        baseUrl,
+        "/api/v15/code/modify",
+        () => {
+          const form = new FormData();
+          form.append("prompt", prompt);
+          form.append("file", file, file.name);
+          return form;
+        },
+        300000,
+        1,
+        accessToken,
+      );
+      return normalizeCodeProjectResponse(data);
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : "V15 project modification failed.",
+      );
+    }
+  }
+
+  throw new Error(
+    errors.at(-1) ||
+      "V15 project modifier is temporarily unavailable.",
+  );
+}
+
+export async function packageCodeProject(
+  spec: CodeProjectSpec,
+  accessToken: string,
+): Promise<CodeProjectResponse> {
+  const data = await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v15/code/package",
+    spec,
+    60000,
+    2,
+    accessToken,
+  );
+  return normalizeCodeProjectResponse(data);
+}
+/* VASUKI_V15_CODE_PROJECT_API_END */
