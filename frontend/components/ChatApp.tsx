@@ -274,6 +274,31 @@ function wantsDownloadableArtifact(value: string) {
 }
 /* VASUKI_INLINE_ARTIFACT_FIX_END */
 
+function isIdentityCriticalImageRequest(value: string) {
+  const normalized = value.toLowerCase();
+  const exactLanguage =
+    /\b(?:exact|canonical|accurate|same character|specific model|identity|do not change|don't change)\b/i.test(
+      normalized,
+    );
+  const namedVehicleOrProduct =
+    /\b(?:bmw|mercedes(?:-benz)?|audi|porsche|tesla|ferrari|lamborghini|bugatti|toyota|honda|ford|volkswagen|tata|mahindra|iphone|ipad|macbook|galaxy|pixel|playstation|xbox)\s+[a-z0-9][a-z0-9.+-]*/i.test(
+      normalized,
+    );
+  const knownCharacter =
+    /\b(?:minato|naruto|sasuke|itachi|kakashi|goku|vegeta|gojo|luffy|zoro|doraemon|akatsuki|hokage|shinobi)\b/i.test(
+      normalized,
+    );
+  const properNamedSubject =
+    /\b[A-Z][A-Za-z'-]{2,}\s+[A-Z][A-Za-z'-]{2,}\b/.test(value);
+
+  return (
+    exactLanguage ||
+    namedVehicleOrProduct ||
+    knownCharacter ||
+    properNamedSubject
+  );
+}
+
 function normaliseSources(value: unknown): SourceInfo[] {
   if (!Array.isArray(value)) return [];
 
@@ -1313,8 +1338,15 @@ export default function ChatApp() {
         let imageUrl = "";
         let imageProvider = "";
         let imageQuotaText = "";
+        const identityCriticalImage =
+          isIdentityCriticalImageRequest(effectiveText);
+        const autoProForIdentity =
+          identityCriticalImage &&
+          aiEngine === "vasuki" &&
+          Boolean(accountPlan?.puter_access) &&
+          Boolean(puterAccount);
 
-        if (aiEngine === "puter") {
+        if (aiEngine === "puter" || autoProForIdentity) {
           if (!accountPlan?.puter_access) {
             throw new Error("Vasuki Pro access required.");
           }
@@ -1327,8 +1359,31 @@ export default function ChatApp() {
           try {
             const result = await generatePuterImage4K(effectiveText);
             imageUrl = result.url;
-            imageProvider = result.provider;
+            imageProvider = autoProForIdentity
+              ? `Vasuki auto-exact · ${result.provider}`
+              : result.provider;
           } catch (puterImageError) {
+            if (identityCriticalImage) {
+              try {
+                const restored =
+                  await releasePuterImageQuota(accessToken);
+                setPuterImageQuota(restored);
+              } catch {
+                // Persistent quota resets automatically.
+              }
+
+              const identityError =
+                puterImageError instanceof Error
+                  ? puterImageError.message
+                  : "Strong image provider unavailable.";
+
+              throw new Error(
+                `${identityError} Exact-identity mode did not use the ` +
+                  "native approximate fallback, so the requested model or " +
+                  "character is not silently replaced.",
+              );
+            }
+
             try {
               const fallback = (await generateImage(
                 effectiveText,
