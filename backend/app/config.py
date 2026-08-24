@@ -122,6 +122,13 @@ class Settings(BaseSettings):
     v17_provider_quota_cooldown_seconds: int = 75
     # VASUKI_V17_MISSION_CONTROL_END
 
+    # VASUKI_V18_LIVING_MIND_START
+    v18_living_mind_enabled: bool = True
+    v18_reflection_enabled: bool = True
+    v18_goal_memory_limit: int = 12
+    v18_experience_memory_limit: int = 8
+    # VASUKI_V18_LIVING_MIND_END
+
     # VASUKI_V16_AUTONOMOUS_BUILDER_START
     # V16 generates a compact manifest first and then source in small batches.
     # This avoids large single-JSON truncation failures.

@@ -2252,7 +2252,7 @@ if (shouldUseCodeProject) {
                   >
                     <strong>Vasuki AI</strong>
                     <small>
-                      Normal · Web · Memory · Documents
+                      Living Mind · Web · Memory · Documents
                     </small>
                   </button>
 
@@ -2291,6 +2291,14 @@ if (shouldUseCodeProject) {
           </div>
 
           <div className="pv-header-right">
+            <span
+              className="pv-living-mind-badge"
+              title="Metacognitive self-model, intuition, goal awareness and self-correction — not literal consciousness"
+            >
+              <i className="pv-living-mind-dot" aria-hidden="true" />
+              <span className="pv-living-mind-label">Living Mind</span>
+              <b>V18</b>
+            </span>
             <span
               className={`pv-plan-badge pv-plan-badge--${planLabel.toLowerCase()}`}
               title={
@@ -2344,11 +2352,11 @@ if (shouldUseCodeProject) {
             <div className="pv-welcome-inner">
               <Logo className="pv-welcome-logo" />
               <div className="pv-welcome-heading">
-                <p>Vasuki Core · online</p>
+                <p>Vasuki Core · Living Mind V18 · online</p>
                 <h1>Turn intent into working systems.</h1>
                 <div className="pv-welcome-subline">
                   Build software, investigate the web, create media and move
-                  projects forward from one command surface.
+                  projects forward with reflection, goal awareness and calibrated intuition.
                 </div>
               </div>
 

@@ -1483,3 +1483,317 @@ async def v17_cancel_code_job(
             detail="Build job not found.",
         )
     return state
+
+
+# VASUKI_V18_LIVING_MIND_INTEGRATION
+import re
+from app.services.personal_memory import (
+    create_user_memory as create_personal_memory_v18,
+    delete_user_memory as delete_personal_memory_v18,
+    list_user_memories as list_personal_memories_v18,
+)
+from app.v18.living_mind import (
+    build_living_context,
+    build_living_snapshot,
+    living_mind_health,
+    public_reflection,
+)
+
+
+# Transparently enrich the existing authenticated /api/chat and
+# /api/chat/stream private-context stage. This reuses current private memory
+# and document context; no new DB table or provider call is introduced.
+_v18_base_private_context = v10.legacy._private_context
+
+
+async def _v18_private_context(
+    *,
+    user_id: str,
+    access_token: str,
+    query: str,
+    request,
+):
+    base_context, document_sources = await _v18_base_private_context(
+        user_id=user_id,
+        access_token=access_token,
+        query=query,
+        request=request,
+    )
+    if not bool(
+        getattr(settings, "v18_living_mind_enabled", True)
+    ):
+        return base_context, document_sources
+
+    try:
+        living_context = build_living_context(
+            [
+                item.model_dump()
+                if hasattr(item, "model_dump")
+                else dict(item)
+                for item in request.messages
+            ],
+            memory_context=base_context,
+            require_current=bool(
+                getattr(request, "research_mode", False)
+            ),
+            enabled=True,
+        )
+    except Exception:
+        living_context = ""
+
+    return (
+        v10.legacy._join_context(
+            base_context,
+            living_context,
+        ),
+        document_sources,
+    )
+
+
+v10.legacy._private_context = _v18_private_context
+
+
+class V18MindInspectRequest(BaseModel):
+    messages: list[dict[str, Any]]
+    require_current: bool = False
+
+
+class V18ReflectRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=30000)
+    answer: str = Field(min_length=1, max_length=100000)
+    current_required: bool = False
+
+
+class V18GoalRequest(BaseModel):
+    goal: str = Field(min_length=3, max_length=600)
+    remember: bool = True
+
+
+class V18ExperienceRequest(BaseModel):
+    outcome: str = Field(
+        default="success",
+        pattern="^(success|failure|partial)$",
+    )
+    lesson: str = Field(min_length=3, max_length=600)
+    remember: bool = False
+
+
+def _v18_memory_context(rows: list[dict[str, Any]]) -> str:
+    lines = ["PRIVATE USER MEMORY:"]
+    for index, row in enumerate(rows, 1):
+        text = str(row.get("memory_text") or "").strip()
+        if text:
+            lines.append(
+                f"[USER MEMORY {index}] {text}"
+            )
+    return "\n".join(lines)
+
+
+@app.get("/health/v18")
+async def health_v18():
+    return {
+        "ok": True,
+        **living_mind_health(),
+        "enabled": bool(
+            getattr(settings, "v18_living_mind_enabled", True)
+        ),
+        "reflection_enabled": bool(
+            getattr(settings, "v18_reflection_enabled", True)
+        ),
+        "persistent_storage": (
+            "existing-private-user-memory"
+            if settings.supabase_url
+            else "not-configured"
+        ),
+        "provider_health": provider_health_summary(
+            provider_snapshot_v12(settings)
+        ),
+    }
+
+
+@app.post("/api/v18/mind/inspect")
+async def v18_mind_inspect(
+    payload: V18MindInspectRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    if not payload.messages:
+        raise HTTPException(
+            status_code=422,
+            detail="At least one message is required.",
+        )
+
+    rows: list[dict[str, Any]] = []
+    try:
+        rows = await list_personal_memories_v18(
+            user.id,
+            settings,
+            limit=max(
+                int(
+                    getattr(
+                        settings,
+                        "v18_goal_memory_limit",
+                        12,
+                    )
+                ),
+                int(
+                    getattr(
+                        settings,
+                        "v18_experience_memory_limit",
+                        8,
+                    )
+                ),
+            ),
+            user_jwt=user.access_token,
+        )
+    except Exception:
+        rows = []
+
+    snapshot = build_living_snapshot(
+        payload.messages,
+        memory_context=_v18_memory_context(rows),
+        require_current=payload.require_current,
+    )
+    return {
+        "ok": True,
+        "mind": snapshot.to_dict(),
+        "note": (
+            "This is a metacognitive/intuition model, not "
+            "literal consciousness or emotion."
+        ),
+    }
+
+
+@app.post("/api/v18/mind/reflect")
+async def v18_mind_reflect(
+    payload: V18ReflectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    return {
+        "ok": True,
+        "reflection": public_reflection(
+            payload.prompt,
+            payload.answer,
+            current_required=payload.current_required,
+        ),
+    }
+
+
+@app.get("/api/v18/mind/goals")
+async def v18_mind_goals(
+    user: AuthUser = Depends(get_current_user),
+):
+    rows = await list_personal_memories_v18(
+        user.id,
+        settings,
+        limit=100,
+        user_jwt=user.access_token,
+    )
+    goals = [
+        row for row in rows
+        if str(row.get("category") or "").casefold()
+        == "living_goal"
+        or str(row.get("memory_text") or "")
+        .casefold()
+        .startswith("goal:")
+    ]
+    return {
+        "ok": True,
+        "goals": goals[
+            : max(
+                1,
+                int(
+                    getattr(
+                        settings,
+                        "v18_goal_memory_limit",
+                        12,
+                    )
+                ),
+            )
+        ],
+        "automatic_persistence": False,
+    }
+
+
+@app.post("/api/v18/mind/goals")
+async def v18_mind_goal_create(
+    payload: V18GoalRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    goal = re.sub(
+        r"\s+",
+        " ",
+        payload.goal,
+    ).strip()
+    if not payload.remember:
+        snapshot = build_living_snapshot(
+            [{"role": "user", "content": f"My goal is {goal}"}],
+        )
+        return {
+            "ok": True,
+            "remembered": False,
+            "mind": snapshot.to_dict(),
+        }
+
+    row = await create_personal_memory_v18(
+        user.id,
+        f"Goal: {goal}",
+        settings,
+        category="living_goal",
+        user_jwt=user.access_token,
+    )
+    return {
+        "ok": True,
+        "remembered": True,
+        "goal": row,
+    }
+
+
+@app.delete("/api/v18/mind/goals/{memory_id}")
+async def v18_mind_goal_delete(
+    memory_id: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    await delete_personal_memory_v18(
+        user.id,
+        memory_id,
+        settings,
+        user_jwt=user.access_token,
+    )
+    return {"ok": True}
+
+
+@app.post("/api/v18/mind/experience")
+async def v18_mind_experience(
+    payload: V18ExperienceRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    lesson = re.sub(
+        r"\s+",
+        " ",
+        payload.lesson,
+    ).strip()
+    if not payload.remember:
+        return {
+            "ok": True,
+            "remembered": False,
+            "experience": {
+                "outcome": payload.outcome,
+                "lesson": lesson,
+            },
+        }
+
+    row = await create_personal_memory_v18(
+        user.id,
+        (
+            f"Experience lesson: {lesson} "
+            f"(outcome: {payload.outcome})"
+        ),
+        settings,
+        category="living_experience",
+        user_jwt=user.access_token,
+    )
+    return {
+        "ok": True,
+        "remembered": True,
+        "experience": row,
+    }
