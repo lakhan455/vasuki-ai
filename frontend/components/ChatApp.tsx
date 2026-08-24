@@ -667,10 +667,10 @@ export default function ChatApp() {
   const [documentsEnabled, setDocumentsEnabled] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [streamingStarted, setStreamingStarted] = useState(false);
-  const [quotaStatus, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
+  const [, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
   const [accountPlan, setAccountPlan] = useState<AccountPlan | null>(null);
   const [aiEngine, setAiEngine] = useState<AiEngine>("vasuki");
-  const [puterImageQuota, setPuterImageQuota] = useState<PuterImageQuota | null>(null);
+  const [, setPuterImageQuota] = useState<PuterImageQuota | null>(null);
   const [puterAccount, setPuterAccount] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
@@ -1151,18 +1151,6 @@ export default function ChatApp() {
     }
   }
 
-  async function deleteCurrentChat() {
-    if (currentChatId) {
-      const current = chatRecords.find((chat) => chat.id === currentChatId);
-      await deleteChatById(currentChatId, current?.title || "this chat");
-      return;
-    }
-
-    if (messages.length > 0 && window.confirm("Clear this unsaved chat?")) {
-      startNewChat();
-    }
-  }
-
   async function chooseAttachment(file: File) {
     setError("");
 
@@ -1378,8 +1366,6 @@ if (shouldUseCodeProject) {
     },
   ];
 } else if (shouldUseSmartFiles) {
-
-      } else if (shouldUseSmartFiles) {
 
         const data = await analyzeSmartFiles(
           selectedAttachment ? [selectedAttachment.file] : [],
@@ -1990,12 +1976,6 @@ if (shouldUseCodeProject) {
     typeof user.user_metadata?.avatar_url === "string"
       ? user.user_metadata.avatar_url
       : "";
-  const planLabel =
-    accountPlan?.plan === "owner"
-      ? "OWNER"
-      : accountPlan?.plan === "pro"
-        ? "PRO"
-        : "FREE";
   const activeProject = projects.find(
     (project) => project.id === activeProjectId,
   );
@@ -2252,7 +2232,7 @@ if (shouldUseCodeProject) {
                   >
                     <strong>Vasuki AI</strong>
                     <small>
-                      Living Mind · Web · Memory · Documents
+                      Context Brain · Project Memory · Web · Documents
                     </small>
                   </button>
 
@@ -2290,61 +2270,6 @@ if (shouldUseCodeProject) {
             ) : null}
           </div>
 
-          <div className="pv-header-right">
-            <span
-              className="pv-living-mind-badge"
-              title="Metacognitive self-model, intuition, goal awareness and self-correction — not literal consciousness"
-            >
-              <i className="pv-living-mind-dot" aria-hidden="true" />
-              <span className="pv-living-mind-label">Living Mind</span>
-              <b>V18</b>
-            </span>
-            <span
-              className={`pv-plan-badge pv-plan-badge--${planLabel.toLowerCase()}`}
-              title={
-                accountPlan?.pro_expires_at
-                  ? `Pro until ${new Date(
-                      accountPlan.pro_expires_at,
-                    ).toLocaleDateString()}`
-                  : planLabel
-              }
-            >
-              {planLabel}
-            </span>
-            {puterImageQuota && (
-              <span
-                className="pv-quota-indicator"
-                title="Image quota resets daily"
-              >
-                Images: {puterImageQuota.daily_remaining}/
-                {puterImageQuota.daily_limit}
-              </span>
-            )}
-            {quotaStatus && (
-              <span
-                className="pv-quota-indicator"
-                title={`${quotaStatus.minuteRemaining}/${quotaStatus.minuteLimit} requests available this minute`}
-              >
-                {quotaStatus.dailyLimit <= 0
-                  ? "Chat: Unlimited"
-                  : `Today: ${quotaStatus.dailyRemaining}/${quotaStatus.dailyLimit}`}
-              </span>
-            )}
-            <span className="pv-saved-indicator">
-              {currentChatId ? "Saved" : "New chat"}
-            </span>
-            {hasMessages && (
-              <button
-                type="button"
-                className="pv-delete-chat-button"
-                aria-label="Delete current chat"
-                title="Delete current chat"
-                onClick={() => void deleteCurrentChat()}
-              >
-                <Icon name="trash" />
-              </button>
-            )}
-          </div>
         </header>
 
         {!hasMessages ? (
@@ -2352,7 +2277,7 @@ if (shouldUseCodeProject) {
             <div className="pv-welcome-inner">
               <Logo className="pv-welcome-logo" />
               <div className="pv-welcome-heading">
-                <p>Vasuki Core · Living Mind V18 · online</p>
+                <p>Vasuki Core · V19 Context Brain · online</p>
                 <h1>Turn intent into working systems.</h1>
                 <div className="pv-welcome-subline">
                   Build software, investigate the web, create media and move
