@@ -110,6 +110,11 @@ class Settings(BaseSettings):
     v11_stt_model: str = "whisper-1"
     # VASUKI_V11_ALL_IN_ONE_END
 
+    # VASUKI_V17_MISSION_CONTROL_START
+    v17_max_concurrent_builds: int = 2
+    v17_job_ttl_seconds: int = 3600
+    # VASUKI_V17_MISSION_CONTROL_END
+
     # VASUKI_V16_AUTONOMOUS_BUILDER_START
     # V16 generates a compact manifest first and then source in small batches.
     # This avoids large single-JSON truncation failures.

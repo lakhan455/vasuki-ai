@@ -687,12 +687,24 @@ def tool_catalog() -> list[dict[str, str]]:
     ]
 
 
+async def _emit_progress(
+    progress,
+    stage: str,
+    value: int,
+    message: str,
+) -> None:
+    if progress is None:
+        return
+    await progress(stage, value, message)
+
+
 async def build_autonomous_project(
     request: str,
     *,
     chat: ChatFn,
     settings: Any,
     existing_files: list[dict[str, str]] | None = None,
+    progress=None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     max_files = max(
         4,
@@ -711,6 +723,12 @@ async def build_autonomous_project(
         min(3, int(getattr(settings, "v16_repair_attempts", 2))),
     )
 
+    await _emit_progress(
+        progress,
+        "planning",
+        6,
+        "Designing project architecture",
+    )
     manifest, manifest_provider, manifest_attempts = (
         await _generate_manifest(
             chat,
@@ -719,6 +737,13 @@ async def build_autonomous_project(
             max_files=max_files,
         )
     )
+    await _emit_progress(
+        progress,
+        "planning",
+        16,
+        f"Architecture ready · {len(manifest['files'])} files planned",
+    )
+
     existing = _existing_map(existing_files)
     batches = [
         manifest["files"][index:index + batch_size]
@@ -732,9 +757,27 @@ async def build_autonomous_project(
                 chat, request, manifest, batch, existing
             )
 
-    results = await asyncio.gather(
-        *(run_batch(batch) for batch in batches)
+    await _emit_progress(
+        progress,
+        "building",
+        20,
+        f"Generating {len(batches)} code batches",
     )
+
+    tasks = [
+        asyncio.create_task(run_batch(batch))
+        for batch in batches
+    ]
+    results = []
+    for index, task in enumerate(asyncio.as_completed(tasks), 1):
+        results.append(await task)
+        percentage = 20 + int(45 * index / max(1, len(tasks)))
+        await _emit_progress(
+            progress,
+            "building",
+            percentage,
+            f"Code batch {index}/{len(tasks)} complete",
+        )
 
     generated: dict[str, str] = {}
     providers: list[str] = [manifest_provider]
@@ -744,6 +787,13 @@ async def build_autonomous_project(
         providers.extend(used_providers)
         batch_missing.extend(missing)
 
+    await _emit_progress(
+        progress,
+        "validating",
+        70,
+        f"Validating {len(generated)} generated files",
+    )
+
     generated, repairs, repair_providers = await _repair_failed_files(
         chat,
         request,
@@ -752,6 +802,17 @@ async def build_autonomous_project(
         max_attempts=repair_attempts,
     )
     providers.extend(repair_providers)
+
+    await _emit_progress(
+        progress,
+        "repairing",
+        82,
+        (
+            f"Self-repair complete · {len(repairs)} repair action(s)"
+            if repairs
+            else "Validation clean · no repair needed"
+        ),
+    )
 
     project_payload = {
         "project_name": manifest["project_name"],
@@ -775,11 +836,25 @@ async def build_autonomous_project(
         item["path"]: item["content"] for item in project["files"]
     }
     validation = validate_files(final_map)
+
+    await _emit_progress(
+        progress,
+        "sandbox",
+        90,
+        "Running safe validation sandbox when available",
+    )
     sandbox = docker_sandbox_validate(
         final_map,
         enabled=bool(
             getattr(settings, "v16_docker_sandbox_enabled", True)
         ),
+    )
+
+    await _emit_progress(
+        progress,
+        "packaging",
+        96,
+        "Preparing project ZIP and runbook",
     )
 
     telemetry = {
@@ -798,11 +873,14 @@ async def build_autonomous_project(
         "repairs": repairs,
         "validation": validation,
         "sandbox": sandbox,
-        "providers": list(dict.fromkeys(provider for provider in providers if provider)),
+        "providers": list(
+            dict.fromkeys(
+                provider for provider in providers if provider
+            )
+        ),
         "tools": tool_catalog(),
     }
     return project, telemetry
-
 
 def _zip_text_paths(data: bytes) -> list[dict[str, str]]:
     return extract_zip_text_files(data)
