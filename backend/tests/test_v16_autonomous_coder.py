@@ -7,6 +7,7 @@ import json
 
 from app.v16.autonomous_coder import (
     build_autonomous_project,
+    _generate_batch,
     coder_health,
     normalize_manifest,
     parse_file_markers,
@@ -134,3 +135,72 @@ def test_health_reports_v16_without_migration():
     assert health["db_migration_required"] is False
     assert health["new_api_key_required_for_core"] is False
     assert "unterminated-json-project-failure" in health["fixes"]
+
+def test_batch_failure_recovers_files_individually():
+    async def scenario():
+        calls = 0
+
+        async def fake_chat(messages):
+            nonlocal calls
+            calls += 1
+            user = messages[-1]["content"]
+
+            if calls == 1:
+                raise RuntimeError(
+                    "temporary batch provider failure"
+                )
+
+            path = (
+                "src/a.py"
+                if "PATH: src/a.py" in user
+                else "src/b.py"
+            )
+            return (
+                f"<<<FILE:{path}>>>\n"
+                f"print({path!r})\n"
+                "<<<END_FILE>>>",
+                "fake-provider",
+            )
+
+        manifest = {
+            "project_name": "demo",
+            "summary": "demo",
+            "language": "python",
+            "framework": "python",
+            "files": [
+                {
+                    "path": "src/a.py",
+                    "purpose": "a",
+                    "depends_on": [],
+                    "order": 1,
+                },
+                {
+                    "path": "src/b.py",
+                    "purpose": "b",
+                    "depends_on": [],
+                    "order": 2,
+                },
+            ],
+            "powershell": [],
+            "run_commands": [],
+            "notes": [],
+        }
+
+        files, providers, initially_missing = (
+            await _generate_batch(
+                fake_chat,
+                "build demo",
+                manifest,
+                manifest["files"],
+                {},
+            )
+        )
+
+        assert set(files) == {"src/a.py", "src/b.py"}
+        assert providers
+        assert set(initially_missing) == {
+            "src/a.py",
+            "src/b.py",
+        }
+
+    asyncio.run(scenario())

@@ -1286,6 +1286,10 @@ from app.v17.jobs import (
     jobs_health,
     shutdown_build_jobs,
 )
+from app.v17.provider_recovery import (
+    CodingProviderRecovery,
+    coding_provider_health,
+)
 
 
 class V17CodeJobRequest(BaseModel):
@@ -1304,12 +1308,16 @@ async def _v17_job_runner(
 ):
     async def runner(progress):
         async with _v17_build_semaphore:
+            provider_pool = CodingProviderRecovery(settings)
             project, telemetry = await build_autonomous_project(
                 prompt,
-                chat=_v16_chat,
+                chat=provider_pool,
                 settings=settings,
                 existing_files=existing_files,
                 progress=progress,
+            )
+            telemetry["provider_recovery"] = (
+                provider_pool.snapshot()
             )
             await progress(
                 "packaging",
@@ -1324,6 +1332,7 @@ async def _v17_job_runner(
                 provider=f"vasuki-v17:{provider}",
             )
             response["version"] = "v17"
+            response["provider_recovery_version"] = "v17.1"
             response["agent"] = telemetry
             response["answer"] = (
                 str(response.get("answer") or "").rstrip()
@@ -1353,15 +1362,23 @@ async def health_v17():
             "v16-self-repair",
             "zip-readme-powershell-artifacts",
             "mission-control-interface",
+            "per-batch-explicit-provider-failover",
+            "build-local-provider-circuit-breaker",
+            "missing-file-sequential-recovery",
+            "partial-batch-preservation",
         ],
         "fixes": [
             "long-build-request-timeout",
             "generic-project-server-error",
             "proxy-error-masking",
+            "shared-provider-cooldown-build-abort",
+            "no-healthy-provider-at-mid-build",
+            "single-batch-provider-failure-aborts-project",
         ],
         "db_migration_required": False,
         "new_api_key_required": False,
         "jobs": jobs_health(),
+        "coding_provider_recovery": coding_provider_health(settings),
         "provider_health": provider_health_summary(
             provider_snapshot_v12(settings)
         ),

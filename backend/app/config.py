@@ -113,6 +113,13 @@ class Settings(BaseSettings):
     # VASUKI_V17_MISSION_CONTROL_START
     v17_max_concurrent_builds: int = 2
     v17_job_ttl_seconds: int = 3600
+
+    # V17.1 build-only provider recovery. These settings do not change
+    # normal chat routing.
+    v17_provider_retry_rounds: int = 2
+    v17_provider_attempt_timeout_seconds: int = 38
+    v17_provider_transient_cooldown_seconds: int = 4
+    v17_provider_quota_cooldown_seconds: int = 75
     # VASUKI_V17_MISSION_CONTROL_END
 
     # VASUKI_V16_AUTONOMOUS_BUILDER_START

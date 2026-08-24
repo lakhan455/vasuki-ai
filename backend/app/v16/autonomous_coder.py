@@ -426,37 +426,67 @@ async def _generate_batch(
     batch: list[dict[str, Any]],
     existing: dict[str, str],
 ) -> tuple[dict[str, str], list[str], list[str]]:
-    raw, provider = await _ask(
-        chat,
-        system=FILE_BATCH_SYSTEM,
-        user=_batch_prompt(request, manifest, batch, existing),
-        attempts=3,
-    )
-    parsed = parse_file_markers(raw)
     wanted = {item["path"] for item in batch}
-    completed = {
-        path: content for path, content in parsed.items()
-        if path in wanted
-    }
-    missing = sorted(wanted - set(completed))
-    providers = [provider]
+    completed: dict[str, str] = {}
+    providers: list[str] = []
 
-    for path in missing:
-        item = next(value for value in batch if value["path"] == path)
-        individual_prompt = _batch_prompt(
-            request, manifest, [item], existing
-        )
-        one_raw, one_provider = await _ask(
+    # Batch generation is an optimization, not a single point of failure.
+    try:
+        raw, provider = await _ask(
             chat,
             system=FILE_BATCH_SYSTEM,
-            user=individual_prompt,
-            attempts=3,
+            user=_batch_prompt(
+                request,
+                manifest,
+                batch,
+                existing,
+            ),
+            attempts=1,
         )
-        completed[path] = _single_file_fallback(one_raw, path)
-        providers.append(one_provider)
+        providers.append(provider)
+        parsed = parse_file_markers(raw)
+        completed.update(
+            {
+                path: content
+                for path, content in parsed.items()
+                if path in wanted
+            }
+        )
+    except Exception:
+        # Missing paths below are retried individually.
+        pass
 
-    return completed, providers, missing
+    initially_missing = sorted(wanted - set(completed))
 
+    for path in initially_missing:
+        item = next(
+            value for value in batch
+            if value["path"] == path
+        )
+        individual_prompt = _batch_prompt(
+            request,
+            manifest,
+            [item],
+            existing,
+        )
+        try:
+            one_raw, one_provider = await _ask(
+                chat,
+                system=FILE_BATCH_SYSTEM,
+                user=individual_prompt,
+                attempts=2,
+            )
+            completed[path] = _single_file_fallback(
+                one_raw,
+                path,
+            )
+            providers.append(one_provider)
+        except Exception:
+            # Preserve every completed file; project-level recovery gets
+            # another sequential chance for this path.
+            continue
+
+    return completed, providers, initially_missing
 
 def validate_files(files: dict[str, str]) -> dict[str, Any]:
     validate_suffixes = {
@@ -488,6 +518,70 @@ def validate_files(files: dict[str, str]) -> dict[str, Any]:
     }
 
 
+async def _recover_required_files(
+    chat: ChatFn,
+    request: str,
+    manifest: dict[str, Any],
+    existing: dict[str, str],
+    generated: dict[str, str],
+    *,
+    progress=None,
+) -> tuple[
+    dict[str, str],
+    list[str],
+    list[str],
+    dict[str, str],
+]:
+    current = dict(generated)
+    planned = [item["path"] for item in manifest["files"]]
+    missing = [path for path in planned if path not in current]
+    recovered: list[str] = []
+    providers: list[str] = []
+    errors: dict[str, str] = {}
+
+    for index, path in enumerate(missing, 1):
+        item = next(
+            value
+            for value in manifest["files"]
+            if value["path"] == path
+        )
+        await _emit_progress(
+            progress,
+            "recovering",
+            min(
+                69,
+                64 + int(5 * index / max(1, len(missing))),
+            ),
+            (
+                f"Recovering missing file {index}/"
+                f"{len(missing)} · {path}"
+            ),
+        )
+        try:
+            raw, provider = await _ask(
+                chat,
+                system=FILE_BATCH_SYSTEM,
+                user=_batch_prompt(
+                    request,
+                    manifest,
+                    [item],
+                    existing,
+                ),
+                attempts=2,
+            )
+            current[path] = _single_file_fallback(raw, path)
+            providers.append(provider)
+            recovered.append(path)
+        except Exception as exc:
+            errors[path] = str(exc)[:900]
+
+    unresolved = [path for path in planned if path not in current]
+    return current, recovered, providers, {
+        path: errors.get(path, "generation unavailable")
+        for path in unresolved
+    }
+
+
 async def _repair_failed_files(
     chat: ChatFn,
     request: str,
@@ -516,19 +610,29 @@ async def _repair_failed_files(
                 f"{json.dumps(result, ensure_ascii=False)}\n\n"
                 f"CURRENT CONTENT:\n{content[:MAX_FILE_OUTPUT_CHARS]}"
             )
-            raw, provider = await _ask(
-                chat,
-                system=REPAIR_SYSTEM,
-                user=prompt,
-                attempts=2,
-            )
-            current[path] = _single_file_fallback(raw, path)
-            providers.append(provider)
-            repairs.append({
-                "attempt": attempt,
-                "path": path,
-                "provider": provider,
-            })
+            try:
+                raw, provider = await _ask(
+                    chat,
+                    system=REPAIR_SYSTEM,
+                    user=prompt,
+                    attempts=2,
+                )
+                current[path] = _single_file_fallback(raw, path)
+                providers.append(provider)
+                repairs.append({
+                    "attempt": attempt,
+                    "path": path,
+                    "provider": provider,
+                    "ok": True,
+                })
+            except Exception as exc:
+                repairs.append({
+                    "attempt": attempt,
+                    "path": path,
+                    "provider": "",
+                    "ok": False,
+                    "error": str(exc)[:900],
+                })
 
     return current, repairs, providers
 
@@ -787,6 +891,28 @@ async def build_autonomous_project(
         providers.extend(used_providers)
         batch_missing.extend(missing)
 
+    generated, recovered_files, recovery_providers, unresolved = (
+        await _recover_required_files(
+            chat,
+            request,
+            manifest,
+            existing,
+            generated,
+            progress=progress,
+        )
+    )
+    providers.extend(recovery_providers)
+
+    if unresolved:
+        detail = " | ".join(
+            f"{path}: {error}"
+            for path, error in list(unresolved.items())[:8]
+        )
+        raise RuntimeError(
+            "V17 could not recover all required project files after "
+            "cross-provider failover. " + detail
+        )
+
     await _emit_progress(
         progress,
         "validating",
@@ -870,6 +996,8 @@ async def build_autonomous_project(
         "generated_files": len(generated),
         "batch_count": len(batches),
         "batch_recovered_missing_files": sorted(set(batch_missing)),
+        "project_recovered_files": sorted(set(recovered_files)),
+        "unresolved_required_files": [],
         "repairs": repairs,
         "validation": validation,
         "sandbox": sandbox,
