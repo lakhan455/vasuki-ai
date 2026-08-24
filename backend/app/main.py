@@ -50,6 +50,7 @@ from app.services.personal_memory import (
     create_user_memory,
     delete_user_memory,
     explicit_memory_category,
+    extract_explicit_memory,
     extract_explicit_memory_command,
     get_memory_enabled,
     list_user_memories,

@@ -66,19 +66,23 @@ async def chat_stream_v5(
             provider="vasuki-identity",
         )
 
-    explicit_memory = (
-        legacy.extract_explicit_memory(query)
+    explicit_memory, memory_followup = (
+        legacy.extract_explicit_memory_command(query)
         if chat_request.use_memory
-        else None
+        else (None, "")
     )
+    memory_action_context = ""
     if explicit_memory:
+        memory_saved = False
         try:
             await remember_with_conflict_resolution(
                 current_user.id,
                 explicit_memory,
                 settings,
+                category=legacy.explicit_memory_category(explicit_memory),
                 user_jwt=current_user.access_token,
             )
+            memory_saved = True
             answer = f"I will remember: {explicit_memory}"
         except ValueError as exc:
             answer = str(exc)
@@ -101,9 +105,34 @@ async def chat_stream_v5(
                 f"Request ID: {request_id}"
             )
 
-        return legacy._direct_stream(
-            answer,
-            provider="vasuki-personal-memory",
+        if not memory_followup:
+            return legacy._direct_stream(
+                answer,
+                provider="vasuki-personal-memory",
+            )
+
+        if memory_saved:
+            memory_action_context = (
+                "SYSTEM ACTION RESULT:\n"
+                "The user's explicit memory was saved successfully.\n"
+                f"MEMORY: {explicit_memory}\n"
+                "Continue with the remaining user request. "
+                "Do not stop at a memory acknowledgement."
+            )
+        else:
+            memory_action_context = (
+                "SYSTEM ACTION RESULT:\n"
+                "The user asked to save an explicit memory, but "
+                "persistence failed. Use it only for this turn.\n"
+                f"ATTEMPTED MEMORY: {explicit_memory}\n"
+                "Answer the remaining request and briefly mention "
+                "that persistence did not succeed."
+            )
+
+        query = memory_followup
+        raw_messages = legacy._replace_last_user_content(
+            raw_messages,
+            memory_followup,
         )
 
     (
@@ -166,6 +195,7 @@ async def chat_stream_v5(
         shared_pack,
         private_pack,
         live_pack,
+        memory_action_context,
     )
     available_message_chars = max(
         8000,
