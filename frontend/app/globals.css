@@ -4320,3 +4320,65 @@ button {
   }
 }
 /* VASUKI_V17_MISSION_CONTROL_UI_END */
+
+
+/* VASUKI_V18_LIVING_MIND_UI */
+.pv-living-mind-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid rgba(218, 185, 104, 0.22);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(218, 185, 104, 0.08),
+      rgba(218, 185, 104, 0.025)
+    );
+  color: rgba(244, 226, 179, 0.94);
+  font-size: 11px;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 0 24px rgba(218, 185, 104, 0.035);
+}
+
+.pv-living-mind-badge b {
+  color: rgba(179, 236, 211, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.pv-living-mind-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(162, 232, 204, 0.95);
+  box-shadow: 0 0 0 3px rgba(162, 232, 204, 0.08);
+  animation: pv-living-mind-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes pv-living-mind-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@media (max-width: 760px) {
+  .pv-living-mind-badge {
+    padding: 0 7px;
+  }
+
+  .pv-living-mind-label {
+    display: none;
+  }
+}
