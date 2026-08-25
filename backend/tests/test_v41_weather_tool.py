@@ -207,3 +207,40 @@ def test_main_v11_passes_latest_query_to_weather_context():
     start = source.index("async def _v41_web_context(")
     end = source.index("\n\nasync def _v41_build_autonomous_project(", start)
     assert "query=query," in source[start:end]
+
+def test_hinglish_sunrise_sunset_location():
+    decision = detect_weather_intent(
+        "Jaipur ka sunrise aur sunset kab hai?"
+    )
+    assert decision.matched is True
+    assert decision.operation == "astronomy"
+    assert decision.location.casefold() == "jaipur"
+
+
+def test_hinglish_sunset_location():
+    decision = detect_weather_intent("Delhi ka sunset kab hai?")
+    assert decision.operation == "astronomy"
+    assert decision.location.casefold() == "delhi"
+
+
+def test_hinglish_astronomy_mein_location():
+    decision = detect_weather_intent("Jaipur me sunrise kab hoga?")
+    assert decision.operation == "astronomy"
+    assert decision.location.casefold() == "jaipur"
+
+
+def test_hinglish_timezone_location():
+    decision = detect_weather_intent("Mumbai ka timezone kya hai?")
+    assert decision.operation == "timezone"
+    assert decision.location.casefold() == "mumbai"
+
+
+def test_v41_2_health_version_and_location_features():
+    settings = SimpleNamespace(
+        weatherapi_key="configured",
+        weatherapi_base_url="https://api.weatherapi.com/v1",
+    )
+    health = weatherapi_health(settings)
+    assert health["version"] == "v41.2"
+    assert "hinglish-astronomy-location-routing" in health["features"]
+    assert "hinglish-timezone-location-routing" in health["features"]

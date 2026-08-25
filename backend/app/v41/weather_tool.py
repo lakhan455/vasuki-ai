@@ -53,7 +53,17 @@ _LOCATION_PATTERNS = (
     ),
     re.compile(
         r"^\s*(.+?)\s+(?:ka|ki|ke)\s+"
-        r"(?:weather|mausam|temperature|temp|forecast|aqi|air quality)"
+        r"(?:weather|mausam|temperature|temp|forecast|aqi|air quality|"
+        r"sunrise|sunset|moonrise|moonset|moon phase|astronomy|"
+        r"timezone|time zone|humidity|wind|weather alert|alerts?)"
+        r"(?:[?.!,]|\s|$)",
+        re.I,
+    ),
+    re.compile(
+        r"^\s*(.+?)\s+(?:me|mein)\s+"
+        r"(?:sunrise|sunset|moonrise|moonset|moon phase|astronomy|"
+        r"timezone|time zone|weather|mausam|temperature|temp|forecast|"
+        r"aqi|air quality|humidity|wind)"
         r"(?:[?.!,]|\s|$)",
         re.I,
     ),
@@ -558,7 +568,7 @@ VASUKI V41 WEATHERAPI INTEGRATION CONTRACT:
 
 def weatherapi_health(settings: Any) -> dict[str, Any]:
     return {
-        "version": "v41.1",
+        "version": "v41.2",
         "name": "Vasuki Live Weather Tool",
         "configured": weatherapi_configured(settings),
         "provider": "WeatherAPI.com",
@@ -578,6 +588,8 @@ def weatherapi_health(settings: Any) -> dict[str, Any]:
             "no-unrequested-weather-media",
             "no-cross-turn-weather-contamination",
             "ui-managed-weather-source-rendering",
+            "hinglish-astronomy-location-routing",
+            "hinglish-timezone-location-routing",
         ],
         "api_key_exposed_to_frontend": False,
         "server_ip_used_as_user_location": False,
