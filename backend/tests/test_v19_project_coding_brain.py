@@ -138,4 +138,5 @@ def test_frontend_cleanup_and_smart_files_fix():
     assert (
         "Vasuki Core · V19 Context Brain · online" in source
         or "Vasuki Core · V30 Autonomous Runtime · online" in source
+        or "Vasuki Core · V40 Advanced Creator Runtime · online" in source
     )
