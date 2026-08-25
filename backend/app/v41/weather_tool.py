@@ -458,18 +458,34 @@ def build_weather_context(
     compact: dict[str, Any] | list[dict[str, Any]],
     *,
     operation: str,
+    query: str = "",
 ) -> str:
+    latest_query = " ".join(str(query or "").split()).strip()
     return (
-        "VASUKI V41 LIVE WEATHER TOOL RESULT (WeatherAPI.com):\n"
+        "VASUKI V41.1 LIVE WEATHER TOOL RESULT (WeatherAPI.com):\n"
         "Treat this structured external API result as the authoritative live weather "
-        "evidence for this turn. Do not invent missing measurements. Mention the matched "
-        "location and relevant update/date when useful. If the requested field is absent, "
-        "say it was not returned by the configured WeatherAPI plan.\n"
+        "evidence for this turn. Do not invent missing measurements.\n"
+        "STRICT WEATHER RESPONSE CONTRACT:\n"
+        "1. Answer ONLY the latest user weather question shown below. Earlier conversation "
+        "turns are background only; do not answer, summarize, list, or revisit old weather "
+        "questions unless the latest user explicitly asks for them.\n"
+        "2. Use only DATA fields relevant to the latest question. Never add an 'other questions' "
+        "or recap section.\n"
+        "3. Do NOT output Markdown images, image links, HTML images, SVG, logos, favicons, "
+        "decorative media, business logos, or unrelated visual assets.\n"
+        "4. Do NOT manually create a Sources/Source/स्रोत section, numbered citation list, "
+        "favicon line, image-source line, or duplicate source URL. Source metadata is rendered "
+        "separately by the application UI.\n"
+        "5. Do NOT discuss unrelated weather facts or say they are unavailable when the latest "
+        "user did not ask for them.\n"
+        "6. Answer in the user's language. For a simple weather fact, prefer one concise sentence "
+        "or a short compact list.\n"
+        "7. If the requested field is absent from DATA, say only that it was not returned.\n"
+        f"LATEST USER QUERY: {latest_query[:1000]}\n"
         f"OPERATION: {operation}\n"
         "DATA:\n"
         + json.dumps(compact, ensure_ascii=False, separators=(",", ":"))[:18000]
     )
-
 
 def weather_source(
     compact: dict[str, Any] | list[dict[str, Any]],
@@ -542,7 +558,7 @@ VASUKI V41 WEATHERAPI INTEGRATION CONTRACT:
 
 def weatherapi_health(settings: Any) -> dict[str, Any]:
     return {
-        "version": "v41",
+        "version": "v41.1",
         "name": "Vasuki Live Weather Tool",
         "configured": weatherapi_configured(settings),
         "provider": "WeatherAPI.com",
@@ -558,6 +574,10 @@ def weatherapi_health(settings: Any) -> dict[str, Any]:
             "location-search",
             "existing-verified-web-fallback",
             "weather-app-coding-guidance",
+            "latest-weather-query-only-response",
+            "no-unrequested-weather-media",
+            "no-cross-turn-weather-contamination",
+            "ui-managed-weather-source-rendering",
         ],
         "api_key_exposed_to_frontend": False,
         "server_ip_used_as_user_location": False,

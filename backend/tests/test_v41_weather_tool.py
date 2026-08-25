@@ -123,10 +123,14 @@ def test_context_marks_data_as_external_live_evidence():
     context = build_weather_context(
         {"location": {"name": "Jaipur"}, "current": {"temp_c": 29}},
         operation="current",
+        query="Jaipur ka weather kya hai?",
     )
     assert "LIVE WEATHER TOOL RESULT" in context
     assert "authoritative live weather evidence" in context
-
+    assert "LATEST USER QUERY: Jaipur ka weather kya hai?" in context
+    assert "Answer ONLY the latest user weather question" in context
+    assert "Do NOT output Markdown images" in context
+    assert "Do NOT manually create a Sources/Source/स्रोत section" in context
 
 def test_weather_coding_guidance_is_backend_key_safe():
     prompt = "Build a React weather dashboard"
@@ -181,3 +185,25 @@ def test_env_example_has_placeholder_not_secret():
     env = (backend / ".env.example").read_text(encoding="utf-8")
     assert "WEATHERAPI_KEY=" in env
     assert "WEATHERAPI_BASE_URL=https://api.weatherapi.com/v1" in env
+
+def test_weather_context_blocks_cross_turn_noise_and_media():
+    context = build_weather_context(
+        {
+            "location": {"name": "Jaipur", "localtime": "2026-08-25 11:00"},
+            "astronomy": {"sunrise": "06:03 AM", "sunset": "06:54 PM"},
+        },
+        operation="astronomy",
+        query="Jaipur ka sunrise aur sunset kab hai?",
+    )
+    assert "Earlier conversation turns are background only" in context
+    assert "logos, favicons" in context
+    assert "other questions" in context
+    assert "Source metadata is rendered separately" in context
+
+
+def test_main_v11_passes_latest_query_to_weather_context():
+    backend = Path(__file__).resolve().parents[1]
+    source = (backend / "app" / "main_v11.py").read_text(encoding="utf-8")
+    start = source.index("async def _v41_web_context(")
+    end = source.index("\n\nasync def _v41_build_autonomous_project(", start)
+    assert "query=query," in source[start:end]

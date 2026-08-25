@@ -2605,6 +2605,7 @@ async def _v41_web_context(
             build_weather_context(
                 compact,
                 operation=decision.operation,
+                query=query,
             ),
         )
     except (WeatherAPIError, asyncio.TimeoutError):
