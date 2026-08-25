@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     cloudflare_edit_model: str = "@cf/black-forest-labs/flux-2-klein-4b"
     ocr_space_api: str | None = None
 
+    # VASUKI_V41_LIVE_WEATHER_TOOL_START
+    # Backend-only WeatherAPI credentials. Never expose this key in Vercel/frontend.
+    weatherapi_key: str | None = None
+    weatherapi_base_url: str = "https://api.weatherapi.com/v1"
+    weatherapi_timeout_seconds: float = 9.0
+    # VASUKI_V41_LIVE_WEATHER_TOOL_END
+
     # Backend-only Supabase credentials.
     # Never put a service-role/secret key in the frontend or Vercel.
     supabase_url: str | None = None

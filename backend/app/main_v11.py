@@ -2525,3 +2525,283 @@ async def v40_code_inspect(
         "coding": code,
         "review": review_code_plan(code).to_dict(),
     }
+
+# VASUKI_V41_LIVE_WEATHER_TOOL_INTEGRATION
+from app.v41.weather_tool import (
+    WeatherAPIError,
+    build_weather_context,
+    compact_weather_payload,
+    detect_weather_intent,
+    fetch_weather,
+    weather_coding_guidance,
+    weather_source,
+    weatherapi_configured,
+    weatherapi_health,
+)
+
+_v41_base_web_context = v10.legacy._web_context
+_v41_base_build_autonomous_project = build_autonomous_project
+
+
+async def _v41_web_context(
+    *,
+    query: str,
+    current_date: str,
+    request,
+):
+    decision = detect_weather_intent(query)
+
+    if not decision.matched:
+        return await _v41_base_web_context(
+            query=query,
+            current_date=current_date,
+            request=request,
+        )
+
+    # Do not guess the user's location and do not use Render/server IP as
+    # a substitute for the user's device location.
+    if not decision.location or not weatherapi_configured(settings):
+        require_current, sources, pack = await _v41_base_web_context(
+            query=query,
+            current_date=current_date,
+            request=request,
+        )
+        return True, sources, pack
+
+    try:
+        payload = await asyncio.wait_for(
+            fetch_weather(
+                settings,
+                location=decision.location,
+                operation=decision.operation,
+                days=decision.days,
+                include_aqi=decision.include_aqi,
+                include_alerts=decision.include_alerts,
+            ),
+            timeout=min(
+                22.0,
+                float(
+                    getattr(
+                        settings,
+                        "weatherapi_timeout_seconds",
+                        9.0,
+                    )
+                )
+                + 3.0,
+            ),
+        )
+        compact = compact_weather_payload(
+            payload,
+            operation=decision.operation,
+        )
+        return (
+            True,
+            [
+                weather_source(
+                    compact,
+                    operation=decision.operation,
+                )
+            ],
+            build_weather_context(
+                compact,
+                operation=decision.operation,
+            ),
+        )
+    except (WeatherAPIError, asyncio.TimeoutError):
+        # Preserve the existing verified web/search path if WeatherAPI is
+        # unavailable, invalid, rate-limited, or not supported by the plan.
+        require_current, sources, pack = await _v41_base_web_context(
+            query=query,
+            current_date=current_date,
+            request=request,
+        )
+        return True, sources, pack
+
+
+async def _v41_build_autonomous_project(
+    request: str,
+    *,
+    chat,
+    settings,
+    existing_files: list[dict[str, str]] | None = None,
+    progress=None,
+):
+    enhanced = weather_coding_guidance(request)
+    project, telemetry = await _v41_base_build_autonomous_project(
+        enhanced,
+        chat=chat,
+        settings=settings,
+        existing_files=existing_files,
+        progress=progress,
+    )
+    telemetry = dict(telemetry or {})
+    if enhanced != request:
+        telemetry["v41_weatherapi"] = {
+            "enabled": True,
+            "provider": "WeatherAPI.com",
+            "backend_env": "WEATHERAPI_KEY",
+            "frontend_secret_exposure": False,
+            "extra_provider_call_for_planning": False,
+        }
+    return project, telemetry
+
+
+# main_v4/main_v5 production chat resolves web context dynamically.
+v10.legacy._web_context = _v41_web_context
+
+# V16/V17 code paths resolve the global builder dynamically.
+build_autonomous_project = _v41_build_autonomous_project
+
+
+@app.get("/health/v41")
+async def health_v41():
+    return {
+        "ok": True,
+        **weatherapi_health(settings),
+        "v40_creator_runtime_preserved": True,
+        "v30_autonomy_preserved": True,
+        "existing_verified_web_fallback_preserved": True,
+    }
+
+
+@app.get("/api/v41/weather/current")
+async def v41_weather_current(
+    q: str = Query(..., min_length=1, max_length=160),
+    aqi: bool = Query(False),
+    _user: AuthUser = Depends(get_current_user),
+):
+    try:
+        payload = await fetch_weather(
+            settings,
+            location=q,
+            operation="current",
+            include_aqi=aqi,
+        )
+        compact = compact_weather_payload(
+            payload,
+            operation="current",
+        )
+        return {
+            "ok": True,
+            "provider": "weatherapi",
+            "weather": compact,
+        }
+    except WeatherAPIError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:500],
+        ) from exc
+
+
+@app.get("/api/v41/weather/forecast")
+async def v41_weather_forecast(
+    q: str = Query(..., min_length=1, max_length=160),
+    days: int = Query(3, ge=1, le=14),
+    aqi: bool = Query(False),
+    alerts: bool = Query(False),
+    _user: AuthUser = Depends(get_current_user),
+):
+    try:
+        payload = await fetch_weather(
+            settings,
+            location=q,
+            operation="forecast",
+            days=days,
+            include_aqi=aqi,
+            include_alerts=alerts,
+        )
+        compact = compact_weather_payload(
+            payload,
+            operation="forecast",
+        )
+        return {
+            "ok": True,
+            "provider": "weatherapi",
+            "weather": compact,
+        }
+    except WeatherAPIError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:500],
+        ) from exc
+
+
+@app.get("/api/v41/weather/search")
+async def v41_weather_search(
+    q: str = Query(..., min_length=1, max_length=160),
+    _user: AuthUser = Depends(get_current_user),
+):
+    try:
+        payload = await fetch_weather(
+            settings,
+            location=q,
+            operation="search",
+        )
+        compact = compact_weather_payload(
+            payload,
+            operation="search",
+        )
+        return {
+            "ok": True,
+            "provider": "weatherapi",
+            "results": compact,
+        }
+    except WeatherAPIError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:500],
+        ) from exc
+
+
+@app.get("/api/v41/weather/astronomy")
+async def v41_weather_astronomy(
+    q: str = Query(..., min_length=1, max_length=160),
+    _user: AuthUser = Depends(get_current_user),
+):
+    try:
+        payload = await fetch_weather(
+            settings,
+            location=q,
+            operation="astronomy",
+        )
+        compact = compact_weather_payload(
+            payload,
+            operation="astronomy",
+        )
+        return {
+            "ok": True,
+            "provider": "weatherapi",
+            "astronomy": compact,
+        }
+    except WeatherAPIError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:500],
+        ) from exc
+
+
+@app.get("/api/v41/weather/timezone")
+async def v41_weather_timezone(
+    q: str = Query(..., min_length=1, max_length=160),
+    _user: AuthUser = Depends(get_current_user),
+):
+    try:
+        payload = await fetch_weather(
+            settings,
+            location=q,
+            operation="timezone",
+        )
+        compact = compact_weather_payload(
+            payload,
+            operation="timezone",
+        )
+        return {
+            "ok": True,
+            "provider": "weatherapi",
+            "timezone": compact,
+        }
+    except WeatherAPIError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc)[:500],
+        ) from exc
