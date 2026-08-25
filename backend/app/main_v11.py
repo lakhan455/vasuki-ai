@@ -2269,3 +2269,259 @@ async def v30_autonomy_inspect(
         project_files=project_rows,
     )
     return {"ok": True, "autonomy": decision.to_dict()}
+
+# VASUKI_V40_ADVANCED_CREATOR_RUNTIME_INTEGRATION
+from app.v31.coding_spec import coding_spec_health, compile_coding_spec
+from app.v32.impact_engine import build_impact_plan, impact_engine_health
+from app.v33.patch_brain import build_patch_strategy, patch_brain_health
+from app.v34.verification_engine import (
+    build_verification_plan,
+    verification_engine_health,
+)
+from app.v35.code_runtime import code_runtime_health, enhance_coding_request
+from app.v36.image_director import image_director_health
+from app.v37.image_fidelity import image_fidelity_health
+from app.v38.image_runtime import (
+    build_image_generation_plan,
+    image_runtime_health,
+)
+from app.v39.creator_critic import (
+    creator_critic_health,
+    review_code_plan,
+    review_image_plan,
+)
+from app.v40.creator_runtime import (
+    build_creator_context,
+    creator_inspect,
+    creator_runtime_health,
+)
+
+_v40_base_private_context = v10.legacy._private_context
+_v40_base_build_autonomous_project = build_autonomous_project
+_v40_base_route_image = v10.legacy.route_image
+
+
+async def _v40_private_context(
+    *,
+    user_id: str,
+    access_token: str,
+    query: str,
+    request,
+):
+    base_context, document_sources = await _v40_base_private_context(
+        user_id=user_id,
+        access_token=access_token,
+        query=query,
+        request=request,
+    )
+    try:
+        creator_context = build_creator_context(
+            _v19_request_messages(request)
+        )
+    except Exception:
+        creator_context = ""
+    return (
+        v10.legacy._join_context(base_context, creator_context),
+        document_sources,
+    )
+
+
+async def _v40_build_autonomous_project(
+    request: str,
+    *,
+    chat,
+    settings,
+    existing_files: list[dict[str, str]] | None = None,
+    progress=None,
+):
+    enhanced_request, v40_code = enhance_coding_request(
+        request,
+        existing_files,
+    )
+    project, telemetry = await _v40_base_build_autonomous_project(
+        enhanced_request,
+        chat=chat,
+        settings=settings,
+        existing_files=existing_files,
+        progress=progress,
+    )
+    telemetry = dict(telemetry or {})
+    telemetry["v40_creator_runtime"] = {
+        "version": "v40",
+        "coding": v40_code,
+        "review": review_code_plan(v40_code).to_dict(),
+        "original_request_preserved": True,
+        "extra_provider_call": False,
+    }
+    return project, telemetry
+
+
+async def _v40_route_image(
+    provider: str,
+    prompt: str,
+    settings_arg,
+):
+    plan = build_image_generation_plan(
+        prompt,
+        provider=provider,
+    )
+    result = await _v40_base_route_image(
+        provider,
+        plan.enhanced_prompt,
+        settings_arg,
+    )
+    payload = dict(result or {})
+    plan_public = plan.to_dict(include_prompt=False)
+    payload["image_runtime"] = {
+        **plan_public,
+        "review": review_image_plan(plan_public).to_dict(),
+        "prompt_enhanced": (
+            plan.enhanced_prompt.strip()
+            != str(prompt or "").strip()
+        ),
+        "original_request_preserved": True,
+        "native_resolution_guarantee": False,
+    }
+    return payload
+
+
+# Existing V16/V17 builder code resolves this global at request execution time.
+build_autonomous_project = _v40_build_autonomous_project
+
+# Existing /api/image endpoint resolves app.main.route_image dynamically.
+v10.legacy.route_image = _v40_route_image
+
+# Existing production chat stream resolves private context dynamically.
+v10.legacy._private_context = _v40_private_context
+
+
+class V40CreatorInspectRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=30000)
+    provider: str = Field(default="auto", max_length=80)
+    existing_paths: list[str] = Field(default_factory=list)
+
+
+@app.get("/health/v31")
+async def health_v31():
+    return {"ok": True, **coding_spec_health()}
+
+
+@app.get("/health/v32")
+async def health_v32():
+    return {"ok": True, **impact_engine_health()}
+
+
+@app.get("/health/v33")
+async def health_v33():
+    return {"ok": True, **patch_brain_health()}
+
+
+@app.get("/health/v34")
+async def health_v34():
+    return {"ok": True, **verification_engine_health()}
+
+
+@app.get("/health/v35")
+async def health_v35():
+    return {"ok": True, **code_runtime_health()}
+
+
+@app.get("/health/v36")
+async def health_v36():
+    return {"ok": True, **image_director_health()}
+
+
+@app.get("/health/v37")
+async def health_v37():
+    return {"ok": True, **image_fidelity_health()}
+
+
+@app.get("/health/v38")
+async def health_v38():
+    return {"ok": True, **image_runtime_health()}
+
+
+@app.get("/health/v39")
+async def health_v39():
+    return {"ok": True, **creator_critic_health()}
+
+
+@app.get("/health/v40")
+async def health_v40():
+    return {
+        "ok": True,
+        **creator_runtime_health(),
+        "v30_unified_autonomy_preserved": True,
+        "v19_project_context_preserved": True,
+        "v18_memory_continue_preserved": True,
+        "v17_async_builder_preserved": True,
+        "existing_image_quota_preserved": True,
+        "existing_image_provider_fallback_preserved": True,
+    }
+
+
+@app.post("/api/v40/creator/inspect")
+async def v40_creator_inspect(
+    payload: V40CreatorInspectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    existing = [
+        {"path": path, "content": ""}
+        for path in payload.existing_paths[:100]
+        if str(path).strip()
+    ]
+    return {
+        "ok": True,
+        "creator": creator_inspect(
+            payload.prompt,
+            provider=payload.provider,
+            existing_files=existing,
+        ),
+    }
+
+
+@app.post("/api/v40/image/inspect")
+async def v40_image_inspect(
+    payload: V40CreatorInspectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    plan = build_image_generation_plan(
+        payload.prompt,
+        provider=payload.provider,
+    )
+    public = plan.to_dict(include_prompt=False)
+    return {
+        "ok": True,
+        "image": public,
+        "review": review_image_plan(public).to_dict(),
+    }
+
+
+@app.post("/api/v40/code/inspect")
+async def v40_code_inspect(
+    payload: V40CreatorInspectRequest,
+    _user: AuthUser = Depends(get_current_user),
+):
+    existing = [
+        {"path": path, "content": ""}
+        for path in payload.existing_paths[:100]
+        if str(path).strip()
+    ]
+    spec = compile_coding_spec(
+        payload.prompt,
+        existing_files=existing,
+    )
+    impact = build_impact_plan(spec, existing)
+    patch = build_patch_strategy(spec, impact)
+    verify = build_verification_plan(spec, existing)
+    code = {
+        "spec": spec.to_dict(),
+        "impact": impact.to_dict(),
+        "patch": patch.to_dict(),
+        "verification": verify.to_dict(),
+    }
+    return {
+        "ok": True,
+        "coding": code,
+        "review": review_code_plan(code).to_dict(),
+    }
