@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     openrouter_image_enabled: bool = False
     openrouter_image_model: str = ""
     # VASUKI_V42_DUAL_PROVIDER_END
+
+    # VASUKI_V44_ZAI_GLM_CODING_START
+    # Backend-only Z.AI GLM Coding Plan provider.
+    # Coding Plan keys must use the dedicated coding endpoint.
+    zai_api_key: str | None = None
+    zai_coding_base_url: str = "https://api.z.ai/api/coding/paas/v4"
+    zai_model: str = "glm-4.7"
+    zai_timeout_seconds: float = 45.0
+    # VASUKI_V44_ZAI_GLM_CODING_END
+
     mistral_ai_api: str | None = None
     mistral_model: str = "mistral-small-latest"
 

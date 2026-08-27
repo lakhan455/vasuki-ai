@@ -450,6 +450,47 @@ async def chat_opencode_zen(
         token_field="max_tokens",
     )
 
+async def chat_zai_glm(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str = "",
+    *,
+    require_current: bool = False,
+    as_of: str | None = None,
+    temperature: float = 0.0,
+) -> str:
+    if not getattr(settings, "zai_api_key", None):
+        raise RuntimeError("ZAI_API_KEY is not configured")
+
+    model = str(getattr(settings, "zai_model", "") or "").strip()
+    if not model:
+        raise RuntimeError("ZAI_MODEL is not configured")
+
+    base_url = str(
+        getattr(
+            settings,
+            "zai_coding_base_url",
+            "https://api.z.ai/api/coding/paas/v4",
+        )
+        or ""
+    ).strip().rstrip("/")
+
+    return await _openai_compatible(
+        f"{base_url}/chat/completions",
+        settings.zai_api_key,
+        model,
+        _openai_messages(
+            messages,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        ),
+        settings,
+        temperature=temperature,
+        token_field="max_tokens",
+    )
+
+
 async def chat_openrouter(
     messages: list[dict],
     settings: Settings,
@@ -600,6 +641,7 @@ PROVIDERS = {
     "cerebras": chat_cerebras,
     "gemini": chat_gemini,
     "opencode_zen": chat_opencode_zen,
+    "zai_glm": chat_zai_glm,
     "openrouter": chat_openrouter,
     "mistral": chat_mistral,
 }
@@ -870,6 +912,14 @@ def _stream_provider_config(
             f"{str(settings.opencode_zen_base_url or '').rstrip('/')}/chat/completions",
             settings.opencode_zen_api_key or "",
             settings.opencode_zen_model,
+            "max_tokens",
+            {},
+        )
+    if name == "zai_glm":
+        return (
+            f"{str(getattr(settings, 'zai_coding_base_url', '') or '').rstrip('/')}/chat/completions",
+            getattr(settings, "zai_api_key", None) or "",
+            str(getattr(settings, "zai_model", "") or ""),
             "max_tokens",
             {},
         )

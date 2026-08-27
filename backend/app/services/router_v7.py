@@ -52,6 +52,7 @@ def configured_provider(name: str, s: Settings) -> bool:
         "cerebras": bool(getattr(s, "cerebras_api_key", None)),
         "gemini": bool(getattr(s, "google_gemini_api", None)),
         "opencode_zen": bool(getattr(s, "opencode_zen_api_key", None)),
+        "zai_glm": bool(getattr(s, "zai_api_key", None)),
         "openrouter": bool(getattr(s, "openrouter_api", None)),
         "mistral": bool(getattr(s, "mistral_ai_api", None)),
     }.get(name, False)
@@ -68,6 +69,6 @@ def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
             "sambanova",
             "gemini",
         ]
-    if d.task_type == "code": return ["opencode_zen","groq","openrouter","gemini","mistral","cerebras","sambanova"]
+    if d.task_type == "code": return ["opencode_zen","zai_glm","groq","openrouter","gemini","mistral","cerebras","sambanova"]
     if d.task_type in {"research","reasoning"}: return ["groq","gemini","sambanova","cerebras","openrouter"]
     return ["groq","gemini","openrouter","sambanova","cerebras"]
