@@ -2822,3 +2822,11 @@ from app.v43.instant_response import instant_response_health
 @app.get("/health/v43")
 async def health_v43():
     return instant_response_health()
+
+# VASUKI_V44_ZAI_GLM_CODING_INTEGRATION
+from app.v44.zai_glm import zai_glm_health
+
+
+@app.get("/health/v44")
+async def health_v44():
+    return zai_glm_health(settings)

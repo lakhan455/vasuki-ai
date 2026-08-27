@@ -17,6 +17,7 @@ ProviderCaller = Callable[
 
 CODE_PROVIDER_ORDER = (
     "opencode_zen",
+    "zai_glm",
     "groq",
     "gemini",
     "sambanova",
