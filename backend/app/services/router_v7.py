@@ -46,10 +46,14 @@ def classify_route(messages: list[dict[str, Any]], *, require_current: bool=Fals
 
 def configured_provider(name: str, s: Settings) -> bool:
     return {
-        "groq_fast": bool(s.groq_api_key), "groq": bool(s.groq_api_key),
-        "sambanova": bool(s.sambanova_api_key), "cerebras": bool(s.cerebras_api_key),
-        "gemini": bool(s.google_gemini_api), "openrouter": bool(s.openrouter_api),
-        "mistral": bool(s.mistral_ai_api),
+        "groq_fast": bool(getattr(s, "groq_api_key", None)),
+        "groq": bool(getattr(s, "groq_api_key", None)),
+        "sambanova": bool(getattr(s, "sambanova_api_key", None)),
+        "cerebras": bool(getattr(s, "cerebras_api_key", None)),
+        "gemini": bool(getattr(s, "google_gemini_api", None)),
+        "opencode_zen": bool(getattr(s, "opencode_zen_api_key", None)),
+        "openrouter": bool(getattr(s, "openrouter_api", None)),
+        "mistral": bool(getattr(s, "mistral_ai_api", None)),
     }.get(name, False)
 
 def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
@@ -64,6 +68,6 @@ def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
             "sambanova",
             "gemini",
         ]
-    if d.task_type == "code": return ["groq","openrouter","gemini","cerebras","sambanova"]
+    if d.task_type == "code": return ["opencode_zen","groq","openrouter","gemini","mistral","cerebras","sambanova"]
     if d.task_type in {"research","reasoning"}: return ["groq","gemini","sambanova","cerebras","openrouter"]
     return ["groq","gemini","openrouter","sambanova","cerebras"]
