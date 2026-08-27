@@ -2814,3 +2814,11 @@ from app.v42.dual_provider import dual_provider_health
 @app.get("/health/v42")
 async def health_v42():
     return dual_provider_health(settings)
+
+# VASUKI_V43_INSTANT_INTENT_RESPONSE_INTEGRATION
+from app.v43.instant_response import instant_response_health
+
+
+@app.get("/health/v43")
+async def health_v43():
+    return instant_response_health()

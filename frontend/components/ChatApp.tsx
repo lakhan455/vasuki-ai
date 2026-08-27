@@ -521,6 +521,59 @@ function isLikelyCodeRequest(value: string) {
   return /\bcode\b/i.test(text) || ((explicitCode || webBuild) && action);
 }
 
+/* VASUKI_V43_INSTANT_INTENT_START */
+function instantIntentStatus(
+  value: string,
+  currentMode: ActionMode,
+  attachmentKind?: PendingAttachment["kind"],
+) {
+  const text = value.toLowerCase();
+
+  if (attachmentKind === "image") return "Intent: Image analysis · starting…";
+  if (attachmentKind === "document") return "Intent: Document analysis · starting…";
+
+  if (currentMode === "image") return "Intent: Image creation · starting…";
+  if (currentMode === "research") return "Intent: Deep research · starting…";
+  if (currentMode === "web") return "Intent: Live web search · starting…";
+  if (currentMode === "write") return "Intent: Writing · starting…";
+  if (currentMode === "analyze") return "Intent: Analysis · starting…";
+
+  if (
+    /\b(weather|mausam|temperature|forecast|rain|barish|aqi|air quality|sunrise|sunset|moonrise|moonset|timezone|humidity|wind)\b/i.test(
+      text,
+    )
+  ) {
+    return "Intent: Live weather · starting…";
+  }
+
+  if (
+    /\b(create|generate|make|draw|design|render)\b.{0,30}\b(image|photo|poster|picture|logo|visual|wallpaper)\b/i.test(
+      text,
+    )
+  ) {
+    return "Intent: Image creation · starting…";
+  }
+
+  if (isLikelyCodeRequest(value) || isLikelyProjectBuildRequest(value)) {
+    return "Intent: Coding · starting…";
+  }
+
+  if (
+    /\b(research|latest|current|today|news|verify|source|citation|compare)\b/i.test(
+      text,
+    )
+  ) {
+    return "Intent: Research · starting…";
+  }
+
+  if (/\b(calculate|solve|equation|proof|logic|reason|math|ganit)\b/i.test(text)) {
+    return "Intent: Reasoning · starting…";
+  }
+
+  return "Intent: Chat · starting…";
+}
+/* VASUKI_V43_INSTANT_INTENT_END */
+
 /* VASUKI_V15_PROJECT_INTENT_START */
 function isLikelyProjectBuildRequest(value: string) {
   const text = value.toLowerCase();
@@ -667,6 +720,7 @@ export default function ChatApp() {
   const [documentsEnabled, setDocumentsEnabled] = useState(false);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [streamingStarted, setStreamingStarted] = useState(false);
+  const [instantIntent, setInstantIntent] = useState("");
   const [, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
   const [accountPlan, setAccountPlan] = useState<AccountPlan | null>(null);
   const [aiEngine, setAiEngine] = useState<AiEngine>("vasuki");
@@ -971,6 +1025,7 @@ export default function ChatApp() {
     setAttachment(null);
     setInput("");
     setError("");
+    setInstantIntent("");
     setMode("chat");
     setWebEnabled(false);
     setEditingMessageId(null);
@@ -1231,6 +1286,13 @@ export default function ChatApp() {
         ? "Analyze this document in detail. If it is a question paper, answer every question in the correct order."
         : "Analyze this image in detail and explain all important information.");
 
+    const instantStatus = instantIntentStatus(
+      effectiveText,
+      mode,
+      selectedAttachment?.kind,
+    );
+    setInstantIntent(instantStatus);
+
     const codingRequest = isLikelyCodeRequest(effectiveText);
     const projectBuildRequest = isLikelyProjectBuildRequest(effectiveText);
     const zipProjectAttachment = Boolean(
@@ -1330,6 +1392,7 @@ if (shouldUseCodeProject) {
     accessToken,
     (status) => {
       setCodeBuildStatus(status);
+      setInstantIntent("");
       setStreamingStarted(true);
     },
     controller.signal,
@@ -1612,6 +1675,7 @@ if (shouldUseCodeProject) {
         streamAbortRef.current = controller;
 
         const onStreamToken = (token: string) => {
+          setInstantIntent("");
           streamedAnswer += token;
           const inlineCodeSnapshot = extractInlineCode(streamedAnswer);
           if (inlineCodeSnapshot) {
@@ -1750,6 +1814,7 @@ if (shouldUseCodeProject) {
     } finally {
       streamAbortRef.current = null;
       activeCodeJobRef.current = null;
+      setInstantIntent("");
       setStreamingStarted(false);
       setBusy(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
@@ -2475,12 +2540,22 @@ if (shouldUseCodeProject) {
                 ))}
 
                 {busy && !streamingStarted && (
-                  <article className="pv-message pv-message--assistant">
+                  <article
+                    className="pv-message pv-message--assistant"
+                    aria-live="polite"
+                  >
                     <Logo className="pv-assistant-logo" />
-                    <div className="pv-typing" aria-label="Thinking">
-                      <span />
-                      <span />
-                      <span />
+                    <div className="pv-message-body">
+                      {instantIntent ? (
+                        <div className="pv-markdown">
+                          <p>{instantIntent}</p>
+                        </div>
+                      ) : null}
+                      <div className="pv-typing" aria-label="Starting response">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
                     </div>
                   </article>
                 )}
