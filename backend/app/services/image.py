@@ -179,6 +179,44 @@ async def image_cloudflare(prompt: str, settings: Settings) -> dict:
     }
 
 
+async def image_openrouter(prompt: str, settings: Settings) -> dict:
+    if not settings.openrouter_api:
+        raise RuntimeError("OPENROUTER_API is not configured")
+    if not bool(getattr(settings, "openrouter_image_enabled", False)):
+        raise RuntimeError("OPENROUTER_IMAGE_ENABLED is false")
+    model = str(getattr(settings, "openrouter_image_model", "") or "").strip()
+    if not model:
+        raise RuntimeError("OPENROUTER_IMAGE_MODEL is not configured")
+
+    response = await _post_with_retry(
+        "https://openrouter.ai/api/v1/images",
+        headers={
+            "Authorization": f"Bearer {settings.openrouter_api}",
+            "Content-Type": "application/json",
+            "X-Title": settings.app_name,
+        },
+        json_body={"model": model, "prompt": prompt[:8000], "n": 1},
+        form_body=None,
+        timeout_seconds=float(settings.image_timeout_seconds),
+        attempts=int(settings.image_retry_attempts),
+    )
+    if response.is_error:
+        raise _response_error("openrouter", response)
+    try:
+        payload = response.json()
+    except Exception as exc:
+        raise RuntimeError("OpenRouter returned an invalid image response.") from exc
+    rows = payload.get("data") or []
+    item = rows[0] if rows and isinstance(rows[0], dict) else {}
+    url_value = item.get("url")
+    if isinstance(url_value, str) and url_value.strip():
+        return {"url": url_value.strip(), "provider": f"openrouter:{model}"}
+    image_b64 = item.get("b64_json")
+    if isinstance(image_b64, str) and image_b64.strip():
+        media_type = str(item.get("media_type") or "image/png")
+        return {"url": f"data:{media_type};base64,{image_b64.strip()}", "provider": f"openrouter:{model}"}
+    raise RuntimeError("OpenRouter image response contained neither url nor b64_json.")
+
 async def image_huggingface(prompt: str, settings: Settings) -> dict:
     if not settings.hugging_face_inference_api:
         raise RuntimeError("HUGGING_FACE_INFERENCE_API is not configured")
@@ -242,6 +280,7 @@ async def image_deepai(prompt: str, settings: Settings) -> dict:
 async def route_image(provider: str, prompt: str, settings: Settings) -> dict:
     providers: dict[str, Callable[[str, Settings], Awaitable[dict]]] = {
         "cloudflare": image_cloudflare,
+        "openrouter": image_openrouter,
         "huggingface": image_huggingface,
         "deepai": image_deepai,
     }
@@ -249,11 +288,17 @@ async def route_image(provider: str, prompt: str, settings: Settings) -> dict:
     if provider != "auto" and provider not in providers:
         raise RuntimeError(f"Unknown image provider: {provider}")
 
-    order = (
-        [provider]
-        if provider != "auto"
-        else ["cloudflare", "huggingface", "deepai"]
-    )
+    if provider != "auto":
+        order = [provider]
+    else:
+        order = ["cloudflare"]
+        if (
+            bool(getattr(settings, "openrouter_image_enabled", False))
+            and bool(getattr(settings, "openrouter_api", None))
+            and bool(str(getattr(settings, "openrouter_image_model", "") or "").strip())
+        ):
+            order.append("openrouter")
+        order.extend(["huggingface", "deepai"])
 
     errors: list[str] = []
     for name in order:

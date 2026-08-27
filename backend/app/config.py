@@ -25,6 +25,22 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 768
     openrouter_api: str | None = None
     openrouter_model: str = "openai/gpt-4.1-mini"
+
+    # VASUKI_V42_DUAL_PROVIDER_START
+    # Backend-only OpenCode Zen gateway. Keep the API key out of frontend/Vercel.
+    # The default uses a Zen model documented on /chat/completions.
+    # For a stronger paid coding model after enabling Zen billing, set:
+    # OPENCODE_ZEN_MODEL=kimi-k2.7-code
+    opencode_zen_api_key: str | None = None
+    opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
+    opencode_zen_model: str = "north-mini-code-free"
+    opencode_zen_timeout_seconds: float = 45.0
+
+    # OpenRouter chat already uses OPENROUTER_API above.
+    # Image generation is opt-in because it can consume OpenRouter credits.
+    openrouter_image_enabled: bool = False
+    openrouter_image_model: str = ""
+    # VASUKI_V42_DUAL_PROVIDER_END
     mistral_ai_api: str | None = None
     mistral_model: str = "mistral-small-latest"
 

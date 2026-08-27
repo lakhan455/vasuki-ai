@@ -2806,3 +2806,11 @@ async def v41_weather_timezone(
             status_code=503,
             detail=str(exc)[:500],
         ) from exc
+
+# VASUKI_V42_DUAL_PROVIDER_CODING_IMAGE_INTEGRATION
+from app.v42.dual_provider import dual_provider_health
+
+
+@app.get("/health/v42")
+async def health_v42():
+    return dual_provider_health(settings)

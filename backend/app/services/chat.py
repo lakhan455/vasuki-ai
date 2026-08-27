@@ -420,6 +420,36 @@ async def chat_cerebras(
     )
 
 
+async def chat_opencode_zen(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str = "",
+    *,
+    require_current: bool = False,
+    as_of: str | None = None,
+    temperature: float = 0.0,
+) -> str:
+    if not settings.opencode_zen_api_key:
+        raise RuntimeError("OPENCODE_ZEN_API_KEY is not configured")
+    model = str(settings.opencode_zen_model or "").strip()
+    if not model:
+        raise RuntimeError("OPENCODE_ZEN_MODEL is not configured")
+    base_url = str(settings.opencode_zen_base_url or "").strip().rstrip("/")
+    return await _openai_compatible(
+        f"{base_url}/chat/completions",
+        settings.opencode_zen_api_key,
+        model,
+        _openai_messages(
+            messages,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        ),
+        settings,
+        temperature=temperature,
+        token_field="max_tokens",
+    )
+
 async def chat_openrouter(
     messages: list[dict],
     settings: Settings,
@@ -569,6 +599,7 @@ PROVIDERS = {
     "sambanova": chat_sambanova,
     "cerebras": chat_cerebras,
     "gemini": chat_gemini,
+    "opencode_zen": chat_opencode_zen,
     "openrouter": chat_openrouter,
     "mistral": chat_mistral,
 }
@@ -832,6 +863,14 @@ def _stream_provider_config(
             settings.cerebras_api_key or "",
             settings.cerebras_model,
             "max_completion_tokens",
+            {},
+        )
+    if name == "opencode_zen":
+        return (
+            f"{str(settings.opencode_zen_base_url or '').rstrip('/')}/chat/completions",
+            settings.opencode_zen_api_key or "",
+            settings.opencode_zen_model,
+            "max_tokens",
             {},
         )
     if name == "openrouter":
