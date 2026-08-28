@@ -96,6 +96,9 @@ type UiMessage = ChatMessage & {
   imageUrl?: string;
   fileName?: string;
   provider?: string;
+  providerModel?: string;
+  firstTokenMs?: number;
+  durationMs?: number;
   sources?: SourceInfo[];
   artifacts?: SmartFileArtifact[];
 };
@@ -142,6 +145,34 @@ type PendingAttachment = {
 
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze" | "research";
 type AiEngine = "vasuki" | "puter";
+
+/* VASUKI_V45_PROVIDER_BADGE_START */
+function providerDisplayName(value?: string) {
+  const provider = String(value || "").replace(/^cache:/i, "").trim();
+  const labels: Record<string, string> = {
+    opencode_zen: "OpenCode Zen",
+    zai_glm: "Z.AI GLM",
+    groq_fast: "Groq Fast",
+    groq: "Groq",
+    openrouter: "OpenRouter",
+    gemini: "Gemini",
+    mistral: "Mistral",
+    cerebras: "Cerebras",
+    sambanova: "SambaNova",
+  };
+  return labels[provider] || provider || "Vasuki";
+}
+
+function latencyLabel(milliseconds?: number) {
+  if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds)) {
+    return "";
+  }
+  if (milliseconds < 1000) {
+    return `${Math.max(1, Math.round(milliseconds))} ms`;
+  }
+  return `${(milliseconds / 1000).toFixed(milliseconds < 10000 ? 1 : 0)} s`;
+}
+/* VASUKI_V45_PROVIDER_BADGE_END */
 
 /* VASUKI_VOICE_TYPES_START */
 type SpeechRecognitionResultLike = {
@@ -1660,6 +1691,9 @@ if (shouldUseCodeProject) {
         const assistantId = makeId();
         let streamedAnswer = "";
         let providerName = "";
+        let providerModel = "";
+        let firstTokenMs: number | undefined;
+        let durationMs: number | undefined;
         let answerSources: SourceInfo[] = [];
 
         setMessages([
@@ -1729,6 +1763,15 @@ if (shouldUseCodeProject) {
           );
 
           providerName = meta.provider || "";
+          providerModel = meta.provider_model || "";
+          firstTokenMs =
+            typeof meta.first_token_ms === "number"
+              ? meta.first_token_ms
+              : undefined;
+          durationMs =
+            typeof meta.duration_ms === "number"
+              ? meta.duration_ms
+              : undefined;
           answerSources = normaliseSources(meta.sources);
 
           if (typeof meta.daily_remaining === "number") {
@@ -1762,6 +1805,9 @@ if (shouldUseCodeProject) {
             role: "assistant",
             content: answer,
             provider: providerName,
+            providerModel: providerModel || undefined,
+            firstTokenMs,
+            durationMs,
             sources: answerSources,
           },
         ];
@@ -1865,7 +1911,7 @@ if (shouldUseCodeProject) {
       .replace(/^cache:/i, "")
       .trim();
     const priorProvider = [
-      "groq", "groq_fast", "sambanova", "cerebras", "gemini", "openrouter", "mistral",
+      "opencode_zen", "zai_glm", "groq", "groq_fast", "sambanova", "cerebras", "gemini", "openrouter", "mistral",
     ].includes(priorProviderRaw) ? priorProviderRaw : undefined;
 
     const priorMessages = messages.slice(0, assistantIndex);
@@ -2448,6 +2494,28 @@ if (shouldUseCodeProject) {
                           ) : null}
 
                           <SourceStrip sources={message.sources} />
+
+                          {message.provider && (
+                            <div
+                              className="pv-provider-diagnostic"
+                              title="Provider diagnostics"
+                            >
+                              <span>{providerDisplayName(message.provider)}</span>
+                              {message.providerModel ? (
+                                <span>{message.providerModel}</span>
+                              ) : null}
+                              {message.firstTokenMs ? (
+                                <span>
+                                  first token {latencyLabel(message.firstTokenMs)}
+                                </span>
+                              ) : null}
+                              {message.durationMs ? (
+                                <span>
+                                  total {latencyLabel(message.durationMs)}
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
 
                           {message.imageUrl && (
                             <img

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -10,33 +11,49 @@ import httpx
 from app.config import Settings
 from app.services import chat as legacy_chat
 from app.services.chat_v4 import safe_error
+from app.services.router_v7 import base_candidates, classify_route, configured_provider
+# VASUKI_V45_PROVIDER_DIAGNOSTICS_IMPORTS
 
 
 def _provider_order(
     provider: str,
     messages: list[dict[str, Any]],
+    settings: Settings | None = None,
 ) -> list[str]:
     if provider != "auto":
         return [provider]
 
-    if legacy_chat._is_large_request(messages):
-        return [
+    decision = classify_route(messages)
+    if decision.task_type == "code":
+        order = [
+            "opencode_zen",
+            "zai_glm",
             "groq",
-            "sambanova",
             "openrouter",
             "mistral",
             "cerebras",
+            "sambanova",
             "groq_fast",
         ]
+    else:
+        order = base_candidates(decision, "auto")
 
-    return [
+    stream_capable = {
         "groq_fast",
         "groq",
         "sambanova",
+        "cerebras",
+        "opencode_zen",
+        "zai_glm",
         "openrouter",
         "mistral",
-        "cerebras",
-    ]
+    }
+    order = [name for name in order if name in stream_capable]
+
+    if settings is not None:
+        order = [name for name in order if configured_provider(name, settings)]
+
+    return order
 
 
 def build_resume_messages(
@@ -188,7 +205,7 @@ async def route_chat_stream_v5(
     complete_text = ""
     errors: list[str] = []
 
-    for name in _provider_order(provider, messages):
+    for name in _provider_order(provider, messages, settings):
         if not legacy_chat._provider_is_available(name):
             errors.append(f"{name}: cooling down")
             yield {
@@ -200,6 +217,9 @@ async def route_chat_stream_v5(
 
         working_messages = build_resume_messages(messages, complete_text)
         provider_emitted = False
+        attempt_started = time.perf_counter()
+        first_token_ms = 0.0
+        provider_model = ""
 
         try:
             for continuation_index in range(max_continuations + 1):
@@ -239,9 +259,22 @@ async def route_chat_stream_v5(
                             if token:
                                 if not provider_emitted:
                                     provider_emitted = True
+                                    first_token_ms = round(
+                                        (time.perf_counter() - attempt_started) * 1000,
+                                        1,
+                                    )
+                                    try:
+                                        provider_model = legacy_chat._stream_provider_config(
+                                            name,
+                                            settings,
+                                        )[2]
+                                    except Exception:
+                                        provider_model = ""
                                     yield {
                                         "type": "provider",
                                         "provider": name,
+                                        "model": provider_model,
+                                        "first_token_ms": first_token_ms,
                                     }
                                 segment_text += token
                                 complete_text += token
@@ -255,9 +288,22 @@ async def route_chat_stream_v5(
                             if token:
                                 if not provider_emitted:
                                     provider_emitted = True
+                                    first_token_ms = round(
+                                        (time.perf_counter() - attempt_started) * 1000,
+                                        1,
+                                    )
+                                    try:
+                                        provider_model = legacy_chat._stream_provider_config(
+                                            name,
+                                            settings,
+                                        )[2]
+                                    except Exception:
+                                        provider_model = ""
                                     yield {
                                         "type": "provider",
                                         "provider": name,
+                                        "model": provider_model,
+                                        "first_token_ms": first_token_ms,
                                     }
                                 segment_text += token
                                 complete_text += token

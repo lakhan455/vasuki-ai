@@ -212,6 +212,8 @@ async def chat_stream_v5(
 
     async def generate():
         provider_name = ""
+        provider_model = ""
+        first_token_ms = None
         started = time.perf_counter()
 
         try:
@@ -245,9 +247,15 @@ async def chat_stream_v5(
                 event_type = event.get("type")
                 if event_type == "provider":
                     provider_name = event.get("provider", "")
+                    provider_model = event.get("model", "")
+                    first_token_ms = event.get("first_token_ms")
                     yield legacy._sse(
                         "provider",
-                        {"provider": provider_name},
+                        {
+                            "provider": provider_name,
+                            "provider_model": provider_model,
+                            "first_token_ms": first_token_ms,
+                        },
                     )
                 elif event_type == "token":
                     yield legacy._sse(
@@ -284,6 +292,9 @@ async def chat_stream_v5(
                 {
                     "request_id": request_id,
                     "provider": provider_name or "auto",
+                    "provider_model": provider_model,
+                    "first_token_ms": first_token_ms,
+                    "duration_ms": duration_ms,
                     "sources": all_sources,
                     "context_trimmed": context_stats.trimmed,
                     "original_context_chars": context_stats.original_chars,
