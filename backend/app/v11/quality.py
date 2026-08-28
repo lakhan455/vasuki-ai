@@ -115,8 +115,13 @@ async def load_persisted_provider_learning(settings, limit: int=2000) -> int:
     for row in reversed(rows):
         provider=str(row.get("provider") or "")
         task=str(row.get("task_type") or "general")
+        signal_type=str(row.get("signal_type") or "")
+        # V47 stores latency/reliability telemetry in the existing V11 table,
+        # but those runtime metrics must not be treated as answer-quality votes.
+        if signal_type.startswith("v47_runtime_"):
+            continue
         value=float(row.get("signal_value") or 0)
-        if row.get("signal_type")=="feedback_down": value=0.0
+        if signal_type=="feedback_down": value=0.0
         elif value>1.0: value=value/100.0
         with _LOCK:
             if provider: _OBS[task][provider].append(max(0.0,min(1.0,value))); loaded+=1

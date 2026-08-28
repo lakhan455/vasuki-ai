@@ -17,9 +17,12 @@ export type StreamChatMeta = {
   provider?: string;
   provider_model?: string;
   first_token_ms?: number;
+  provider_first_token_ms?: number;
   duration_ms?: number;
   attempt_count?: number;
   adaptive_routing?: boolean;
+  router_version?: string;
+  reliability_score?: number;
   sources?: unknown[];
   request_id?: string;
   context_trimmed?: boolean;

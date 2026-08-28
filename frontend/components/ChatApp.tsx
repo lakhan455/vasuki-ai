@@ -101,6 +101,8 @@ type UiMessage = ChatMessage & {
   durationMs?: number;
   attemptCount?: number;
   adaptiveRouting?: boolean;
+  routerVersion?: string;
+  reliabilityScore?: number;
   sources?: SourceInfo[];
   artifacts?: SmartFileArtifact[];
 };
@@ -1698,6 +1700,8 @@ if (shouldUseCodeProject) {
         let durationMs: number | undefined;
         let attemptCount: number | undefined;
         let adaptiveRouting = false;
+        let routerVersion = "";
+        let reliabilityScore: number | undefined;
         let answerSources: SourceInfo[] = [];
 
         setMessages([
@@ -1781,6 +1785,12 @@ if (shouldUseCodeProject) {
               ? meta.attempt_count
               : undefined;
           adaptiveRouting = meta.adaptive_routing === true;
+          routerVersion =
+            typeof meta.router_version === "string" ? meta.router_version : "";
+          reliabilityScore =
+            typeof meta.reliability_score === "number"
+              ? meta.reliability_score
+              : undefined;
           answerSources = normaliseSources(meta.sources);
 
           if (typeof meta.daily_remaining === "number") {
@@ -1819,6 +1829,8 @@ if (shouldUseCodeProject) {
             durationMs,
             attemptCount,
             adaptiveRouting,
+            routerVersion: routerVersion || undefined,
+            reliabilityScore,
             sources: answerSources,
           },
         ];
@@ -2530,6 +2542,12 @@ if (shouldUseCodeProject) {
                               ) : null}
                               {message.adaptiveRouting ? (
                                 <span>adaptive</span>
+                              ) : null}
+                              {message.routerVersion ? (
+                                <span>{message.routerVersion.toUpperCase()}</span>
+                              ) : null}
+                              {typeof message.reliabilityScore === "number" ? (
+                                <span>health {Math.round(message.reliabilityScore * 100)}%</span>
                               ) : null}
                             </div>
                           )}
