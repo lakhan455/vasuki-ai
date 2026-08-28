@@ -18,6 +18,8 @@ export type StreamChatMeta = {
   provider_model?: string;
   first_token_ms?: number;
   duration_ms?: number;
+  attempt_count?: number;
+  adaptive_routing?: boolean;
   sources?: unknown[];
   request_id?: string;
   context_trimmed?: boolean;
@@ -402,9 +404,10 @@ async function streamAt(
             : "";
         if (token) onToken(token);
       } else if (parsed.event === "provider") {
-        if (typeof parsed.data.provider === "string") {
-          meta.provider = parsed.data.provider;
-        }
+        meta = {
+          ...meta,
+          ...(parsed.data as StreamChatMeta),
+        };
         if (typeof parsed.data.provider_model === "string") {
           meta.provider_model = parsed.data.provider_model;
         }

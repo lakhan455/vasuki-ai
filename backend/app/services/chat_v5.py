@@ -12,6 +12,12 @@ from app.config import Settings
 from app.services import chat as legacy_chat
 from app.services.chat_v4 import safe_error
 from app.services.router_v7 import base_candidates, classify_route, configured_provider
+from app.v46.adaptive_speed import (
+    adaptive_provider_order,
+    first_token_timeout_seconds,
+    record_provider_failure,
+    record_provider_success,
+)
 # VASUKI_V45_PROVIDER_DIAGNOSTICS_IMPORTS
 
 
@@ -19,6 +25,8 @@ def _provider_order(
     provider: str,
     messages: list[dict[str, Any]],
     settings: Settings | None = None,
+    *,
+    exclude_provider: str | None = None,
 ) -> list[str]:
     if provider != "auto":
         return [provider]
@@ -52,6 +60,17 @@ def _provider_order(
 
     if settings is not None:
         order = [name for name in order if configured_provider(name, settings)]
+
+    if exclude_provider:
+        order = [name for name in order if name != exclude_provider]
+
+    if settings is not None:
+        order = adaptive_provider_order(
+            order,
+            decision.task_type,
+            enabled=bool(getattr(settings, "v46_adaptive_speed_enabled", True)),
+            min_samples=int(getattr(settings, "v46_adaptive_min_samples", 2)),
+        )
 
     return order
 
@@ -190,13 +209,17 @@ async def route_chat_stream_v5(
     *,
     require_current: bool = False,
     as_of: str | None = None,
+    cache_bypass: bool = False,
+    exclude_provider: str | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     """True token streaming with continuation and fallback recovery."""
 
     large_request = legacy_chat._is_large_request(messages)
-    first_token_timeout = max(
-        2.0,
-        float(getattr(settings, "first_token_timeout_seconds", 6)),
+    decision = classify_route(messages, require_current=require_current)
+    first_token_timeout = first_token_timeout_seconds(
+        decision.task_type,
+        large_request=large_request,
+        settings=settings,
     )
     max_continuations = max(
         0,
@@ -204,8 +227,14 @@ async def route_chat_stream_v5(
     )
     complete_text = ""
     errors: list[str] = []
+    attempt_count = 0
 
-    for name in _provider_order(provider, messages, settings):
+    for name in _provider_order(
+        provider,
+        messages,
+        settings,
+        exclude_provider=exclude_provider,
+    ):
         if not legacy_chat._provider_is_available(name):
             errors.append(f"{name}: cooling down")
             yield {
@@ -215,6 +244,7 @@ async def route_chat_stream_v5(
             }
             continue
 
+        attempt_count += 1
         working_messages = build_resume_messages(messages, complete_text)
         provider_emitted = False
         attempt_started = time.perf_counter()
@@ -270,11 +300,18 @@ async def route_chat_stream_v5(
                                         )[2]
                                     except Exception:
                                         provider_model = ""
+                                    record_provider_success(
+                                        name,
+                                        first_token_ms,
+                                        decision.task_type,
+                                    )
                                     yield {
                                         "type": "provider",
                                         "provider": name,
                                         "model": provider_model,
                                         "first_token_ms": first_token_ms,
+                                        "attempt_count": attempt_count,
+                                        "adaptive_routing": True,
                                     }
                                 segment_text += token
                                 complete_text += token
@@ -299,11 +336,18 @@ async def route_chat_stream_v5(
                                         )[2]
                                     except Exception:
                                         provider_model = ""
+                                    record_provider_success(
+                                        name,
+                                        first_token_ms,
+                                        decision.task_type,
+                                    )
                                     yield {
                                         "type": "provider",
                                         "provider": name,
                                         "model": provider_model,
                                         "first_token_ms": first_token_ms,
+                                        "attempt_count": attempt_count,
+                                        "adaptive_routing": True,
                                     }
                                 segment_text += token
                                 complete_text += token
@@ -360,6 +404,7 @@ async def route_chat_stream_v5(
 
         except Exception as exc:
             legacy_chat._mark_provider_failure(name, exc, settings)
+            record_provider_failure(name, decision.task_type)
             clean = safe_error(exc)
             errors.append(f"{name}: {clean}")
             yield {
