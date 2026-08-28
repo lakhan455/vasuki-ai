@@ -2830,3 +2830,11 @@ from app.v44.zai_glm import zai_glm_health
 @app.get("/health/v44")
 async def health_v44():
     return zai_glm_health(settings)
+
+# VASUKI_V45_PROVIDER_DIAGNOSTICS_INTEGRATION
+from app.v45.provider_diagnostics import provider_diagnostics_health
+
+
+@app.get("/health/v45")
+async def health_v45():
+    return provider_diagnostics_health()

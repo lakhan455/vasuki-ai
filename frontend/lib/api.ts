@@ -15,6 +15,9 @@ export type ChatMessage = {
 
 export type StreamChatMeta = {
   provider?: string;
+  provider_model?: string;
+  first_token_ms?: number;
+  duration_ms?: number;
   sources?: unknown[];
   request_id?: string;
   context_trimmed?: boolean;
@@ -401,6 +404,12 @@ async function streamAt(
       } else if (parsed.event === "provider") {
         if (typeof parsed.data.provider === "string") {
           meta.provider = parsed.data.provider;
+        }
+        if (typeof parsed.data.provider_model === "string") {
+          meta.provider_model = parsed.data.provider_model;
+        }
+        if (typeof parsed.data.first_token_ms === "number") {
+          meta.first_token_ms = parsed.data.first_token_ms;
         }
       } else if (parsed.event === "meta") {
         meta = {

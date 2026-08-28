@@ -4382,3 +4382,30 @@ button {
     display: none;
   }
 }
+
+/* VASUKI_V45_PROVIDER_BADGE */
+.pv-provider-diagnostic {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 2px;
+  color: #999;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.pv-provider-diagnostic span {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.pv-provider-diagnostic span:first-child {
+  color: #d6d6d6;
+  font-weight: 600;
+}
