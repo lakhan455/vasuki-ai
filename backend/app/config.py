@@ -207,6 +207,25 @@ class Settings(BaseSettings):
     v46_code_first_token_timeout_seconds: float = 2.2
     v46_large_first_token_timeout_seconds: float = 3.0
     # VASUKI_V46_ADAPTIVE_SPEED_END
+
+    # VASUKI_V47_SELF_HEALING_ROUTER_START
+    # V47 learns real runtime speed/reliability, persists sampled signals in
+    # the existing v11_provider_quality table, and opens task-specific circuits
+    # around repeatedly failing providers. No new database migration is needed.
+    v47_reliability_router_enabled: bool = True
+    v47_persistent_learning_enabled: bool = True
+    v47_adaptive_min_samples: int = 2
+    v47_persist_every_n_successes: int = 3
+    v47_persist_timeout_seconds: float = 1.2
+    v47_restore_timeout_seconds: float = 4.0
+    v47_circuit_failure_threshold: int = 2
+    v47_circuit_base_cooldown_seconds: float = 45.0
+    v47_circuit_max_cooldown_seconds: float = 900.0
+    v47_first_token_timeout_floor_seconds: float = 1.0
+    v47_simple_first_token_timeout_max_seconds: float = 3.5
+    v47_code_first_token_timeout_max_seconds: float = 5.5
+    v47_large_first_token_timeout_max_seconds: float = 7.0
+    # VASUKI_V47_SELF_HEALING_ROUTER_END
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0
     error_alert_webhook_url: str | None = None

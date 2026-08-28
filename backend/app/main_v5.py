@@ -214,8 +214,11 @@ async def chat_stream_v5(
         provider_name = ""
         provider_model = ""
         first_token_ms = None
+        provider_first_token_ms = None
         attempt_count = 0
         adaptive_routing = False
+        router_version = ""
+        reliability_score = None
         started = time.perf_counter()
 
         try:
@@ -251,16 +254,22 @@ async def chat_stream_v5(
                     provider_name = event.get("provider", "")
                     provider_model = event.get("model", "")
                     first_token_ms = event.get("first_token_ms")
+                    provider_first_token_ms = event.get("provider_first_token_ms")
                     attempt_count = int(event.get("attempt_count") or 0)
                     adaptive_routing = bool(event.get("adaptive_routing"))
+                    router_version = str(event.get("router_version") or "")
+                    reliability_score = event.get("reliability_score")
                     yield legacy._sse(
                         "provider",
                         {
                             "provider": provider_name,
                             "provider_model": provider_model,
                             "first_token_ms": first_token_ms,
+                            "provider_first_token_ms": provider_first_token_ms,
                             "attempt_count": attempt_count,
                             "adaptive_routing": adaptive_routing,
+                            "router_version": router_version,
+                            "reliability_score": reliability_score,
                         },
                     )
                 elif event_type == "token":
@@ -300,9 +309,12 @@ async def chat_stream_v5(
                     "provider": provider_name or "auto",
                     "provider_model": provider_model,
                     "first_token_ms": first_token_ms,
+                    "provider_first_token_ms": provider_first_token_ms,
                     "duration_ms": duration_ms,
                     "attempt_count": attempt_count,
                     "adaptive_routing": adaptive_routing,
+                    "router_version": router_version,
+                    "reliability_score": reliability_score,
                     "sources": all_sources,
                     "context_trimmed": context_stats.trimmed,
                     "original_context_chars": context_stats.original_chars,

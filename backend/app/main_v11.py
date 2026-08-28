@@ -45,6 +45,12 @@ from app.v13.incidents import recovery_plan
 from app.v13.orchestrator import orchestrate_request
 from app.v13.project_brain import project_snapshot
 from app.v14.runtime import prepare_quality_messages, runtime_health
+from app.v47.reliability_router import (
+    flush_persistence as flush_v47_persistence,
+    load_persisted_reliability,
+    reliability_snapshot as v47_reliability_snapshot,
+    v47_health,
+)
 from app.v15.coding_agent import (
     V15_PROJECT_SYSTEM_PROMPT,
     build_project_prompt,
@@ -95,6 +101,9 @@ async def _v11_release_guard_loop():
 @app.on_event("startup")
 async def v11_startup():
     await load_persisted_provider_learning(settings)
+    # V47 restores sampled runtime latency/reliability without requiring a
+    # separate migration. If Supabase is unavailable, startup remains healthy.
+    await load_persisted_reliability(settings)
     if bool(getattr(settings, "v11_scheduler_enabled", True)):
         _v11_background_tasks.append(asyncio.create_task(_v11_scheduler_loop()))
     if bool(getattr(settings, "v11_auto_rollback_enabled", False)):
@@ -104,6 +113,10 @@ async def v11_startup():
 async def v11_shutdown():
     for task in _v11_background_tasks:
         task.cancel()
+    try:
+        await flush_v47_persistence()
+    except Exception:
+        pass
     try:
         from app.v17.jobs import shutdown_build_jobs
         await shutdown_build_jobs()
@@ -2846,3 +2859,20 @@ from app.v46.adaptive_speed import adaptive_speed_health
 @app.get("/health/v46")
 async def health_v46():
     return adaptive_speed_health(settings)
+
+# VASUKI_V47_SELF_HEALING_ROUTER_INTEGRATION
+@app.get("/health/v47")
+async def health_v47():
+    return v47_health(settings)
+
+
+@app.get("/api/owner/v47/providers/reliability")
+async def v47_provider_reliability(
+    _user: AuthUser = Depends(get_current_user),
+):
+    return {
+        "ok": True,
+        "version": "v47",
+        "runtime": v47_reliability_snapshot(),
+    }
+
