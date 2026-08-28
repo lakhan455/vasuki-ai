@@ -2838,3 +2838,11 @@ from app.v45.provider_diagnostics import provider_diagnostics_health
 @app.get("/health/v45")
 async def health_v45():
     return provider_diagnostics_health()
+
+# VASUKI_V46_ADAPTIVE_SPEED_INTEGRATION
+from app.v46.adaptive_speed import adaptive_speed_health
+
+
+@app.get("/health/v46")
+async def health_v46():
+    return adaptive_speed_health(settings)

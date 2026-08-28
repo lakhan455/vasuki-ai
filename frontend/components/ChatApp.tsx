@@ -99,6 +99,8 @@ type UiMessage = ChatMessage & {
   providerModel?: string;
   firstTokenMs?: number;
   durationMs?: number;
+  attemptCount?: number;
+  adaptiveRouting?: boolean;
   sources?: SourceInfo[];
   artifacts?: SmartFileArtifact[];
 };
@@ -1694,6 +1696,8 @@ if (shouldUseCodeProject) {
         let providerModel = "";
         let firstTokenMs: number | undefined;
         let durationMs: number | undefined;
+        let attemptCount: number | undefined;
+        let adaptiveRouting = false;
         let answerSources: SourceInfo[] = [];
 
         setMessages([
@@ -1772,6 +1776,11 @@ if (shouldUseCodeProject) {
             typeof meta.duration_ms === "number"
               ? meta.duration_ms
               : undefined;
+          attemptCount =
+            typeof meta.attempt_count === "number"
+              ? meta.attempt_count
+              : undefined;
+          adaptiveRouting = meta.adaptive_routing === true;
           answerSources = normaliseSources(meta.sources);
 
           if (typeof meta.daily_remaining === "number") {
@@ -1808,6 +1817,8 @@ if (shouldUseCodeProject) {
             providerModel: providerModel || undefined,
             firstTokenMs,
             durationMs,
+            attemptCount,
+            adaptiveRouting,
             sources: answerSources,
           },
         ];
@@ -2513,6 +2524,12 @@ if (shouldUseCodeProject) {
                                 <span>
                                   total {latencyLabel(message.durationMs)}
                                 </span>
+                              ) : null}
+                              {message.attemptCount && message.attemptCount > 1 ? (
+                                <span>fallback {message.attemptCount - 1}</span>
+                              ) : null}
+                              {message.adaptiveRouting ? (
+                                <span>adaptive</span>
                               ) : null}
                             </div>
                           )}

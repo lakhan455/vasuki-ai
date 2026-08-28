@@ -198,6 +198,15 @@ class Settings(BaseSettings):
     fast_provider_timeout_seconds: int = 4
     first_token_timeout_seconds: float = 1.6
     large_provider_timeout_seconds: int = 45
+
+    # VASUKI_V46_ADAPTIVE_SPEED_START
+    # In-memory latency learning. No extra provider calls and no DB writes.
+    v46_adaptive_speed_enabled: bool = True
+    v46_adaptive_min_samples: int = 2
+    v46_simple_first_token_timeout_seconds: float = 1.25
+    v46_code_first_token_timeout_seconds: float = 2.2
+    v46_large_first_token_timeout_seconds: float = 3.0
+    # VASUKI_V46_ADAPTIVE_SPEED_END
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0
     error_alert_webhook_url: str | None = None
