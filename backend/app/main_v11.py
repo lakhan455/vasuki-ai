@@ -45,6 +45,8 @@ from app.v13.incidents import recovery_plan
 from app.v13.orchestrator import orchestrate_request
 from app.v13.project_brain import project_snapshot
 from app.v14.runtime import prepare_quality_messages, runtime_health
+from app.v48.router import build_router as build_v48_router
+from app.v48.data_analysis import spreadsheet_text as v48_spreadsheet_text
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
     load_persisted_reliability,
@@ -670,6 +672,11 @@ def _extract_upload(name: str,data: bytes)->str:
     if lower.endswith(".docx"):
         doc=Document(io.BytesIO(data))
         return "\n".join(p.text for p in doc.paragraphs)[:80000]
+    if lower.endswith((".xlsx", ".tsv")):
+        try:
+            return v48_spreadsheet_text(name, data, 80000)
+        except Exception:
+            return ""
     if lower.endswith((".txt",".md",".csv",".json",".py",".js",".ts",".tsx",".html",".css")):
         return data.decode("utf-8",errors="replace")[:80000]
     return ""
@@ -742,6 +749,9 @@ async def scheduler_manual_tick(user: AuthUser=Depends(get_current_user)):
     await require_owner(user)
     return {"ok":True,"tick":await scheduler_tick(settings,_scheduled_executor),"note":runtime_note()}
 
+
+# VASUKI_V48_UNIFIED_TOOLS_HUB
+app.include_router(build_v48_router(settings))
 
 # VASUKI_V12_CORE_RELIABILITY
 app.include_router(v12_router)
@@ -2876,3 +2886,25 @@ async def v47_provider_reliability(
         "runtime": v47_reliability_snapshot(),
     }
 
+# VASUKI_V48_DIRECT_ROUTE_FALLBACK_START
+# Deterministic V48 registration fallback.
+# Register only missing path+method route objects directly on the production app.
+_v48_runtime_router = build_v48_router(settings)
+_v48_existing_route_keys = {
+    (
+        getattr(_route, "path", None),
+        tuple(sorted(getattr(_route, "methods", None) or ())),
+    )
+    for _route in app.router.routes
+}
+for _v48_route in _v48_runtime_router.routes:
+    _v48_key = (
+        getattr(_v48_route, "path", None),
+        tuple(sorted(getattr(_v48_route, "methods", None) or ())),
+    )
+    if _v48_key not in _v48_existing_route_keys:
+        app.router.routes.append(_v48_route)
+        _v48_existing_route_keys.add(_v48_key)
+
+app.openapi_schema = None
+# VASUKI_V48_DIRECT_ROUTE_FALLBACK_END

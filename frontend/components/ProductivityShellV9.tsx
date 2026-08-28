@@ -11,6 +11,7 @@ const commands = [
   { label: "New chat", href: "/", keywords: "new chat home" },
   { label: "Image Studio", href: "/images", keywords: "image generate studio" },
   { label: "Document Intelligence", href: "/documents", keywords: "pdf docx document" },
+  { label: "Tools Hub V48", href: "/tools", keywords: "tools data analysis scheduled tasks file library research image voice" },
   { label: "Projects", href: "/projects", keywords: "project workspace code" },
   { label: "Operations Center", href: "/operations", keywords: "jobs notifications usage" },
   { label: "Files", href: "/files", keywords: "downloads artifacts files" },
