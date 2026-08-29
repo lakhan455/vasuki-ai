@@ -554,68 +554,113 @@ async def exa_search(
 
 
 def _select_state_evidence(results: list[dict]) -> list[dict]:
-    ranked = _dedupe_and_rank(results, 8)
+    """Keep enough per-state evidence for deterministic verification.
+
+    V49 originally kept only two sources, which made the result unstable when
+    one snippet was sparse. V49.2 preserves several official and reputable
+    sources while keeping context bounded.
+    """
+    ranked = _dedupe_and_rank(results, 16)
     if not ranked:
         return []
 
     selected: list[dict] = []
-    official = next((item for item in ranked if item.get("source_type") == "official"), None)
-    recent = next(
-        (
-            item for item in sorted(ranked, key=lambda x: -_parse_date(x.get("published_date")))
-            if item.get("source_type") in {"official", "reputable_news"}
-        ),
-        None,
-    )
-    for item in (official, recent, ranked[0]):
-        if item and all(existing.get("url") != item.get("url") for existing in selected):
-            # Two short pieces of evidence per state keep the verifier context manageable.
-            item = dict(item)
-            item["content"] = item.get("content", "")[:1200]
-            selected.append(item)
-        if len(selected) >= 2:
+    seen: set[str] = set()
+
+    def add(item: dict) -> None:
+        url = str(item.get("url") or "")
+        if not url or url in seen:
+            return
+        copied = dict(item)
+        copied["content"] = str(copied.get("content") or "")[:2200]
+        selected.append(copied)
+        seen.add(url)
+
+    for item in ranked:
+        if item.get("source_type") == "official":
+            add(item)
+        if sum(1 for x in selected if x.get("source_type") == "official") >= 3:
             break
+
+    for item in ranked:
+        if item.get("source_type") in {"reputable_news", "trusted_reference", "primary_platform"}:
+            add(item)
+        if len(selected) >= 6:
+            break
+
+    for item in ranked:
+        add(item)
+        if len(selected) >= 7:
+            break
+
     return selected
 
 
-async def _search_one_state_cm(state: str, settings: Settings, as_of: str, semaphore: asyncio.Semaphore) -> list[dict]:
-    cache_key = f"{as_of}:{state.casefold()}"
+
+async def _search_one_state_cm(
+    state: str,
+    settings: Settings,
+    as_of: str,
+    semaphore: asyncio.Semaphore,
+) -> list[dict]:
+    # Versioned cache key so older sparse V49 evidence is never reused after
+    # the V49.2 evidence-pipeline upgrade.
+    cache_key = f"v49.2:{as_of}:{state.casefold()}"
     cached = _STATE_CACHE.get(cache_key)
     if cached and time.monotonic() - cached[0] < _STATE_CACHE_TTL_SECONDS:
         return cached[1]
 
     query = (
-        f"As of {as_of}, who is the current Chief Minister of {state}, India? "
-        "Find the newest official government, oath/appointment, or highly reputable current source. "
-        "Exclude former chief ministers and pages describing a previous administration."
+        f"As of {as_of}, who is the CURRENT serving Chief Minister of {state}, India? "
+        "Return sources that explicitly connect the person's name to the current Chief "
+        "Minister office. Prefer the official state government/CMO/profile or oath/"
+        "appointment source. Exclude deputy CMs, former CMs, opposition leaders and candidates."
     )
+
     async with semaphore:
-        results: list[dict] = []
-        try:
-            results.extend(
-                await tavily_search(
+        jobs = [
+            tavily_search(
+                query,
+                settings,
+                max_results=7,
+                topic="general",
+                search_depth="advanced",
+                entity=state,
+                content_limit=2400,
+            ),
+            tavily_search(
+                query,
+                settings,
+                max_results=7,
+                topic="general",
+                include_domains=("gov.in", "nic.in"),
+                search_depth="advanced",
+                entity=state,
+                content_limit=2400,
+            ),
+        ]
+        if str(getattr(settings, "exa_api", "") or "").strip():
+            jobs.append(
+                exa_search(
                     query,
                     settings,
-                    max_results=5,
-                    topic="general",
-                    search_depth="basic",
+                    max_results=7,
                     entity=state,
-                    content_limit=1600,
+                    content_limit=2400,
                 )
             )
-        except Exception:
-            pass
-        if not results:
-            try:
-                results.extend(
-                    await exa_search(query, settings, max_results=5, entity=state, content_limit=1600)
-                )
-            except Exception:
-                pass
+
+        completed = await asyncio.gather(*jobs, return_exceptions=True)
+
+    results: list[dict] = []
+    for batch in completed:
+        if not isinstance(batch, Exception):
+            results.extend(batch)
 
     evidence = _select_state_evidence(results)
     _STATE_CACHE[cache_key] = (time.monotonic(), evidence)
     return evidence
+
 
 
 async def search_all_india_state_cms(settings: Settings, as_of: str) -> tuple[list[dict], str]:

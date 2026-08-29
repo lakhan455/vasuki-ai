@@ -235,6 +235,40 @@ async def refresh_topic(settings: Any, topic: LiveTopic) -> dict[str, Any]:
     started = time.perf_counter()
     as_of = datetime.now(timezone.utc).date().isoformat()
 
+    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS
+    if (
+        topic.id == "india-state-chief-ministers"
+        and bool(getattr(settings, "v49_1_authoritative_current_facts_enabled", True))
+    ):
+        from app.v49.current_facts import build_verified_india_cm_snapshot
+
+        snapshot = await build_verified_india_cm_snapshot(settings, as_of=as_of)
+        await _upsert_verified(
+            question=topic.question,
+            answer=snapshot.stored_answer[:24000],
+            aliases=list(dict.fromkeys((topic.question, *topic.aliases)))[:10],
+            evidence_urls=snapshot.evidence_urls,
+            dynamic=True,
+            confidence=snapshot.confidence,
+            settings=settings,
+        )
+        row = {
+            "id": topic.id,
+            "ok": True,
+            "authoritative": True,
+            "verified_entities": snapshot.verified_entities,
+            "source_count": len(snapshot.sources),
+            "search_provider": snapshot.search_provider,
+            "answer_provider": snapshot.verifier_provider,
+            "confidence": snapshot.confidence,
+            "refreshed_at": _now_iso(),
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+        }
+        _state["topics"][topic.id] = row
+        _state["refresh_successes"] = int(_state["refresh_successes"]) + 1
+        _state["last_success_at"] = row["refreshed_at"]
+        return row
+
     import app.main as legacy
 
     max_results = max(4, min(16, int(getattr(settings, "v49_search_results_per_topic", 10))))
