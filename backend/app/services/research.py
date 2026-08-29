@@ -298,7 +298,68 @@ def _normalized(query: str) -> str:
 
 def is_all_india_state_cm_query(query: str) -> bool:
     normalized = _normalized(query)
-    return any(term in normalized for term in ALL_STATE_CM_TERMS) or bool(ALL_STATE_CM_REGEX.search(query))
+
+    if any(term in normalized for term in ALL_STATE_CM_TERMS):
+        return True
+    if ALL_STATE_CM_REGEX.search(query):
+        return True
+
+    # V48.1: Roman-Hindi shorthand such as
+    # "ind ke saare cm ki list do 2026 ki" must use the existing
+    # per-state verification path rather than generic web research.
+    india_scope = any(
+        term in normalized
+        for term in (
+            " india ",
+            " indian ",
+            " ind ",
+            " bharat ",
+            " hindustan ",
+            " भारत ",
+            " इंडिया ",
+        )
+    )
+    cm_scope = any(
+        term in normalized
+        for term in (
+            " cm ",
+            " cms ",
+            " chief minister",
+            " chief ministers",
+            " mukhyamantri",
+            " मुख्यमंत्री",
+            " सीएम",
+        )
+    )
+    all_scope = any(
+        term in normalized
+        for term in (
+            " all ",
+            " sabhi ",
+            " sare ",
+            " saare ",
+            " poore ",
+            " pure ",
+            " complete ",
+            " पूरी ",
+            " सभी ",
+            " सारे ",
+        )
+    )
+    list_scope = any(
+        term in normalized
+        for term in (
+            " cm list ",
+            " cms list ",
+            " cm ki list ",
+            " cm ke list ",
+            " list of cm ",
+            " list of cms ",
+            " सूची ",
+        )
+    )
+
+    return bool(india_scope and cm_scope and (all_scope or list_scope))
 
 
 def _is_officeholder_query(query: str) -> bool:
