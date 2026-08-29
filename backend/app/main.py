@@ -657,9 +657,37 @@ async def chat(
 
     strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
 
+    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS
+    authoritative_cm_answer = None
+    if is_all_india_state_cm_query(query):
+        try:
+            from app.v49.current_facts import extract_recent_cm_snapshot
+            authoritative_cm_answer = extract_recent_cm_snapshot(
+                strong_hits,
+                max_age_hours=float(
+                    getattr(settings, "v49_1_cm_snapshot_max_age_hours", 6.0)
+                ),
+            )
+        except Exception:
+            authoritative_cm_answer = None
+
+    if authoritative_cm_answer:
+        return ChatResponse(
+            answer=authoritative_cm_answer,
+            provider="v49.1-authoritative-current-facts",
+            sources=shared_sources,
+            context_trimmed=False,
+            original_context_chars=original_chars,
+            used_context_chars=len(query),
+        )
+
+    if needs_live_web(query):
+        strong_hits, shared_sources, shared_pack = [], [], ""
+
     if (
         strong_hits
         and is_direct_fact_question(query)
+        and not needs_live_web(query)
         and not request.use_web
         and not request.use_documents
     ):
@@ -862,9 +890,34 @@ async def chat_stream(
 
     strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
 
+    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS_STREAM
+    authoritative_cm_answer = None
+    if is_all_india_state_cm_query(query):
+        try:
+            from app.v49.current_facts import extract_recent_cm_snapshot
+            authoritative_cm_answer = extract_recent_cm_snapshot(
+                strong_hits,
+                max_age_hours=float(
+                    getattr(settings, "v49_1_cm_snapshot_max_age_hours", 6.0)
+                ),
+            )
+        except Exception:
+            authoritative_cm_answer = None
+
+    if authoritative_cm_answer:
+        return _direct_stream(
+            authoritative_cm_answer,
+            provider="v49.1-authoritative-current-facts",
+            sources=shared_sources,
+        )
+
+    if needs_live_web(query):
+        strong_hits, shared_sources, shared_pack = [], [], ""
+
     if (
         strong_hits
         and is_direct_fact_question(query)
+        and not needs_live_web(query)
         and not chat_request.use_web
         and not chat_request.use_documents
     ):

@@ -237,6 +237,15 @@ class Settings(BaseSettings):
     v49_min_sources: int = 2
     v49_topic_timeout_seconds: float = 120.0
     v49_default_topics_enabled: bool = True
+
+    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS_START
+    # Current officeholder snapshots are accepted only when every requested
+    # entity is independently supported by current evidence.
+    v49_1_authoritative_current_facts_enabled: bool = True
+    v49_1_cm_snapshot_max_age_hours: float = 6.0
+    v49_1_cm_min_confidence: float = 0.84
+    v49_1_cm_batch_size: int = 4
+    # LLM is only a last-resort CM adjudicator after source checks.\n    v49_1_llm_fallback_enabled: bool = True\n    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS_END
     # VASUKI_V49_CONTINUOUS_LIVE_KNOWLEDGE_END
 
     rate_limit_per_minute: int = 60
