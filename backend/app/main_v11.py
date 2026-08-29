@@ -47,6 +47,8 @@ from app.v13.project_brain import project_snapshot
 from app.v14.runtime import prepare_quality_messages, runtime_health
 from app.v48.router import build_router as build_v48_router
 from app.v48.data_analysis import spreadsheet_text as v48_spreadsheet_text
+from app.v49.live_knowledge import background_loop as v49_live_knowledge_loop
+from app.v49.router import build_router as build_v49_router
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
     load_persisted_reliability,
@@ -108,6 +110,8 @@ async def v11_startup():
     await load_persisted_reliability(settings)
     if bool(getattr(settings, "v11_scheduler_enabled", True)):
         _v11_background_tasks.append(asyncio.create_task(_v11_scheduler_loop()))
+    if bool(getattr(settings, "v49_live_knowledge_enabled", True)):
+        _v11_background_tasks.append(asyncio.create_task(v49_live_knowledge_loop(settings)))
     if bool(getattr(settings, "v11_auto_rollback_enabled", False)):
         _v11_background_tasks.append(asyncio.create_task(_v11_release_guard_loop()))
 
@@ -752,6 +756,9 @@ async def scheduler_manual_tick(user: AuthUser=Depends(get_current_user)):
 
 # VASUKI_V48_UNIFIED_TOOLS_HUB
 app.include_router(build_v48_router(settings))
+
+# VASUKI_V49_CONTINUOUS_LIVE_KNOWLEDGE
+app.include_router(build_v49_router(settings))
 
 # VASUKI_V12_CORE_RELIABILITY
 app.include_router(v12_router)
@@ -2908,3 +2915,21 @@ for _v48_route in _v48_runtime_router.routes:
 
 app.openapi_schema = None
 # VASUKI_V48_DIRECT_ROUTE_FALLBACK_END
+
+# VASUKI_V49_DIRECT_ROUTE_FALLBACK_START
+_v49_runtime_router = build_v49_router(settings)
+_v49_existing_route_keys = {
+    (getattr(_route, "path", None), tuple(sorted(getattr(_route, "methods", None) or ())))
+    for _route in app.router.routes
+}
+for _v49_route in _v49_runtime_router.routes:
+    _v49_key = (
+        getattr(_v49_route, "path", None),
+        tuple(sorted(getattr(_v49_route, "methods", None) or ())),
+    )
+    if _v49_key not in _v49_existing_route_keys:
+        app.router.routes.append(_v49_route)
+        _v49_existing_route_keys.add(_v49_key)
+app.openapi_schema = None
+# VASUKI_V49_DIRECT_ROUTE_FALLBACK_END
+

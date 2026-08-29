@@ -226,6 +226,19 @@ class Settings(BaseSettings):
     v47_code_first_token_timeout_max_seconds: float = 5.5
     v47_large_first_token_timeout_max_seconds: float = 7.0
     # VASUKI_V47_SELF_HEALING_ROUTER_END
+    # VASUKI_V49_CONTINUOUS_LIVE_KNOWLEDGE_START
+    # Budget-aware background freshness collector. Reuses existing web research
+    # credentials and existing verified Supabase global knowledge.
+    v49_live_knowledge_enabled: bool = True
+    v49_refresh_interval_seconds: int = 7200
+    v49_startup_delay_seconds: int = 20
+    v49_topics_per_cycle: int = 2
+    v49_search_results_per_topic: int = 10
+    v49_min_sources: int = 2
+    v49_topic_timeout_seconds: float = 120.0
+    v49_default_topics_enabled: bool = True
+    # VASUKI_V49_CONTINUOUS_LIVE_KNOWLEDGE_END
+
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0
     error_alert_webhook_url: str | None = None

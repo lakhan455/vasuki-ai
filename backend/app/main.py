@@ -222,6 +222,15 @@ async def _web_context(
         or research_mode
         or runtime.intelligence.needs_current
     )
+
+    # VASUKI_V49_CONTINUOUS_LIVE_KNOWLEDGE
+    if require_current:
+        try:
+            from app.v49.live_knowledge import observe_current_query
+            observe_current_query(query)
+        except Exception:
+            pass
+
     should_search = (
         request.use_web
         or require_current
@@ -690,7 +699,11 @@ async def chat(
         )
 
     missing = _missing_state_evidence(query, web_sources)
-    if missing:
+    has_fresh_dynamic_knowledge = any(
+        bool(getattr(hit, "dynamic", False))
+        for hit in strong_hits
+    )
+    if missing and not has_fresh_dynamic_knowledge:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -884,7 +897,11 @@ async def chat_stream(
         )
 
     missing = _missing_state_evidence(query, web_sources)
-    if missing:
+    has_fresh_dynamic_knowledge = any(
+        bool(getattr(hit, "dynamic", False))
+        for hit in strong_hits
+    )
+    if missing and not has_fresh_dynamic_knowledge:
         return _direct_stream(
             (
                 "The complete list could not be safely verified because live "

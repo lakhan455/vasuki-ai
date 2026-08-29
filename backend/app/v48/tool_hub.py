@@ -17,6 +17,15 @@ def tool_hub_health(settings: Any) -> dict[str, Any]:
         str(getattr(settings, "v11_video_api_base_url", "") or "").strip()
         and str(getattr(settings, "v11_video_api_key", "") or "").strip()
     )
+    live_search_ready = bool(
+        str(getattr(settings, "tavily_api_key", "") or "").strip()
+        or str(getattr(settings, "exa_api", "") or "").strip()
+        or (
+            bool(getattr(settings, "omniroute_enabled", False))
+            and bool(getattr(settings, "omniroute_search_enabled", False))
+            and str(getattr(settings, "omniroute_base_url", "") or "").strip()
+        )
+    )
     return {
         "ok": True,
         "version": "v48",
@@ -24,6 +33,12 @@ def tool_hub_health(settings: Any) -> dict[str, Any]:
         "tools": [
             {"id": "web-search", "name": "Web Search", "status": "ready", "native": True},
             {"id": "deep-research", "name": "Deep Research", "status": "ready", "native": True},
+            {
+                "id": "live-knowledge",
+                "name": "Continuous Live Knowledge",
+                "status": "ready" if (supabase_ready and live_search_ready) else "needs-search-or-supabase",
+                "native": True,
+            },
             {"id": "image-generation", "name": "Image Generation", "status": "ready", "native": True},
             {"id": "image-editing", "name": "Image Editing + Vision", "status": "ready", "native": True},
             {"id": "file-analysis", "name": "File Analysis", "status": "ready", "native": True},
