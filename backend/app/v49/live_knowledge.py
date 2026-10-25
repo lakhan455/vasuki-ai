@@ -10,6 +10,8 @@ from typing import Any
 
 from app.services.knowledge import _upsert_verified
 from app.services.research import INDIA_STATES
+from app.v50.telemetry import persist_checkpoint, record_degraded, restore_checkpoint
+from app.v50.truth import assess_current_evidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,6 +288,27 @@ async def refresh_topic(settings: Any, topic: LiveTopic) -> dict[str, Any]:
             f"Not enough current evidence for {topic.id}: {len(sources)} source(s)."
         )
 
+    assessment = assess_current_evidence(
+        topic.question,
+        sources,
+        require_current=True,
+        min_sources=max(
+            min_sources,
+            int(getattr(settings, "v50_truth_min_sources", 2)),
+        ),
+        min_domains=int(getattr(settings, "v50_truth_min_domains", 2)),
+    )
+    if (
+        bool(getattr(settings, "v50_generic_truth_guard_enabled", True))
+        and not assessment.safe_to_store
+    ):
+        raise RuntimeError(
+            f"V50 refused to persist weak current evidence for {topic.id}: "
+            + "; ".join(
+                assessment.issues or ("insufficient evidence quality",)
+            )
+        )
+
     if topic.require_all_india_state_entities:
         found = _entity_coverage(sources)
         missing = [state for state in INDIA_STATES if state.casefold() not in found]
@@ -332,7 +355,7 @@ Rules:
         aliases=list(dict.fromkeys((topic.question, *topic.aliases)))[:10],
         evidence_urls=_unique_urls(sources),
         dynamic=True,
-        confidence=0.86,
+        confidence=assessment.confidence,
         settings=settings,
     )
 
@@ -343,6 +366,7 @@ Rules:
         "source_count": len(sources),
         "search_provider": provider,
         "answer_provider": answer_provider,
+        "evidence_quality": assessment.to_dict(),
         "refreshed_at": _now_iso(),
         "latency_ms": elapsed_ms,
     }
@@ -406,6 +430,20 @@ async def refresh_cycle(settings: Any) -> dict[str, Any]:
     finally:
         _state["running"] = False
         _state["last_cycle_finished_at"] = _now_iso()
+        await persist_checkpoint(
+            settings,
+            "live_knowledge",
+            {
+                "last_cycle_started_at": _state["last_cycle_started_at"],
+                "last_cycle_finished_at": _state["last_cycle_finished_at"],
+                "last_success_at": _state["last_success_at"],
+                "cycles": int(_state["cycles"]),
+                "refresh_successes": int(_state["refresh_successes"]),
+                "refresh_failures": int(_state["refresh_failures"]),
+                "last_error": str(_state["last_error"])[:1200],
+                "topics": dict(_state["topics"]),
+            },
+        )
 
     return {"ok": any(bool(item.get("ok")) for item in results), "results": results}
 
@@ -434,6 +472,22 @@ async def refresh_now(
 
 
 async def background_loop(settings: Any) -> None:
+    restored = await restore_checkpoint(settings, "live_knowledge")
+    if isinstance(restored, dict):
+        for key in (
+            "last_cycle_started_at",
+            "last_cycle_finished_at",
+            "last_success_at",
+            "cycles",
+            "refresh_successes",
+            "refresh_failures",
+            "last_error",
+            "topics",
+        ):
+            if key in restored:
+                _state[key] = restored[key]
+        _state["running"] = False
+
     delay = max(5, min(300, int(getattr(settings, "v49_startup_delay_seconds", 20))))
     await asyncio.sleep(delay)
     while True:
@@ -443,6 +497,7 @@ async def background_loop(settings: Any) -> None:
             raise
         except Exception as exc:
             _state["last_error"] = str(exc)[:1200]
+            record_degraded("live_knowledge", "background_cycle", exc)
         interval = max(900, int(getattr(settings, "v49_refresh_interval_seconds", 7200)))
         await asyncio.sleep(interval)
 
@@ -474,7 +529,7 @@ def live_knowledge_status(settings: Any) -> dict[str, Any]:
             "last_error": str(_state["last_error"]),
             "topics": dict(_state["topics"]),
         },
-        "persistence": "existing Supabase verified global knowledge",
+        "persistence": "verified global knowledge + V50 durable runtime checkpoint",
         "query_learning": "public freshness-sensitive queries are queued for background refresh",
         "privacy": "email/phone/password/token-like queries are not promoted to shared knowledge",
         "new_database_migration_required": False,
