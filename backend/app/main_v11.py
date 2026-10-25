@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import secrets
 import time
 import zipfile
 from typing import Any
 
-from fastapi import Body, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import Body, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
@@ -47,8 +48,11 @@ from app.v13.project_brain import project_snapshot
 from app.v14.runtime import prepare_quality_messages, runtime_health
 from app.v48.router import build_router as build_v48_router
 from app.v48.data_analysis import spreadsheet_text as v48_spreadsheet_text
-from app.v49.live_knowledge import background_loop as v49_live_knowledge_loop
+from app.v49.live_knowledge import background_loop as v49_live_knowledge_loop, refresh_now as v49_refresh_now
 from app.v49.router import build_router as build_v49_router
+from app.v50.production_core import health_snapshot as v50_health_snapshot
+from app.v50.telemetry import record_degraded
+from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
     load_persisted_reliability,
@@ -77,8 +81,8 @@ async def _v11_scheduler_loop():
         await asyncio.sleep(max(30, int(getattr(settings, "v11_scheduler_poll_seconds", 60))))
         try:
             await scheduler_tick(settings, _scheduled_executor)
-        except Exception:
-            pass
+        except Exception as exc:
+            record_degraded("scheduler", "scheduler_tick", exc)
 
 async def _v11_release_guard_loop():
     global _v11_last_rollback_at
@@ -99,8 +103,8 @@ async def _v11_release_guard_loop():
             result=await rollback(settings,reason=f"V11 automatic guard: error_pct={snap.get('error_pct')} threshold={threshold}")
             if result.get("triggered"):
                 _v11_last_rollback_at=now
-        except Exception:
-            pass
+        except Exception as exc:
+            record_degraded("release_guard", "auto_rollback", exc)
 
 @app.on_event("startup")
 async def v11_startup():
@@ -126,8 +130,29 @@ async def v11_shutdown():
     try:
         from app.v17.jobs import shutdown_build_jobs
         await shutdown_build_jobs()
-    except Exception:
-        pass
+    except Exception as exc:
+        record_degraded("shutdown", "build_jobs", exc, severity="info")
+
+
+@app.get("/health/v50")
+async def health_v50() -> dict[str, Any]:
+    return v50_health_snapshot(settings)
+
+
+@app.post("/internal/v50/live-refresh")
+async def v50_external_live_refresh(
+    x_vasuki_cron_secret: str = Header(default="", alias="X-Vasuki-Cron-Secret"),
+) -> dict[str, Any]:
+    expected = str(getattr(settings, "v50_cron_secret", "") or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="V50 external scheduler is not configured.",
+        )
+    supplied = str(x_vasuki_cron_secret or "")
+    if not supplied or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(status_code=403, detail="Invalid scheduler credential.")
+    return await v49_refresh_now(settings)
 
 
 # V11 provider quality learning becomes part of Vasuki's existing V7/V10 router.
@@ -173,12 +198,18 @@ async def route_chat_stream_v11(
         try:
             query=last_user_query(messages)
             task=classify_route(messages,require_current=require_current).task_type
-            automatic=judge_answer(query,complete,sources=[])
+            grounding_sources=extract_sources_from_context(web_context)
+            automatic=judge_answer(query,complete,sources=grounding_sources)
             verification=verify_answer(
                 query,
                 complete,
-                sources=[],
+                sources=grounding_sources,
                 current_required=require_current,
+            )
+            fact_check=(
+                citation_fact_check(complete,grounding_sources)
+                if grounding_sources
+                else {"coverage":0.0,"claim_count":0,"risk":"unknown"}
             )
             combined_score=min(
                 float(automatic["overall"]),
@@ -198,6 +229,9 @@ async def route_chat_stream_v11(
                     "chars":len(complete),
                     "v13_retry_recommended":verification.needs_retry,
                     "v13_issues":list(verification.issues),
+                    "v50_grounding_sources":len(grounding_sources),
+                    "v50_claim_coverage":float(fact_check.get("coverage") or 0.0),
+                    "v50_fact_check_risk":str(fact_check.get("risk") or "unknown"),
                 },
             )
         except Exception:
@@ -227,10 +261,11 @@ async def route_chat_v11(
     if provider == "auto":
         try:
             query=last_user_query(messages)
+            grounding_sources=extract_sources_from_context(web_context)
             review=critic_review(
                 query,
                 answer,
-                sources=[{"type":"provided_context"}] if web_context.strip() else [],
+                sources=grounding_sources,
                 current_required=require_current,
             )
             issue_text=" ".join(review.issues).casefold()

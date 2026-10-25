@@ -20,9 +20,9 @@ FRESHNESS_TERMS = (
     "weather", "release date", "version", "ceo", "president", "prime minister",
     "chief minister", "minister", "governor", "office holder", "law", "rule", "regulation",
     "election", "result", "winner", "cabinet", "appointment", "resigned", "sworn in",
-    "à¤…à¤­à¥€", "à¤µà¤°à¥à¤¤à¤®à¤¾à¤¨", "à¤µà¤°à¥à¤¤à¤®à¤¾à¤¨ à¤®à¥‡à¤‚", "à¤†à¤œ", "à¤¨à¤µà¥€à¤¨à¤¤à¤®", "à¤²à¥‡à¤Ÿà¥‡à¤¸à¥à¤Ÿ", "à¤¤à¤¾à¤œà¤¾", "à¤¤à¤¾à¤œà¤¼à¤¾",
-    "à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤ªà¥à¤°à¤§à¤¾à¤¨à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¤ªà¤¤à¤¿", "à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤°à¤¾à¤œà¥à¤¯à¤ªà¤¾à¤²", "à¤¸à¥€à¤à¤®", "à¤•à¥€à¤®à¤¤",
-    "à¤®à¥Œà¤¸à¤®", "à¤¸à¥à¤•à¥‹à¤°", "à¤¶à¥‡à¤¡à¥à¤¯à¥‚à¤²", "à¤°à¤¿à¤²à¥€à¤œ", "à¤¨à¤¿à¤¯à¤®", "à¤•à¤¾à¤¨à¥‚à¤¨", "à¤šà¥à¤¨à¤¾à¤µ", "à¤¨à¤¤à¥€à¤œà¥‡",
+    "अभी", "वर्तमान", "वर्तमान में", "आज", "नवीनतम", "लेटेस्ट", "ताजा", "ताज़ा",
+    "मुख्यमंत्री", "प्रधानमंत्री", "राष्ट्रपति", "मंत्री", "राज्यपाल", "सीएम", "कीमत",
+    "मौसम", "स्कोर", "शेड्यूल", "रिलीज", "नियम", "कानून", "चुनाव", "नतीजे",
 )
 
 DYNAMIC_FACT_TERMS = (
@@ -35,37 +35,37 @@ DYNAMIC_FACT_TERMS = (
 )
 
 OFFICEHOLDER_TERMS = (
-    "chief minister", "à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", " cm ", "president", "à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¤ªà¤¤à¤¿", "prime minister",
-    "à¤ªà¥à¤°à¤§à¤¾à¤¨à¤®à¤‚à¤¤à¥à¤°à¥€", "governor", "à¤°à¤¾à¤œà¥à¤¯à¤ªà¤¾à¤²", "minister", "à¤®à¤‚à¤¤à¥à¤°à¥€", "ceo", "chairman",
+    "chief minister", "मुख्यमंत्री", " cm ", "president", "राष्ट्रपति", "prime minister",
+    "प्रधानमंत्री", "governor", "राज्यपाल", "minister", "मंत्री", "ceo", "chairman",
     "mayor", "office holder", "mukhyamantri", "pradhanmantri", "rashtrapati",
-    "rajyapal", "mantri", "à¤¸à¥€ à¤à¤®", "cm of", "who is the cm", "kon cm", "ka cm",
+    "rajyapal", "mantri", "सी एम", "cm of", "who is the cm", "kon cm", "ka cm",
 )
 
 INDIA_TERMS = (
-    "india", "indian", " ind ", "bharat", "à¤­à¤¾à¤°à¤¤", "à¤‡à¤‚à¤¡à¤¿à¤¯à¤¾", "rajasthan", "à¤°à¤¾à¤œà¤¸à¥à¤¥à¤¾à¤¨",
-    "tamil nadu", "à¤¤à¤®à¤¿à¤²à¤¨à¤¾à¤¡à¥", "state", "states", "à¤°à¤¾à¤œà¥à¤¯", "union territory",
-    "à¤•à¥‡à¤‚à¤¦à¥à¤° à¤¶à¤¾à¤¸à¤¿à¤¤", "chief minister", "à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", " cm ",
+    "india", "indian", " ind ", "bharat", "भारत", "इंडिया", "rajasthan", "राजस्थान",
+    "tamil nadu", "तमिलनाडु", "state", "states", "राज्य", "union territory",
+    "केंद्र शासित", "chief minister", "मुख्यमंत्री", " cm ",
 )
 
 ALL_STATE_CM_TERMS = (
     "all state cm", "all states cm", "all state chief minister", "all states chief minister",
     "chief ministers of all states", "all indian states cm", "all india state cm",
-    "à¤¸à¤­à¥€ à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤•à¥‡ à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤¸à¤¾à¤°à¥‡ à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤•à¥‡ à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€", "à¤¸à¤­à¥€ à¤°à¤¾à¤œà¥à¤¯ à¤•à¥‡ à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€",
-    "à¤°à¤¾à¤œà¥à¤¯à¥‹à¤‚ à¤•à¥‡ à¤¸à¥€à¤à¤®", "sabhi rajya ke cm", "sabhi rajyon ke cm", "sare state ke cm",
+    "सभी राज्यों के मुख्यमंत्री", "सारे राज्यों के मुख्यमंत्री", "सभी राज्य के मुख्यमंत्री",
+    "राज्यों के सीएम", "sabhi rajya ke cm", "sabhi rajyon ke cm", "sare state ke cm",
     "all state ke cm", "all states ke cm", "state ke cm ki list", "all cm list",
 )
 
 # User's spelling/roman-Hindi variants are intentionally covered.
 ALL_STATE_CM_REGEX = re.compile(
-    r"(?:all|sabhi|sare|saare|à¤¸à¤­à¥€|à¤¸à¤¾à¤°à¥‡).{0,30}(?:state|states|rajya|rajyon|à¤°à¤¾à¤œà¥à¤¯).{0,30}"
-    r"(?:cm|chief\s*minister|mukhyamantri|à¤®à¥à¤–à¥à¤¯à¤®à¤‚à¤¤à¥à¤°à¥€|à¤¸à¥€à¤à¤®)",
+    r"(?:all|sabhi|sare|saare|सभी|सारे).{0,30}(?:state|states|rajya|rajyon|राज्य).{0,30}"
+    r"(?:cm|chief\s*minister|mukhyamantri|मुख्यमंत्री|सीएम)",
     re.IGNORECASE | re.DOTALL,
 )
 
 FACTUAL_PREFIXES = (
     "who ", "what ", "when ", "where ", "which ", "how many ", "how much ",
     "tell me", "give me", "list ", "name ", "is ", "are ",
-    "à¤•à¥Œà¤¨", "à¤•à¥à¤¯à¤¾", "à¤•à¤¬", "à¤•à¤¹à¤¾à¤", "à¤•à¤¿à¤¤à¤¨à¥‡", "à¤¬à¤¤à¤¾à¤“", "à¤¸à¥‚à¤šà¥€", "à¤¨à¤¾à¤®",
+    "कौन", "क्या", "कब", "कहाँ", "कितने", "बताओ", "सूची", "नाम",
     "kon", "kya", "kab", "kaha", "kitne", "batao", "list do", "name do",
 )
 

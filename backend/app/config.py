@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
-    groq_fast_model: str = "llama-3.1-8b-instant"
+    groq_fast_model: str = "openai/gpt-oss-20b"
     sambanova_api_key: str | None = None
     sambanova_model: str = "gpt-oss-120b"
     sambanova_base_url: str = "https://api.sambanova.ai/v1"
@@ -245,8 +245,33 @@ class Settings(BaseSettings):
     v49_1_cm_snapshot_max_age_hours: float = 6.0
     v49_1_cm_min_confidence: float = 0.84
     v49_1_cm_batch_size: int = 4
-    # LLM is only a last-resort CM adjudicator after source checks.\n    v49_1_llm_fallback_enabled: bool = True\n    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS_END
+    # LLM is only a last-resort CM adjudicator after source checks.
+    v49_1_llm_fallback_enabled: bool = True
+    # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS_END
     # VASUKI_V49_CONTINUOUS_LIVE_KNOWLEDGE_END
+
+    # VASUKI_V50_PRODUCTION_INTELLIGENCE_CORE_START
+    v50_production_core_enabled: bool = True
+    v50_generic_truth_guard_enabled: bool = True
+    v50_truth_min_sources: int = 2
+    v50_truth_min_domains: int = 2
+    v50_persist_runtime_state: bool = True
+    v50_model_fallback_enabled: bool = True
+
+    # Model fallbacks are attempted only when a selected model is unavailable
+    # or quota-gated. Provider/API-key auth failures still fail fast.
+    v50_groq_fast_fallback_models: str = ""
+    v50_groq_fallback_models: str = ""
+    v50_sambanova_fallback_models: str = ""
+    v50_cerebras_fallback_models: str = ""
+    v50_opencode_zen_fallback_models: str = ""
+    v50_zai_glm_fallback_models: str = ""
+    v50_openrouter_fallback_models: str = "z-ai/glm-5.2:free"
+    v50_mistral_fallback_models: str = ""
+
+    # Optional backend-only secret for an external scheduler.
+    v50_cron_secret: str | None = None
+    # VASUKI_V50_PRODUCTION_INTELLIGENCE_CORE_END
 
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0

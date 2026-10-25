@@ -1,0 +1,21 @@
+name: V50 Production Canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  v50-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check V50 health and optional live refresh
+        env:
+          VASUKI_CANARY_BASE_URL: ${{ secrets.VASUKI_CANARY_BASE_URL }}
+          VASUKI_V50_CRON_SECRET: ${{ secrets.VASUKI_V50_CRON_SECRET }}
+        run: python scripts/v50_canary.py

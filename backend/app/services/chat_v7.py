@@ -1,3 +1,4 @@
+# VASUKI_V50_MODEL_FALLBACK_TELEMETRY
 from __future__ import annotations
 import asyncio, hashlib, time
 from collections.abc import AsyncIterator
@@ -321,6 +322,9 @@ async def route_chat_stream_v7(
                         while pending:
                             e = pending.pop(0)
                             if e.get("type") == "token":
+                                event_model = str(e.get("model") or "")
+                                if event_model:
+                                    provider_model = event_model
                                 token = e.get("token", "")
                                 if token:
                                     if not emitted:
@@ -354,6 +358,9 @@ async def route_chat_stream_v7(
 
                         async for e in it:
                             if e.get("type") == "token":
+                                event_model = str(e.get("model") or "")
+                                if event_model:
+                                    provider_model = event_model
                                 token = e.get("token", "")
                                 if token:
                                     if not emitted:

@@ -106,11 +106,16 @@ async def _stream_provider_segment(
     as_of: str | None,
     large_request: bool,
 ) -> AsyncIterator[dict[str, str]]:
-    url, api_key, model, token_field, extra_headers = (
+    url, api_key, primary_model, token_field, extra_headers = (
         legacy_chat._stream_provider_config(name, settings)
     )
     if not api_key:
         raise RuntimeError(f"{name} API key is not configured")
+
+    from app.v50.provider_guard import model_candidates, should_try_model_fallback
+    from app.v50.telemetry import record_degraded
+
+    models = model_candidates(name, settings, primary=primary_model) or [primary_model]
 
     output_limit = (
         min(settings.max_fast_output_tokens, settings.max_output_tokens)
@@ -127,78 +132,118 @@ async def _stream_provider_segment(
         )
     )
 
-    payload = {
-        "model": model,
-        "messages": legacy_chat._openai_messages(
-            messages,
-            web_context,
-            require_current=require_current,
-            as_of=as_of,
-        ),
-        "temperature": 0.0 if require_current else 0.2,
-        token_field: output_limit,
-        "stream": True,
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        **extra_headers,
-    }
+    errors: list[str] = []
+    for model_index, model in enumerate(models):
+        emitted_any = False
+        finish_reason = ""
+        payload = {
+            "model": model,
+            "messages": legacy_chat._openai_messages(
+                messages,
+                web_context,
+                require_current=require_current,
+                as_of=as_of,
+            ),
+            "temperature": 0.0 if require_current else 0.2,
+            token_field: output_limit,
+            "stream": True,
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            **extra_headers,
+        }
 
-    finish_reason = ""
-
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(
-            timeout_seconds,
-            connect=min(10.0, timeout_seconds),
-            read=timeout_seconds,
-            write=min(15.0, timeout_seconds),
-            pool=min(10.0, timeout_seconds),
-        )
-    ) as client:
-        async with client.stream(
-            "POST",
-            url,
-            headers=headers,
-            json=payload,
-        ) as response:
-            if response.is_error:
-                raw = (
-                    await response.aread()
-                ).decode("utf-8", errors="replace")
-                raise RuntimeError(
-                    f"{response.status_code} from {model}: {raw[:900]}"
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(
+                    timeout_seconds,
+                    connect=min(10.0, timeout_seconds),
+                    read=timeout_seconds,
+                    write=min(15.0, timeout_seconds),
+                    pool=min(10.0, timeout_seconds),
                 )
+            ) as client:
+                async with client.stream(
+                    "POST",
+                    url,
+                    headers=headers,
+                    json=payload,
+                ) as response:
+                    if response.is_error:
+                        raw = (await response.aread()).decode("utf-8", errors="replace")
+                        message = f"{response.status_code} from {model}: {raw[:900]}"
+                        errors.append(message)
+                        if (
+                            model_index + 1 < len(models)
+                            and should_try_model_fallback(
+                                status_code=response.status_code,
+                                error_text=raw,
+                            )
+                        ):
+                            record_degraded(
+                                "provider_model",
+                                f"{name}:{model}",
+                                message,
+                                severity="info",
+                                metadata={"fallback_to": models[model_index + 1]},
+                            )
+                            continue
+                        raise RuntimeError(message)
 
-            async for line in response.aiter_lines():
-                line = line.strip()
-                if not line or not line.startswith("data:"):
-                    continue
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line or not line.startswith("data:"):
+                            continue
+                        data_text = line[5:].strip()
+                        if data_text == "[DONE]":
+                            break
+                        try:
+                            packet = json.loads(data_text)
+                        except json.JSONDecodeError:
+                            continue
+                        choices = packet.get("choices") or []
+                        if not choices:
+                            continue
+                        choice = choices[0] or {}
+                        reason = choice.get("finish_reason")
+                        if reason is not None:
+                            finish_reason = str(reason)
+                        delta = choice.get("delta") or {}
+                        token = delta.get("content")
+                        if token:
+                            emitted_any = True
+                            yield {
+                                "type": "token",
+                                "token": str(token),
+                                "model": model,
+                            }
 
-                data_text = line[5:].strip()
-                if data_text == "[DONE]":
-                    break
+            yield {"type": "finish", "reason": finish_reason, "model": model}
+            return
 
-                try:
-                    packet = json.loads(data_text)
-                except json.JSONDecodeError:
-                    continue
+        except Exception as exc:
+            errors.append(f"{type(exc).__name__}: {str(exc)[:900]}")
+            if emitted_any:
+                raise
+            if (
+                model_index + 1 < len(models)
+                and should_try_model_fallback(error_text=str(exc))
+            ):
+                record_degraded(
+                    "provider_model",
+                    f"{name}:{model}",
+                    exc,
+                    severity="info",
+                    metadata={"fallback_to": models[model_index + 1]},
+                )
+                continue
+            raise
 
-                choices = packet.get("choices") or []
-                if not choices:
-                    continue
+    raise RuntimeError(
+        f"{name} model candidates failed: " + " | ".join(errors[-4:])
+    )
 
-                choice = choices[0] or {}
-                reason = choice.get("finish_reason")
-                if reason is not None:
-                    finish_reason = str(reason)
-
-                delta = choice.get("delta") or {}
-                token = delta.get("content")
-                if token:
-                    yield {"type": "token", "token": str(token)}
-
-    yield {"type": "finish", "reason": finish_reason}
 
 
 async def route_chat_stream_v5(

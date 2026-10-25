@@ -72,6 +72,13 @@ from app.services.research import (
 )
 from app.services.vision import process_vision_request
 from app.v14.runtime import decide_runtime, try_fast_calculation
+from app.v50.telemetry import record_degraded
+from app.v50.truth import (
+    assess_current_evidence,
+    evidence_policy_context,
+    should_fail_closed,
+    truth_guard_message,
+)
 
 
 settings = get_settings()
@@ -160,7 +167,8 @@ async def _private_context(
                 ),
                 timeout=1.8,
             )
-        except Exception:
+        except Exception as exc:
+            record_degraded("personal_memory", "load_context", exc)
             personal_pack = ""
 
     if request.use_documents:
@@ -176,7 +184,8 @@ async def _private_context(
                 timeout=18.0,
             )
             document_pack, document_sources = document_context(hits)
-        except Exception:
+        except Exception as exc:
+            record_degraded("document_rag", "search_context", exc)
             document_pack, document_sources = "", []
 
     return _join_context(personal_pack, document_pack), document_sources
@@ -190,7 +199,8 @@ async def _shared_knowledge(
             find_verified_knowledge(query, settings),
             timeout=0.8,
         )
-    except Exception:
+    except Exception as exc:
+        record_degraded("shared_knowledge", "lookup", exc)
         memory_hits = []
 
     strong_memory_hits = [
@@ -252,7 +262,8 @@ async def _web_context(
             ),
             timeout=min(float(settings.web_search_timeout_seconds), 18.0),
         )
-    except Exception:
+    except Exception as exc:
+        record_degraded("live_search", "search_web", exc)
         sources = []
 
     if not sources:
@@ -272,6 +283,29 @@ async def _web_context(
 
     return require_current, sources, "\n\n".join(parts)
 
+
+
+def _v50_current_guard(
+    query: str,
+    sources: list[dict[str, Any]],
+    *,
+    require_current: bool,
+):
+    assessment = assess_current_evidence(
+        query,
+        sources,
+        require_current=require_current,
+        min_sources=int(getattr(settings, "v50_truth_min_sources", 2)),
+        min_domains=int(getattr(settings, "v50_truth_min_domains", 2)),
+    )
+    return (
+        assessment,
+        evidence_policy_context(assessment) if require_current else "",
+        bool(
+            getattr(settings, "v50_generic_truth_guard_enabled", True)
+            and should_fail_closed(assessment)
+        ),
+    )
 
 def _missing_state_evidence(
     query: str,
@@ -521,11 +555,19 @@ async def research(
     except Exception:
         results, provider = [], "search-unavailable"
 
+    assessment = assess_current_evidence(
+        request.query,
+        results,
+        require_current=require_current,
+        min_sources=int(getattr(settings, "v50_truth_min_sources", 2)),
+        min_domains=int(getattr(settings, "v50_truth_min_domains", 2)),
+    )
     return {
         "results": results,
         "provider": provider,
         "as_of": current_date,
         "live_verification": require_current,
+        "evidence_quality": assessment.to_dict(),
     }
 
 
@@ -725,6 +767,22 @@ async def chat(
             original_context_chars=original_chars,
             used_context_chars=len(query),
         )
+
+    v50_assessment, v50_policy, v50_block = _v50_current_guard(
+        query,
+        web_sources,
+        require_current=require_current,
+    )
+    if v50_block:
+        return ChatResponse(
+            answer=truth_guard_message(v50_assessment),
+            provider="v50-truth-guard",
+            sources=web_sources,
+            context_trimmed=False,
+            original_context_chars=original_chars,
+            used_context_chars=len(query),
+        )
+    live_pack = _join_context(v50_policy, live_pack)
 
     missing = _missing_state_evidence(query, web_sources)
     has_fresh_dynamic_knowledge = any(
@@ -948,6 +1006,19 @@ async def chat_stream(
             provider="truth-guard",
             sources=document_sources,
         )
+
+    v50_assessment, v50_policy, v50_block = _v50_current_guard(
+        query,
+        web_sources,
+        require_current=require_current,
+    )
+    if v50_block:
+        return _direct_stream(
+            truth_guard_message(v50_assessment),
+            provider="v50-truth-guard",
+            sources=web_sources,
+        )
+    live_pack = _join_context(v50_policy, live_pack)
 
     missing = _missing_state_evidence(query, web_sources)
     has_fresh_dynamic_knowledge = any(
