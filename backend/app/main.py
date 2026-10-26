@@ -84,6 +84,9 @@ from app.v51.speed_lane import (
     memory_context_timeout_seconds,
     should_lookup_shared_knowledge,
 )
+from app.v53.intelligence_core import build_intelligence_contract
+from app.v54.knowledge_brain import assess_and_rank_sources
+from app.v57.coding_brain import build_coding_policy
 
 
 settings = get_settings()
@@ -167,6 +170,7 @@ async def _private_context(
                     user_id,
                     settings,
                     user_jwt=access_token,
+                    query=query,
                 ),
                 timeout=memory_context_timeout_seconds(settings),
             )
@@ -194,12 +198,81 @@ async def _private_context(
             record_degraded("document_rag", "search_context", exc)
             return "", []
 
-    personal_pack, document_result = await asyncio.gather(
+    async def load_project() -> str:
+        project_id = str(
+            getattr(request, "project_id", "") or ""
+        ).strip()
+        if not project_id:
+            return ""
+
+        try:
+            from app.services.project_memory_v8 import project_context_v8
+
+            project_pack, _project_rows = await asyncio.wait_for(
+                project_context_v8(
+                    settings,
+                    user_id=user_id,
+                    project_id=project_id,
+                    query=query,
+                ),
+                timeout=3.5,
+            )
+
+            intelligence = build_intelligence_contract(
+                [{"role": "user", "content": query}],
+                project_active=True,
+            )
+
+            code_pack = ""
+            if intelligence.task_type == "code":
+                try:
+                    from app.services.project_kb_v9 import project_kb_context
+
+                    code_pack, _selected = await asyncio.wait_for(
+                        project_kb_context(
+                            settings,
+                            user_id=user_id,
+                            project_id=project_id,
+                            query=query,
+                            max_files=4,
+                        ),
+                        timeout=5.0,
+                    )
+                except Exception as exc:
+                    record_degraded(
+                        "project_context",
+                        "project_kb_context",
+                        exc,
+                        severity="info",
+                    )
+
+            return _join_context(
+                project_pack,
+                code_pack,
+            )
+
+        except Exception as exc:
+            record_degraded(
+                "project_context",
+                "project_memory_context",
+                exc,
+                severity="info",
+            )
+            return ""
+
+    personal_pack, document_result, project_pack = await asyncio.gather(
         load_personal(),
         load_documents(),
+        load_project(),
     )
+
     document_pack, document_sources = document_result
-    return _join_context(personal_pack, document_pack), document_sources
+
+    return _join_context(
+        personal_pack,
+        project_pack,
+        document_pack,
+    ), document_sources
 
 async def _shared_knowledge(
     query: str,
@@ -833,7 +906,38 @@ async def chat(
             ),
         )
 
+    evidence = assess_and_rank_sources(
+        query,
+        web_sources,
+        current_required=require_current,
+        limit=10,
+    )
+    web_sources = list(evidence.sources)
+
+    project_active = bool(
+        str(getattr(request, "project_id", "") or "").strip()
+    )
+
+    intelligence = build_intelligence_contract(
+        raw_messages,
+        require_current=require_current,
+        project_active=project_active,
+        evidence_confidence=(
+            evidence.confidence
+            if web_sources
+            else None
+        ),
+    )
+
+    coding_policy = build_coding_policy(
+        raw_messages,
+        project_active=project_active,
+    )
+
     web_context = _join_context(
+        intelligence.context,
+        evidence.context if web_sources else "",
+        coding_policy,
         shared_pack,
         private_pack,
         live_pack,

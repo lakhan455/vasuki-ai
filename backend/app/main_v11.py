@@ -56,6 +56,11 @@ from app.v51.speed_lane import (
     health_snapshot as v51_health_snapshot,
     startup_restore_budget_seconds,
 )
+from app.v53.intelligence_core import health_snapshot as v53_health_snapshot
+from app.v54.knowledge_brain import health_snapshot as v54_health_snapshot
+from app.v55.memory_brain import health_snapshot as v55_health_snapshot
+from app.v56.ui_contract import health_snapshot as v56_health_snapshot
+from app.v57.coding_brain import health_snapshot as v57_health_snapshot
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -171,6 +176,31 @@ async def health_v50() -> dict[str, Any]:
 @app.get("/health/v51")
 async def health_v51() -> dict[str, Any]:
     return v51_health_snapshot(settings)
+
+
+@app.get("/health/v53")
+async def health_v53() -> dict[str, Any]:
+    return v53_health_snapshot()
+
+
+@app.get("/health/v54")
+async def health_v54() -> dict[str, Any]:
+    return v54_health_snapshot()
+
+
+@app.get("/health/v55")
+async def health_v55() -> dict[str, Any]:
+    return v55_health_snapshot()
+
+
+@app.get("/health/v56")
+async def health_v56() -> dict[str, Any]:
+    return v56_health_snapshot()
+
+
+@app.get("/health/v57")
+async def health_v57() -> dict[str, Any]:
+    return v57_health_snapshot()
 
 
 @app.post("/internal/v50/live-refresh")

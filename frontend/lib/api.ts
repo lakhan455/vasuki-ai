@@ -23,6 +23,15 @@ export type StreamChatMeta = {
   adaptive_routing?: boolean;
   router_version?: string;
   reliability_score?: number;
+  intelligence_mode?: string;
+  intelligence_confidence?: number;
+  verification_required?: boolean;
+  evidence_confidence?: number;
+  evidence_disagreement?: boolean;
+  quality_checked?: boolean;
+  quality_score?: number;
+  quality_issues?: string[];
+  activity?: string;
   sources?: unknown[];
   request_id?: string;
   context_trimmed?: boolean;
@@ -348,6 +357,7 @@ async function streamAt(
   messages: ChatMessage[],
   options: StreamOptions,
   onToken: (token: string) => void,
+  onStatus?: (status: string) => void,
 ): Promise<StreamChatMeta> {
   const response = await fetch(`${baseUrl}/api/chat/stream`, {
     method: "POST",
@@ -400,6 +410,12 @@ async function streamAt(
           ...meta,
           ...(parsed.data as StreamChatMeta),
         };
+        if (
+          typeof parsed.data.activity === "string" &&
+          parsed.data.activity.trim()
+        ) {
+          onStatus?.(parsed.data.activity.trim());
+        }
       } else if (parsed.event === "token") {
         const token =
           typeof parsed.data.token === "string"
@@ -439,6 +455,7 @@ export async function streamChat(
   messages: ChatMessage[],
   options: StreamOptions,
   onToken: (token: string) => void,
+  onStatus?: (status: string) => void,
 ): Promise<StreamChatMeta> {
   let emittedToken = false;
 
@@ -455,6 +472,7 @@ export async function streamChat(
       messages,
       options,
       trackedToken,
+      onStatus,
     );
   } catch (firstError) {
     if (
@@ -494,6 +512,7 @@ export async function streamChat(
           cacheBypass: true,
         },
         trackedToken,
+        onStatus,
       );
     } catch (secondError) {
       if (

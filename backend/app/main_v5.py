@@ -14,6 +14,10 @@ from app.services.error_monitoring import record_error_event
 from app.services.memory_v5 import remember_with_conflict_resolution
 from app.services.quota_v5 import check_chat_quota
 from app.services.rate_limit import QuotaExceeded
+from app.v13.critic import critic_review
+from app.v53.intelligence_core import build_intelligence_contract
+from app.v54.knowledge_brain import assess_and_rank_sources
+from app.v57.coding_brain import build_coding_policy
 
 
 app = v4.app
@@ -183,6 +187,59 @@ async def chat_stream_v5(
             sources=web_sources,
         )
 
+    v50_assessment, v50_policy, v50_block = legacy._v50_current_guard(
+        query,
+        web_sources,
+        require_current=require_current,
+    )
+
+    if v50_block:
+        return legacy._direct_stream(
+            legacy.truth_guard_message(v50_assessment),
+            provider="v50-truth-guard",
+            sources=web_sources,
+        )
+
+    live_pack = legacy._join_context(
+        v50_policy,
+        live_pack,
+    )
+
+    evidence = assess_and_rank_sources(
+        query,
+        web_sources,
+        current_required=require_current,
+        limit=10,
+    )
+    web_sources = list(evidence.sources)
+
+    project_active = bool(
+        str(
+            getattr(
+                chat_request,
+                "project_id",
+                "",
+            )
+            or ""
+        ).strip()
+    )
+
+    intelligence = build_intelligence_contract(
+        raw_messages,
+        require_current=require_current,
+        project_active=project_active,
+        evidence_confidence=(
+            evidence.confidence
+            if web_sources
+            else None
+        ),
+    )
+
+    coding_policy = build_coding_policy(
+        raw_messages,
+        project_active=project_active,
+    )
+
     research_instruction = ""
     if bool(getattr(chat_request, "research_mode", False)):
         research_instruction = (
@@ -191,6 +248,9 @@ async def chat_stream_v5(
             "mention material disagreement, and never invent citations or unsupported claims."
         )
     web_context = legacy._join_context(
+        intelligence.context,
+        evidence.context if web_sources else "",
+        coding_policy,
         research_instruction,
         shared_pack,
         private_pack,
@@ -219,6 +279,7 @@ async def chat_stream_v5(
         adaptive_routing = False
         router_version = ""
         reliability_score = None
+        complete_answer = ""
         started = time.perf_counter()
 
         try:
@@ -233,6 +294,12 @@ async def chat_stream_v5(
                     "minute_remaining": quota.minute_remaining,
                     "daily_limit": quota.daily_limit,
                     "daily_remaining": quota.daily_remaining,
+                    "intelligence_mode": intelligence.mode,
+                    "intelligence_confidence": intelligence.confidence,
+                    "verification_required": intelligence.verification_required,
+                    "activity": intelligence.activity,
+                    "evidence_confidence": evidence.confidence,
+                    "evidence_disagreement": evidence.disagreement,
                 },
             )
 
@@ -273,9 +340,14 @@ async def chat_stream_v5(
                         },
                     )
                 elif event_type == "token":
+                    token = str(
+                        event.get("token", "")
+                        or ""
+                    )
+                    complete_answer += token
                     yield legacy._sse(
                         "token",
-                        {"token": event.get("token", "")},
+                        {"token": token},
                     )
                 elif event_type == "diagnostic":
                     v4._log(
@@ -292,6 +364,13 @@ async def chat_stream_v5(
                             "status": event.get("status", ""),
                         },
                     )
+
+            quality = critic_review(
+                query,
+                complete_answer,
+                sources=all_sources,
+                current_required=require_current,
+            )
 
             duration_ms = round(
                 (time.perf_counter() - started) * 1000
@@ -323,6 +402,14 @@ async def chat_stream_v5(
                     "minute_remaining": quota.minute_remaining,
                     "daily_limit": quota.daily_limit,
                     "daily_remaining": quota.daily_remaining,
+                    "intelligence_mode": intelligence.mode,
+                    "intelligence_confidence": intelligence.confidence,
+                    "verification_required": intelligence.verification_required,
+                    "evidence_confidence": evidence.confidence,
+                    "evidence_disagreement": evidence.disagreement,
+                    "quality_checked": True,
+                    "quality_score": quality.score,
+                    "quality_issues": list(quality.issues[:4]),
                     "done": True,
                 },
             )

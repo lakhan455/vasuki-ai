@@ -318,6 +318,7 @@ async def personal_memory_context(
     settings: Settings,
     *,
     user_jwt: str | None = None,
+    query: str = "",
 ) -> tuple[str, list[dict[str, Any]]]:
     enabled = await get_memory_enabled(
         user_id,
@@ -336,15 +337,9 @@ async def personal_memory_context(
     if not rows:
         return "", []
 
-    lines = [
-        "PRIVATE USER MEMORY:",
-        "Use these only to personalize this user's answer. "
-        "Never reveal that these came from a database unless asked.",
-    ]
-    for index, row in enumerate(rows, 1):
-        lines.append(
-            f"[USER MEMORY {index}] "
-            f"{str(row.get('memory_text') or '').strip()}"
-        )
+    from app.v55.memory_brain import build_smart_memory_context
 
-    return "\n".join(lines), rows
+    return build_smart_memory_context(
+        rows,
+        query=query,
+    )
