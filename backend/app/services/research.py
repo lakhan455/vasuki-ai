@@ -14,6 +14,7 @@ from app.v58.fresh_facts import (
     build_fresh_fact_search_query,
     is_volatile_person_status_query,
 )
+from app.v59.fresh_fact_resolver import build_fresh_fact_plan
 
 
 # Any answer in these categories can change without the model being updated.
@@ -95,6 +96,8 @@ REPUTABLE_NEWS_HOSTS = {
     "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "thehindu.com",
     "indianexpress.com", "hindustantimes.com", "ndtv.com", "economictimes.indiatimes.com",
     "timesofindia.indiatimes.com", "deccanherald.com", "business-standard.com",
+    "indiatoday.in", "theguardian.com", "aljazeera.com", "theprint.in",
+    "moneycontrol.com", "livemint.com", "scroll.in", "news18.com", "firstpost.com",
 }
 
 
@@ -702,6 +705,86 @@ async def search_web(
             f" This is a {profile.label} question. First check official/primary platforms: "
             f"{primary}. Then cross-check with trusted specialist sources: {reference}."
         )
+
+    # V59: volatile public-person facts use several short, explicit search
+    # variants instead of one long Roman-Hindi/Hindi prompt. This improves
+    # recall for recent obituary, arrest, resignation and health reporting.
+    if is_volatile_person_status_query(query):
+        plan = build_fresh_fact_plan(
+            query,
+            as_of=as_of,
+        )
+
+        variants = list(plan.queries[:3])
+        jobs: list = []
+
+        for index, variant in enumerate(variants):
+            jobs.append(
+                tavily_search(
+                    variant,
+                    settings,
+                    max_results=min(max_results, 7),
+                    topic="news",
+                    time_range="year",
+                    search_depth="advanced" if index == 0 else "basic",
+                    content_limit=2000 if index == 0 else 1700,
+                )
+            )
+
+        if variants:
+            jobs.append(
+                tavily_search(
+                    variants[0],
+                    settings,
+                    max_results=min(max_results, 7),
+                    topic="general",
+                    search_depth="advanced",
+                    content_limit=2200,
+                )
+            )
+            jobs.append(
+                tavily_search(
+                    variants[0],
+                    settings,
+                    max_results=min(max_results, 7),
+                    topic="general",
+                    include_domains=tuple(sorted(REPUTABLE_NEWS_HOSTS)),
+                    search_depth="basic",
+                    content_limit=1900,
+                )
+            )
+
+        collected: list[dict] = []
+        errors: list[str] = []
+        completed = await asyncio.gather(*jobs, return_exceptions=True)
+        for result in completed:
+            if isinstance(result, Exception):
+                errors.append(str(result))
+            else:
+                collected.extend(result)
+
+        ranked = _dedupe_and_rank(collected, max_results)
+
+        if len(ranked) < min(4, max_results) and variants:
+            try:
+                ranked = _dedupe_and_rank(
+                    ranked
+                    + await exa_search(
+                        variants[0],
+                        settings,
+                        max_results=max_results,
+                        content_limit=2000,
+                    ),
+                    max_results,
+                )
+            except Exception as exc:
+                errors.append(f"exa: {exc}")
+
+        if ranked:
+            providers = "tavily+exa" if settings.exa_api else "tavily"
+            return ranked, f"fresh-fact:{plan.kind}:{providers}"
+
+        return [], "; ".join(errors) if errors else "No fresh-fact evidence returned"
 
     if is_volatile_person_status_query(query):
         base_query = (

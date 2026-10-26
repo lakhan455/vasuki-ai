@@ -19,6 +19,7 @@ from app.v53.intelligence_core import build_intelligence_contract
 from app.v54.knowledge_brain import assess_and_rank_sources
 from app.v57.coding_brain import build_coding_policy
 from app.v58.fresh_facts import fresh_fact_answer_policy
+from app.v59.fresh_fact_resolver import fresh_fact_evidence_context
 
 
 app = v4.app
@@ -155,6 +156,14 @@ async def chat_stream_v5(
         chat_request=chat_request,
     )
 
+    # V59 defense-in-depth: classification remains current-sensitive even if a
+    # lower context layer returned a degraded result.
+    require_current = bool(
+        require_current
+        or legacy.needs_live_web(query)
+        or bool(getattr(chat_request, "research_mode", False))
+    )
+
     if (
         strong_hits
         and legacy.is_direct_fact_question(query)
@@ -214,6 +223,12 @@ async def chat_stream_v5(
     )
     web_sources = list(evidence.sources)
 
+    fresh_fact_resolution = fresh_fact_evidence_context(
+        query,
+        web_sources,
+        as_of=current_date,
+    )
+
     project_active = bool(
         str(
             getattr(
@@ -253,6 +268,7 @@ async def chat_stream_v5(
             query,
             as_of=current_date,
         ),
+        fresh_fact_resolution,
         intelligence.context,
         evidence.context if web_sources else "",
         coding_policy,

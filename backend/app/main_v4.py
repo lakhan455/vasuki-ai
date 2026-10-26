@@ -184,7 +184,13 @@ async def _parallel_context(
         private_pack, document_sources = private_result
 
     if isinstance(web_result, Exception):
-        require_current, web_sources, live_pack = False, [], ""
+        # V59 fail-closed: a retrieval/runtime error must never turn a
+        # freshness-sensitive query into a normal stale-model question.
+        require_current = bool(
+            legacy.needs_live_web(query)
+            or bool(getattr(chat_request, "research_mode", False))
+        )
+        web_sources, live_pack = [], ""
     else:
         require_current, web_sources, live_pack = web_result
 
