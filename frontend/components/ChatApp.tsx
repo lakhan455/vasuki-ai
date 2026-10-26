@@ -96,6 +96,13 @@ type UiMessage = ChatMessage & {
   adaptiveRouting?: boolean;
   routerVersion?: string;
   reliabilityScore?: number;
+  intelligenceMode?: string;
+  intelligenceConfidence?: number;
+  verificationRequired?: boolean;
+  evidenceConfidence?: number;
+  evidenceDisagreement?: boolean;
+  qualityChecked?: boolean;
+  qualityScore?: number;
   sources?: SourceInfo[];
   artifacts?: SmartFileArtifact[];
 };
@@ -157,6 +164,18 @@ function providerDisplayName(value?: string) {
     sambanova: "SambaNova",
   };
   return labels[provider] || provider || "Vasuki";
+}
+
+function intelligenceModeLabel(value?: string) {
+  const labels: Record<string, string> = {
+    "verified-research": "Verified research",
+    "deep-reasoning": "Deep reasoning",
+    engineering: "Engineering",
+    artifact: "Artifact",
+    image: "Image",
+    direct: "Direct",
+  };
+  return value ? labels[value] || value : "";
 }
 
 function latencyLabel(milliseconds?: number) {
@@ -288,7 +307,7 @@ function wantsDownloadableArtifact(value: string) {
     /\b(?:pdf|docx|word\s+(?:file|document)|txt|text\s+file|qr(?:\s+code)?|one[-\s]?sheet|single[-\s]?page|downloadable\s+file)\b/i.test(
       normalized,
     ) ||
-    /à¤ªà¥€à¤¡à¥€à¤à¤«|à¤•à¥à¤¯à¥‚à¤†à¤°|à¤à¤•\s*à¤¶à¥€à¤Ÿ/.test(normalized);
+    /पीडीएफ|क्यूआर|एक\s*शीट/.test(normalized);
 
   const hasAction =
     /\b(?:create|make|generate|prepare|export|download|provide|give|convert|save|print|build|banao|bana\s*do|banado|bana|de\s*do|dedo|chahiye|create\s+karo|bana\s+kar\s+do|pdf\s+m(?:e|ein))\b/i.test(
@@ -1617,6 +1636,11 @@ if (shouldUseCodeProject) {
             signal: controller.signal,
           },
           onStreamToken,
+          (status) => {
+            if (status) {
+              setInstantIntent(status);
+            }
+          },
         );
 
         providerName = meta.provider || "";
@@ -1642,7 +1666,39 @@ if (shouldUseCodeProject) {
           typeof meta.reliability_score === "number"
             ? meta.reliability_score
             : undefined;
-        answerSources = normaliseSources(meta.sources);
+
+        const intelligenceMode =
+          typeof meta.intelligence_mode === "string"
+            ? meta.intelligence_mode
+            : undefined;
+
+        const intelligenceConfidence =
+          typeof meta.intelligence_confidence === "number"
+            ? meta.intelligence_confidence
+            : undefined;
+
+        const verificationRequired =
+          meta.verification_required === true;
+
+        const evidenceConfidence =
+          typeof meta.evidence_confidence === "number"
+            ? meta.evidence_confidence
+            : undefined;
+
+        const evidenceDisagreement =
+          meta.evidence_disagreement === true;
+
+        const qualityChecked =
+          meta.quality_checked === true;
+
+        const qualityScore =
+          typeof meta.quality_score === "number"
+            ? meta.quality_score
+            : undefined;
+
+        answerSources = normaliseSources(
+          meta.sources,
+        );
 
         const answer = streamedAnswer.trim();
         if (!answer) {
@@ -1663,6 +1719,13 @@ if (shouldUseCodeProject) {
             adaptiveRouting,
             routerVersion: routerVersion || undefined,
             reliabilityScore,
+            intelligenceMode,
+            intelligenceConfidence,
+            verificationRequired,
+            evidenceConfidence,
+            evidenceDisagreement,
+            qualityChecked,
+            qualityScore,
             sources: answerSources,
           },
         ];
@@ -2313,6 +2376,53 @@ if (shouldUseCodeProject) {
                               </ReactMarkdown>
                             </div>
                           ) : null}
+
+                          {(message.intelligenceMode ||
+                            message.qualityChecked ||
+                            message.verificationRequired ||
+                            message.evidenceDisagreement) && (
+                            <div
+                              className="pv-answer-status"
+                              aria-label="Answer quality status"
+                            >
+                              {message.intelligenceMode &&
+                              message.intelligenceMode !== "direct" ? (
+                                <span>
+                                  {intelligenceModeLabel(
+                                    message.intelligenceMode,
+                                  )}
+                                </span>
+                              ) : null}
+
+                              {message.verificationRequired &&
+                              (message.sources?.length || 0) > 0 ? (
+                                <span>Verified sources</span>
+                              ) : null}
+
+                              {message.qualityChecked ? (
+                                <span>
+                                  Quality checked
+                                  {typeof message.qualityScore === "number"
+                                    ? ` · ${Math.round(
+                                        message.qualityScore,
+                                      )}`
+                                    : ""}
+                                </span>
+                              ) : null}
+
+                              {typeof message.intelligenceConfidence ===
+                                "number" &&
+                              message.intelligenceConfidence >= 0.82 ? (
+                                <span>High confidence</span>
+                              ) : null}
+
+                              {message.evidenceDisagreement ? (
+                                <span className="pv-answer-status--warning">
+                                  Sources may disagree
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
 
                           <SourceStrip sources={message.sources} />
 

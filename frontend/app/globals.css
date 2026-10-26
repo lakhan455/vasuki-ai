@@ -5170,3 +5170,49 @@ html[data-pv-theme="light"] .pv-user-bubble {
 }
 
 /* VASUKI_PREMIUM_UI_V1_END */
+
+/* VASUKI_V56_INTELLIGENCE_STATUS_START */
+.pv-answer-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+
+.pv-answer-status > span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(129, 201, 149, 0.18);
+  border-radius: 999px;
+  background: rgba(129, 201, 149, 0.055);
+  color: #a8d8b5;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.pv-answer-status > .pv-answer-status--warning {
+  border-color: rgba(245, 190, 90, 0.22);
+  background: rgba(245, 190, 90, 0.07);
+  color: #e9c77f;
+}
+
+.pv-provider-diagnostic {
+  margin-top: 8px;
+  opacity: 0.52;
+  transition: opacity 140ms ease;
+}
+
+.pv-provider-diagnostic:hover {
+  opacity: 0.82;
+}
+
+[data-pv-theme="light"] .pv-answer-status > span {
+  border-color: rgba(42, 125, 68, 0.16);
+  background: rgba(42, 125, 68, 0.045);
+  color: #2f7444;
+}
+/* VASUKI_V56_INTELLIGENCE_STATUS_END */
+

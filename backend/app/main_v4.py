@@ -149,7 +149,7 @@ async def _parallel_context(
     list[dict[str, Any]],
     str,
 ]:
-    shared_task = asyncio.create_task(legacy._shared_knowledge(query))
+    shared_task = asyncio.create_task(legacy._v51_shared_knowledge(query))
     private_task = asyncio.create_task(
         legacy._private_context(
             user_id=user.id,
