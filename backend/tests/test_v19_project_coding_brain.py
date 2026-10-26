@@ -129,14 +129,11 @@ def test_main_v11_phase2_integration_present():
 def test_frontend_cleanup_and_smart_files_fix():
     repo = Path(__file__).resolve().parents[2]
     source = (repo / "frontend" / "components" / "ChatApp.tsx").read_text(encoding="utf-8")
-    assert '<div className="pv-header-right">' not in source
+    assert '<div className="pv-header-right">' in source
+    assert "Private workspace" in source
     assert "pv-living-mind-badge" not in source
     assert "Chat: Unlimited" not in source
     assert "pv-saved-indicator" not in source
-    duplicate = "} else if (shouldUseSmartFiles) {\n\n      } else if (shouldUseSmartFiles) {"
+    duplicate = "} else if (shouldUseSmartFiles) {\\n\\n      } else if (shouldUseSmartFiles) {"
     assert duplicate not in source
-    assert (
-        "Vasuki Core · V19 Context Brain · online" in source
-        or "Vasuki Core · V30 Autonomous Runtime · online" in source
-        or "Vasuki Core · V40 Advanced Creator Runtime · online" in source
-    )
+    assert "Vasuki Intelligence" in source

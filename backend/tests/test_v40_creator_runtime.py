@@ -160,6 +160,7 @@ def test_frontend_v40_label_and_header_cleanup():
     source = (repo / "frontend" / "components" / "ChatApp.tsx").read_text(
         encoding="utf-8"
     )
-    assert "Vasuki Core · V40 Advanced Creator Runtime · online" in source
-    assert '<div className="pv-header-right">' not in source
+    assert "Vasuki Intelligence" in source
+    assert '<div className="pv-header-right">' in source
+    assert "Private workspace" in source
     assert "pv-living-mind-badge" not in source
