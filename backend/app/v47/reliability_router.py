@@ -402,6 +402,27 @@ async def load_persisted_reliability(settings: Any, limit: int = 2500) -> int:
             else:
                 continue
         loaded += 1
+
+    # V51: after a restart, briefly respect persisted repeated failures instead
+    # of immediately spending latency on providers that were already unhealthy.
+    restored_cooldown = float(
+        getattr(settings, "v51_restored_failure_cooldown_seconds", 90.0)
+    )
+    if (
+        bool(getattr(settings, "v51_speed_lane_enabled", True))
+        and loaded
+        and restored_cooldown > 0
+    ):
+        threshold = max(
+            1,
+            int(getattr(settings, "v47_circuit_failure_threshold", 2)),
+        )
+        until = time.monotonic() + min(180.0, restored_cooldown)
+        with _LOCK:
+            for row in _STATS.values():
+                if row.consecutive_failures >= threshold and row.last_error:
+                    row.circuit_open_until = max(row.circuit_open_until, until)
+
     return loaded
 
 

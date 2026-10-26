@@ -79,6 +79,11 @@ from app.v50.truth import (
     should_fail_closed,
     truth_guard_message,
 )
+from app.v51.speed_lane import (
+    current_web_result_limit,
+    memory_context_timeout_seconds,
+    should_lookup_shared_knowledge,
+)
 
 
 settings = get_settings()
@@ -153,11 +158,9 @@ async def _private_context(
     query: str,
     request: ChatRequest,
 ) -> tuple[str, list[dict[str, Any]]]:
-    personal_pack = ""
-    document_pack = ""
-    document_sources: list[dict[str, Any]] = []
-
-    if request.use_memory:
+    async def load_personal() -> str:
+        if not request.use_memory:
+            return ""
         try:
             personal_pack, _memory_rows = await asyncio.wait_for(
                 personal_memory_context(
@@ -165,13 +168,16 @@ async def _private_context(
                     settings,
                     user_jwt=access_token,
                 ),
-                timeout=1.8,
+                timeout=memory_context_timeout_seconds(settings),
             )
+            return personal_pack
         except Exception as exc:
             record_degraded("personal_memory", "load_context", exc)
-            personal_pack = ""
+            return ""
 
-    if request.use_documents:
+    async def load_documents() -> tuple[str, list[dict[str, Any]]]:
+        if not request.use_documents:
+            return "", []
         try:
             hits = await asyncio.wait_for(
                 search_user_documents(
@@ -183,13 +189,17 @@ async def _private_context(
                 ),
                 timeout=18.0,
             )
-            document_pack, document_sources = document_context(hits)
+            return document_context(hits)
         except Exception as exc:
             record_degraded("document_rag", "search_context", exc)
-            document_pack, document_sources = "", []
+            return "", []
 
+    personal_pack, document_result = await asyncio.gather(
+        load_personal(),
+        load_documents(),
+    )
+    document_pack, document_sources = document_result
     return _join_context(personal_pack, document_pack), document_sources
-
 
 async def _shared_knowledge(
     query: str,
@@ -214,6 +224,20 @@ async def _shared_knowledge(
         hit_sources(strong_memory_hits),
         knowledge_context(strong_memory_hits),
     )
+
+
+async def _v51_shared_knowledge(
+    query: str,
+) -> tuple[list, list, str]:
+    lookup = should_lookup_shared_knowledge(
+        direct_fact=is_direct_fact_question(query),
+        current_required=needs_live_web(query),
+        authoritative_snapshot_candidate=is_all_india_state_cm_query(query),
+        settings=settings,
+    )
+    if not lookup:
+        return [], [], ""
+    return await _shared_knowledge(query)
 
 
 async def _web_context(
@@ -250,7 +274,11 @@ async def _web_context(
     if not should_search:
         return require_current, [], ""
 
-    max_results = 10 if research_mode else (8 if require_current else 4)
+    max_results = current_web_result_limit(
+        settings,
+        research_mode=research_mode,
+        require_current=require_current,
+    )
     try:
         sources, _provider = await asyncio.wait_for(
             search_web(
@@ -697,7 +725,7 @@ async def chat(
             used_context_chars=len(query),
         )
 
-    strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
+    strong_hits, shared_sources, shared_pack = await _v51_shared_knowledge(query)
 
     # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS
     authoritative_cm_answer = None
@@ -743,16 +771,22 @@ async def chat(
             used_context_chars=len(query),
         )
 
-    private_pack, document_sources = await _private_context(
-        user_id=current_user.id,
-        access_token=current_user.access_token,
-        query=query,
-        request=request,
-    )
-    require_current, web_sources, live_pack = await _web_context(
-        query=query,
-        current_date=current_date,
-        request=request,
+    (private_pack, document_sources), (
+        require_current,
+        web_sources,
+        live_pack,
+    ) = await asyncio.gather(
+        _private_context(
+            user_id=current_user.id,
+            access_token=current_user.access_token,
+            query=query,
+            request=request,
+        ),
+        _web_context(
+            query=query,
+            current_date=current_date,
+            request=request,
+        ),
     )
 
     if require_current and not web_sources and not strong_hits:
@@ -946,7 +980,7 @@ async def chat_stream(
             provider="vasuki-calculator",
         )
 
-    strong_hits, shared_sources, shared_pack = await _shared_knowledge(query)
+    strong_hits, shared_sources, shared_pack = await _v51_shared_knowledge(query)
 
     # VASUKI_V49_1_AUTHORITATIVE_CURRENT_FACTS_STREAM
     authoritative_cm_answer = None
@@ -985,16 +1019,22 @@ async def chat_stream(
             sources=shared_sources,
         )
 
-    private_pack, document_sources = await _private_context(
-        user_id=current_user.id,
-        access_token=current_user.access_token,
-        query=query,
-        request=chat_request,
-    )
-    require_current, web_sources, live_pack = await _web_context(
-        query=query,
-        current_date=current_date,
-        request=chat_request,
+    (private_pack, document_sources), (
+        require_current,
+        web_sources,
+        live_pack,
+    ) = await asyncio.gather(
+        _private_context(
+            user_id=current_user.id,
+            access_token=current_user.access_token,
+            query=query,
+            request=chat_request,
+        ),
+        _web_context(
+            query=query,
+            current_date=current_date,
+            request=chat_request,
+        ),
     )
 
     if require_current and not web_sources and not strong_hits:

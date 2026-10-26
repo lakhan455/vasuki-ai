@@ -118,7 +118,8 @@ def test_v47_health_and_startup_restore_are_wired():
     source = (backend / "app" / "main_v11.py").read_text(encoding="utf-8")
     assert "VASUKI_V47_SELF_HEALING_ROUTER_INTEGRATION" in source
     assert '@app.get("/health/v47")' in source
-    assert "await load_persisted_reliability(settings)" in source
+    assert "load_persisted_reliability(settings)" in source
+    assert "_v51_bounded_startup_restore" in source
 
 
 def test_v47_frontend_surfaces_router_health():
