@@ -11,12 +11,12 @@ const commands = [
   { label: "New chat", href: "/", keywords: "new chat home" },
   { label: "Image Studio", href: "/images", keywords: "image generate studio" },
   { label: "Document Intelligence", href: "/documents", keywords: "pdf docx document" },
-  { label: "Tools Hub V48", href: "/tools", keywords: "tools data analysis scheduled tasks file library research image voice" },
+  { label: "Tools", href: "/tools", keywords: "tools data analysis scheduled tasks file library research image voice" },
   { label: "Projects", href: "/projects", keywords: "project workspace code" },
-  { label: "Operations Center", href: "/operations", keywords: "jobs notifications usage" },
+  { label: "Activity", href: "/operations", keywords: "jobs notifications usage" },
   { label: "Files", href: "/files", keywords: "downloads artifacts files" },
   { label: "Account & Privacy", href: "/account", keywords: "export delete storage push privacy" },
-  { label: "Owner Dashboard", href: "/owner", keywords: "owner cost quota feature flags" },
+  { label: "Owner", href: "/owner", keywords: "owner cost quota feature flags" },
 ];
 
 export default function ProductivityShellV9() {
@@ -142,7 +142,7 @@ export default function ProductivityShellV9() {
           >
             <div className="pv-v9-palette-head">
               <div>
-                <p className="pv-v8-kicker">Vasuki AI</p>
+                <p className="pv-v8-kicker">Quick access</p>
                 <h2 id="pv-v9-palette-title">Command Palette</h2>
               </div>
               <button type="button" onClick={() => setPaletteOpen(false)} aria-label="Close command palette">
