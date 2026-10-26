@@ -38,6 +38,8 @@ def _authority(item: dict[str, Any]) -> float:
         return 0.98
     if source_type in {"research", "documentation", "docs", "academic"}:
         return 0.88
+    if source_type in {"reputable_news", "trusted_reference"}:
+        return 0.84
     if source_type in {"news", "press"}:
         return 0.76
     return 0.58
