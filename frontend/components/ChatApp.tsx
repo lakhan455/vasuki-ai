@@ -41,15 +41,9 @@ import {
   consumePuterImageQuota,
   releasePuterImageQuota,
   fetchAccountPlan,
-  fetchPuterContext,
   type AccountPlan,
   type PuterImageQuota,
 } from "@/lib/plans";
-import {
-  connectPuter,
-  generatePuterImage4K,
-  streamPuterChat,
-} from "@/lib/puter";
 
 const VASUKI_LOGO_URL = "/vasuki-pwa.svg";
 
@@ -147,7 +141,6 @@ type PendingAttachment = {
 };
 
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze" | "research";
-type AiEngine = "vasuki" | "puter";
 
 /* VASUKI_V45_PROVIDER_BADGE_START */
 function providerDisplayName(value?: string) {
@@ -757,11 +750,7 @@ export default function ChatApp() {
   const [instantIntent, setInstantIntent] = useState("");
   const [, setQuotaStatus] = useState<QuotaUiStatus | null>(null);
   const [accountPlan, setAccountPlan] = useState<AccountPlan | null>(null);
-  const [aiEngine, setAiEngine] = useState<AiEngine>("vasuki");
   const [, setPuterImageQuota] = useState<PuterImageQuota | null>(null);
-  const [puterAccount, setPuterAccount] = useState("");
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [planBusy, setPlanBusy] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [feedbackById, setFeedbackById] = useState<Record<string, "up" | "down">>({});
   const [projects, setProjects] = useState<VasukiProject[]>([]);
@@ -944,15 +933,9 @@ export default function ChatApp() {
   async function refreshAccountPlan() {
     try {
       const accessToken = await currentAccessToken();
-      const nextPlan = await fetchAccountPlan(accessToken);
-      setAccountPlan(nextPlan);
-      if (!nextPlan.puter_access) {
-        setAiEngine("vasuki");
-        setPuterAccount("");
-      }
+      setAccountPlan(await fetchAccountPlan(accessToken));
     } catch (planError) {
       setAccountPlan(null);
-      setAiEngine("vasuki");
       console.error(planError);
     }
   }
@@ -989,34 +972,6 @@ export default function ChatApp() {
     }
     openChat(data as ChatRecord);
     closeHistorySearch();
-  }
-
-  async function selectPuterEngine() {
-    if (!accountPlan?.puter_access) {
-      setError("Vasuki Pro is currently locked.");
-      setModelMenuOpen(false);
-      return;
-    }
-
-    setPlanBusy(true);
-    setError("");
-
-    try {
-      const account = await connectPuter();
-      setPuterAccount(
-        account.username || account.email || "Connected",
-      );
-      setAiEngine("puter");
-      setModelMenuOpen(false);
-    } catch (puterError) {
-      setError(
-        puterError instanceof Error
-          ? puterError.message
-          : "The Vasuki Pro account could not be connected.",
-      );
-    } finally {
-      setPlanBusy(false);
-    }
   }
 
   async function signInWithGoogle() {
@@ -1546,141 +1501,39 @@ if (shouldUseCodeProject) {
         let imageUrl = "";
         let imageProvider = "";
         let imageQuotaText = "";
-        const identityCriticalImage =
-          isIdentityCriticalImageRequest(effectiveText);
-        const autoProForIdentity =
-          identityCriticalImage &&
-          aiEngine === "vasuki" &&
-          Boolean(accountPlan?.puter_access) &&
-          Boolean(puterAccount);
 
-        if (aiEngine === "puter" || autoProForIdentity) {
-          if (!accountPlan?.puter_access) {
-            throw new Error("Vasuki Pro access required.");
-          }
+        const quota = await consumePuterImageQuota(accessToken);
+        setPuterImageQuota(quota);
 
-          const quota = await consumePuterImageQuota(accessToken);
-          setPuterImageQuota(quota);
-          imageQuotaText =
-            ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
+        if (!quota.allowed) {
+          throw new Error(
+            `Daily image limit reached (${quota.daily_limit}/day).`,
+          );
+        }
 
+        imageQuotaText =
+          ` ? Today ${quota.daily_remaining}/${quota.daily_limit} left`;
+
+        try {
+          const data = (await generateImage(
+            effectiveText,
+            accessToken,
+          )) as ImageResponse;
+
+          imageUrl =
+            typeof data.url === "string"
+              ? data.url.trim()
+              : "";
+          imageProvider = data.provider || "";
+        } catch (nativeImageError) {
           try {
-            const result = await generatePuterImage4K(effectiveText);
-            imageUrl = result.url;
-            imageProvider = autoProForIdentity
-              ? `Vasuki auto-exact · ${result.provider}`
-              : result.provider;
-          } catch (puterImageError) {
-            if (identityCriticalImage) {
-              try {
-                const restored =
-                  await releasePuterImageQuota(accessToken);
-                setPuterImageQuota(restored);
-              } catch {
-                // Persistent quota resets automatically.
-              }
-
-              const identityError =
-                puterImageError instanceof Error
-                  ? puterImageError.message
-                  : "Strong image provider unavailable.";
-
-              throw new Error(
-                `${identityError} Exact-identity mode did not use the ` +
-                  "native approximate fallback, so the requested model or " +
-                  "character is not silently replaced.",
-              );
-            }
-
-            try {
-              const fallback = (await generateImage(
-                effectiveText,
-                accessToken,
-              )) as ImageResponse;
-
-              imageUrl =
-                typeof fallback.url === "string"
-                  ? fallback.url.trim()
-                  : "";
-              imageProvider = fallback.provider
-                ? `Vasuki fallback · ${fallback.provider}`
-                : "Vasuki fallback";
-
-              if (!imageUrl) {
-                throw new Error(
-                  "Vasuki fallback returned an empty image.",
-                );
-              }
-            } catch (fallbackError) {
-              try {
-                const restored =
-                  await releasePuterImageQuota(accessToken);
-                setPuterImageQuota(restored);
-              } catch {
-                // The backend will still reset the quota on the next day.
-              }
-
-              const puterMessage =
-                puterImageError instanceof Error
-                  ? puterImageError.message
-                  : "Puter image credits unavailable.";
-              const fallbackMessage =
-                fallbackError instanceof Error
-                  ? fallbackError.message
-                  : "Vasuki fallback unavailable.";
-
-              throw new Error(
-                `${puterMessage} Vasuki fallback also failed: ` +
-                  fallbackMessage,
-              );
-            }
-          }
-        } else {
-          const quota =
-            await consumePuterImageQuota(
-              accessToken,
+            setPuterImageQuota(
+              await releasePuterImageQuota(accessToken),
             );
-
-          setPuterImageQuota(quota);
-
-          if (!quota.allowed) {
-            throw new Error(
-              `Daily image limit reached (${quota.daily_limit}/day).`,
-            );
+          } catch {
+            // Persistent quota resets automatically.
           }
-
-          imageQuotaText =
-            ` · Today ${quota.daily_remaining}/${quota.daily_limit} left`;
-
-          try {
-            const data = (await generateImage(
-              effectiveText,
-              accessToken,
-            )) as ImageResponse;
-
-            imageUrl =
-              typeof data.url === "string"
-                ? data.url.trim()
-                : "";
-
-            imageProvider =
-              data.provider || "";
-          } catch (nativeImageError) {
-            try {
-              const restored =
-                await releasePuterImageQuota(
-                  accessToken,
-                );
-
-              setPuterImageQuota(
-                restored,
-              );
-            } catch {
-              // Persistent quota resets automatically.
-            }
-
-            throw nativeImageError;
-          }
+          throw nativeImageError;
         }
 
         if (!imageUrl) {
@@ -1715,12 +1568,8 @@ if (shouldUseCodeProject) {
         let streamedAnswer = "";
         let providerName = "";
         let providerModel = "";
-        let firstTokenMs: number | undefined;
-        let durationMs: number | undefined;
-        let attemptCount: number | undefined;
         let adaptiveRouting = false;
         let routerVersion = "";
-        let reliabilityScore: number | undefined;
         let answerSources: SourceInfo[] = [];
 
         setMessages([
@@ -1754,82 +1603,46 @@ if (shouldUseCodeProject) {
           );
         };
 
-        if (aiEngine === "puter" && mode !== "research") {
-          if (!accountPlan?.puter_access) {
-            throw new Error("Vasuki Pro access required.");
-          }
-
-          const puterContext = await fetchPuterContext(
+        const meta = await streamChat(
+          requestMessages,
+          {
             accessToken,
-            memoryEnabled,
-          );
-          const usedModel = await streamPuterChat(
-            requestMessages,
-            {
-              systemContext: puterContext.system_prompt,
-              signal: controller.signal,
-            },
-            onStreamToken,
-          );
-          providerName = `vasuki-pro:${usedModel}`;
-        } else {
-          const meta = await streamChat(
-            requestMessages,
-            {
-              accessToken,
-              useWeb: webEnabled || mode === "web" || mode === "research",
-              useMemory: memoryEnabled,
-              useDocuments: documentsEnabled,
-              documentIds: selectedDocumentIds,
-              projectId: activeProjectId || undefined,
-              researchMode: mode === "research",
-              cacheBypass: mode === "research",
-              signal: controller.signal,
-            },
-            onStreamToken,
-          );
+            useWeb: webEnabled || mode === "web" || mode === "research",
+            useMemory: memoryEnabled,
+            useDocuments: documentsEnabled,
+            documentIds: selectedDocumentIds,
+            projectId: activeProjectId || undefined,
+            researchMode: mode === "research",
+            cacheBypass: mode === "research",
+            signal: controller.signal,
+          },
+          onStreamToken,
+        );
 
-          providerName = meta.provider || "";
-          providerModel = meta.provider_model || "";
-          firstTokenMs =
-            typeof meta.first_token_ms === "number"
-              ? meta.first_token_ms
-              : undefined;
-          durationMs =
-            typeof meta.duration_ms === "number"
-              ? meta.duration_ms
-              : undefined;
-          attemptCount =
-            typeof meta.attempt_count === "number"
-              ? meta.attempt_count
-              : undefined;
-          adaptiveRouting = meta.adaptive_routing === true;
-          routerVersion =
-            typeof meta.router_version === "string" ? meta.router_version : "";
-          reliabilityScore =
-            typeof meta.reliability_score === "number"
-              ? meta.reliability_score
-              : undefined;
-          answerSources = normaliseSources(meta.sources);
-
-          if (typeof meta.daily_remaining === "number") {
-            setQuotaStatus({
-              minuteLimit:
-                typeof meta.minute_limit === "number"
-                  ? meta.minute_limit
-                  : 15,
-              minuteRemaining:
-                typeof meta.minute_remaining === "number"
-                  ? meta.minute_remaining
-                  : 0,
-              dailyLimit:
-                typeof meta.daily_limit === "number"
-                  ? meta.daily_limit
-                  : 0,
-              dailyRemaining: meta.daily_remaining,
-            });
-          }
-        }
+        providerName = meta.provider || "";
+        providerModel = meta.provider_model || "";
+        const firstTokenMs =
+          typeof meta.first_token_ms === "number"
+            ? meta.first_token_ms
+            : undefined;
+        const durationMs =
+          typeof meta.duration_ms === "number"
+            ? meta.duration_ms
+            : undefined;
+        const attemptCount =
+          typeof meta.attempt_count === "number"
+            ? meta.attempt_count
+            : undefined;
+        adaptiveRouting = meta.adaptive_routing === true;
+        routerVersion =
+          typeof meta.router_version === "string"
+            ? meta.router_version
+            : "";
+        const reliabilityScore =
+          typeof meta.reliability_score === "number"
+            ? meta.reliability_score
+            : undefined;
+        answerSources = normaliseSources(meta.sources);
 
         const answer = streamedAnswer.trim();
         if (!answer) {
@@ -2356,60 +2169,10 @@ if (shouldUseCodeProject) {
             )}
 
             <div className="pv-model-switcher">
-              <button
-                type="button"
-                className="pv-model-button"
-                onClick={() => setModelMenuOpen((open) => !open)}
-                aria-expanded={modelMenuOpen}
-              >
+              <div className="pv-model-button pv-model-button--static">
                 <Logo className="pv-header-logo" />
-                <span>
-                  {aiEngine === "puter"
-                    ? "Vasuki Pro"
-                    : "Vasuki AI"}
-                </span>
-                <Icon name="chevron" />
-              </button>
-
-              {modelMenuOpen && (
-                <div className="pv-model-menu">
-                  <button
-                    type="button"
-                    className={
-                      aiEngine === "vasuki" ? "is-active" : ""
-                    }
-                    onClick={() => {
-                      setAiEngine("vasuki");
-                      setModelMenuOpen(false);
-                    }}
-                  >
-                    <strong>Vasuki AI</strong>
-                    <small>
-                      Fast answers · Code · Images · Web · Memory
-                    </small>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={
-                      aiEngine === "puter" ? "is-active" : ""
-                    }
-                    disabled={planBusy}
-                    onClick={() => void selectPuterEngine()}
-                  >
-                    <strong>Vasuki Pro</strong>
-                    <small>
-                      Smart answers · Complete coding · 50 images/day
-                    </small>
-                  </button>
-
-                  {puterAccount && (
-                    <p className="pv-puter-account">
-                      Connected: {puterAccount}
-                    </p>
-                  )}
-                </div>
-              )}
+                <span>Vasuki AI</span>
+              </div>
             </div>
 
             {activeProject ? (

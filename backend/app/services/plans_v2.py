@@ -18,27 +18,15 @@ async def get_plan_status(
     user: AuthUser,
     settings: Settings,
 ) -> PlanStatus:
-    if paid.is_owner(user, settings):
-        return PlanStatus(
-            plan="owner",
-            is_owner=True,
-            puter_access=True,
-            pro_expires_at=None,
-            amount_paise=0,
-            plan_days=0,
-        )
-
-    if settings.puter_free_for_all:
-        return PlanStatus(
-            plan="free",
-            is_owner=False,
-            puter_access=True,
-            pro_expires_at=None,
-            amount_paise=0,
-            plan_days=0,
-        )
-
-    return await paid.get_plan_status(user, settings)
+    owner = paid.is_owner(user, settings)
+    return PlanStatus(
+        plan="owner" if owner else "free",
+        is_owner=owner,
+        puter_access=True,
+        pro_expires_at=None,
+        amount_paise=0,
+        plan_days=0,
+    )
 
 
 async def require_puter_access(
@@ -58,9 +46,7 @@ async def create_razorpay_order(
     user: AuthUser,
     settings: Settings,
 ) -> dict[str, Any]:
-    if settings.puter_free_for_all:
-        raise HTTPException(
-            status_code=400,
-            detail="The Puter plan is currently free for all users.",
-        )
-    return await paid.create_razorpay_order(user, settings)
+    raise HTTPException(
+        status_code=410,
+        detail="Paid plan checkout is no longer available.",
+    )
