@@ -51,8 +51,7 @@ import {
   streamPuterChat,
 } from "@/lib/puter";
 
-const VASUKI_LOGO_URL =
-  "https://images.jdmagicbox.com/v2/comp/jaipur/a2/0141px141.x141.260404193718.t6a2/catalogue/vasuki-nfc-luniawas-jaipur-printing-services-604tb4s28a.jpg";
+const VASUKI_LOGO_URL = "/vasuki-pwa.svg";
 
 const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -775,6 +774,7 @@ export default function ChatApp() {
   const [codeWorkspaceTab, setCodeWorkspaceTab] = useState<CodeWorkspaceTab>("code");
   const [codeWorkspaceSnapshot, setCodeWorkspaceSnapshot] = useState<InlineCodeSnapshot | null>(null);
   const [codeBuildStatus, setCodeBuildStatus] = useState<CodeBuildJobStatus | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historySearchInputRef = useRef<HTMLInputElement>(null);
@@ -786,6 +786,25 @@ export default function ChatApp() {
     jobId: string;
     accessToken: string;
   } | null>(null);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("vasuki-ui-theme");
+    const initialTheme =
+      savedTheme === "light" || savedTheme === "dark"
+        ? savedTheme
+        : window.matchMedia?.("(prefers-color-scheme: light)").matches
+          ? "light"
+          : "dark";
+    setTheme(initialTheme);
+    document.documentElement.dataset.pvTheme = initialTheme;
+  }, []);
+
+  function toggleTheme() {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    window.localStorage.setItem("vasuki-ui-theme", nextTheme);
+    document.documentElement.dataset.pvTheme = nextTheme;
+  }
 
   useEffect(() => {
     const wakeBackend = () => {
@@ -2218,10 +2237,10 @@ if (shouldUseCodeProject) {
             <span>New chat</span>
           </button>
           <a className="pv-nav-button" href="/projects"><Icon name="project" /><span>Projects</span></a>
-          <a className="pv-nav-button" href="/files"><Icon name="file" /><span>My Files</span></a>
-          <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Image History</span></a>
+          <a className="pv-nav-button" href="/files"><Icon name="file" /><span>Files</span></a>
+          <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Images</span></a>
           {accountPlan?.plan === "owner" && (
-            <a className="pv-nav-button" href="/owner"><Icon name="analytics" /><span>Owner Analytics</span></a>
+            <a className="pv-nav-button" href="/owner"><Icon name="analytics" /><span>Insights</span></a>
           )}
 
         </nav>
@@ -2366,7 +2385,7 @@ if (shouldUseCodeProject) {
                   >
                     <strong>Vasuki AI</strong>
                     <small>
-                      V40 Creator · Advanced Code · Advanced Images · Web · Memory
+                      Fast answers · Code · Images · Web · Memory
                     </small>
                   </button>
 
@@ -2404,6 +2423,23 @@ if (shouldUseCodeProject) {
             ) : null}
           </div>
 
+          <div className="pv-header-right">
+            <span className="pv-workspace-pill">
+              <span className="pv-workspace-dot" aria-hidden="true" />
+              Private workspace
+            </span>
+            <button
+              type="button"
+              className="pv-theme-toggle"
+              aria-label={
+                theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+              }
+              title={theme === "dark" ? "Light theme" : "Dark theme"}
+              onClick={toggleTheme}
+            >
+              <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+            </button>
+          </div>
         </header>
 
         {!hasMessages ? (
@@ -2411,11 +2447,10 @@ if (shouldUseCodeProject) {
             <div className="pv-welcome-inner">
               <Logo className="pv-welcome-logo" />
               <div className="pv-welcome-heading">
-                <p>Vasuki Core · V40 Advanced Creator Runtime · online</p>
-                <h1>Turn intent into working systems.</h1>
+                <p>Vasuki Intelligence</p>
+                <h1>What can Vasuki help you build today?</h1>
                 <div className="pv-welcome-subline">
-                  Build software, investigate the web, create media and move
-                  projects forward with reflection, goal awareness and calibrated intuition.
+                  Research, create, code and analyze in one focused workspace.
                 </div>
               </div>
 
@@ -2426,8 +2461,8 @@ if (shouldUseCodeProject) {
                     setInput("Build a complete production-ready web app for ")
                   }
                 >
-                  <strong>Build software</strong>
-                  <small>Architecture · code · ZIP · runbook</small>
+                  <strong>Build</strong>
+                  <small>Apps · websites · code · files</small>
                 </button>
                 <button
                   type="button"
@@ -2435,8 +2470,8 @@ if (shouldUseCodeProject) {
                     setInput("Fix and improve this project: ")
                   }
                 >
-                  <strong>Repair a project</strong>
-                  <small>Upload ZIP · inspect · patch · validate</small>
+                  <strong>Improve project</strong>
+                  <small>Upload · inspect · fix · validate</small>
                 </button>
                 <button
                   type="button"
@@ -2446,8 +2481,8 @@ if (shouldUseCodeProject) {
                     setInput("Research and verify ");
                   }}
                 >
-                  <strong>Investigate</strong>
-                  <small>Live web · evidence · synthesis</small>
+                  <strong>Research</strong>
+                  <small>Current web · evidence · sources</small>
                 </button>
                 <button
                   type="button"
@@ -2456,8 +2491,8 @@ if (shouldUseCodeProject) {
                     setInput("Create a premium visual of ");
                   }}
                 >
-                  <strong>Create visual</strong>
-                  <small>Image studio · identity-aware</small>
+                  <strong>Create image</strong>
+                  <small>Posters · concepts · visuals</small>
                 </button>
               </div>
 
@@ -3430,6 +3465,15 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
 
   return (
     <div className="pv-source-strip">
+      <div className="pv-source-verification">
+        <span className="pv-source-verified-icon" aria-hidden="true">✓</span>
+        <span className="pv-source-verification-copy">
+          <strong>Verified sources</strong>
+          <small>
+            {items.length} {items.length === 1 ? "reference" : "references"}
+          </small>
+        </span>
+      </div>
       <div className="pv-source-chip-row" aria-label="Answer sources">
         {preview.map((source, index) =>
           source.url ? (
@@ -3471,7 +3515,7 @@ function SourceStrip({ sources }: { sources?: SourceInfo[] }) {
 
       <details className="pv-sources-details">
         <summary>
-          <strong>Sources</strong>
+          <strong>Source details</strong>
           <span>{items.length}</span>
         </summary>
 

@@ -85,10 +85,10 @@ export default function V11Page() {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const [htmlCode, setHtmlCode] = useState(`<main>
-  <h1>Vasuki V11 Sandbox</h1>
+  <h1>Vasuki Sandbox</h1>
   <button onclick="document.querySelector('h1').textContent='Working!'">Test</button>
 </main>`);
-  const [pythonCode, setPythonCode] = useState(`print("Vasuki V11 Python sandbox ready")`);
+  const [pythonCode, setPythonCode] = useState(`print("Vasuki Python sandbox ready")`);
   const [pythonOutput, setPythonOutput] = useState("");
   const [sandboxLang, setSandboxLang] = useState<"html" | "python">("html");
 
