@@ -2285,3 +2285,97 @@ export async function cancelCodeBuildJobV17(
   );
 }
 /* VASUKI_V17_ASYNC_CODE_JOBS_END */
+
+/* VASUKI_V65_V67_MODERN_AI_API */
+export type ConnectorV65 = {
+  id: string;
+  label: string;
+  category: string;
+  state: string;
+  configured: boolean;
+  read_capable: boolean;
+  write_capable: boolean;
+  permission_required_for_write: boolean;
+  note: string;
+  capabilities: string[];
+};
+
+export type MultimodalCapabilitiesV66 = {
+  image_analysis?: boolean;
+  image_editing?: boolean;
+  pdf_analysis?: boolean;
+  document_analysis?: boolean;
+  audio_upload_transcription?: boolean;
+  server_text_to_speech?: boolean;
+  browser_voice_input?: boolean;
+  browser_read_aloud?: boolean;
+  joint_multimodal_endpoint?: boolean;
+  max_joint_files?: number;
+  max_file_mb?: number;
+};
+
+export type ReliabilityV67 = {
+  state?: string;
+  score?: number;
+  samples?: Record<string, number>;
+  metrics?: {
+    current_search_availability_pct?: number;
+    multi_source_grounding_pct?: number;
+    average_answer_quality?: number;
+    current_fact_answer_quality?: number;
+    truth_guard_blocks?: number;
+  };
+  recent_search_failures?: Array<Record<string, unknown>>;
+  privacy?: Record<string, unknown>;
+};
+
+export async function fetchConnectionsV65(accessToken: string): Promise<{
+  ok?: boolean;
+  connectors: ConnectorV65[];
+}> {
+  const data = await getAt(
+    DIRECT_API_URL,
+    "/api/v65/connections",
+    accessToken,
+  );
+  return {
+    ok: data.ok === true,
+    connectors: Array.isArray(data.connectors)
+      ? (data.connectors as ConnectorV65[])
+      : [],
+  };
+}
+
+export async function fetchMultimodalCapabilitiesV66(
+  accessToken: string,
+): Promise<{
+  ok?: boolean;
+  capabilities: MultimodalCapabilitiesV66;
+}> {
+  const data = await getAt(
+    DIRECT_API_URL,
+    "/api/v66/capabilities",
+    accessToken,
+  );
+  return {
+    ok: data.ok === true,
+    capabilities:
+      data.capabilities && typeof data.capabilities === "object"
+        ? (data.capabilities as MultimodalCapabilitiesV66)
+        : {},
+  };
+}
+
+export async function fetchOwnerReliabilityV67(
+  accessToken: string,
+): Promise<ReliabilityV67> {
+  const data = await getAt(
+    DIRECT_API_URL,
+    "/api/owner/v67/reliability",
+    accessToken,
+  );
+  return data.reliability && typeof data.reliability === "object"
+    ? (data.reliability as ReliabilityV67)
+    : {};
+}
+/* VASUKI_V65_V67_MODERN_AI_API_END */

@@ -187,6 +187,22 @@ function latencyLabel(milliseconds?: number) {
   }
   return `${(milliseconds / 1000).toFixed(milliseconds < 10000 ? 1 : 0)} s`;
 }
+
+function readResponseAloud(value: string) {
+  const text = value.trim();
+  if (!text || typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text.slice(0, 12000));
+  utterance.lang = /[\u0900-\u097F]/.test(text)
+    ? "hi-IN"
+    : navigator.language || "en-IN";
+  utterance.rate = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
 /* VASUKI_V45_PROVIDER_BADGE_END */
 
 /* VASUKI_VOICE_TYPES_START */
@@ -2115,6 +2131,7 @@ if (shouldUseCodeProject) {
           <a className="pv-nav-button" href="/projects"><Icon name="project" /><span>Projects</span></a>
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>Files</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Images</span></a>
+          <a className="pv-nav-button" href="/connections"><Icon name="project" /><span>Connections</span></a>
           {accountPlan?.plan === "owner" && (
             <a className="pv-nav-button" href="/owner"><Icon name="analytics" /><span>Insights</span></a>
           )}
@@ -2483,6 +2500,18 @@ if (shouldUseCodeProject) {
                               }
                             >
                               <Icon name="copy" />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Read response aloud"
+                              title="Read aloud"
+                              onClick={() =>
+                                readResponseAloud(
+                                  chatTextWithoutCodeBlocks(message.content),
+                                )
+                              }
+                            >
+                              <span aria-hidden="true">🔊</span>
                             </button>
                             <button
                               type="button"
