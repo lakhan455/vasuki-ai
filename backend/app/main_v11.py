@@ -62,6 +62,7 @@ from app.v55.memory_brain import health_snapshot as v55_health_snapshot
 from app.v56.ui_contract import health_snapshot as v56_health_snapshot
 from app.v57.coding_brain import health_snapshot as v57_health_snapshot
 from app.v58.fresh_facts import health_snapshot as v58_health_snapshot
+from app.v59.fresh_fact_resolver import health_snapshot as v59_health_snapshot
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -207,6 +208,11 @@ async def health_v57() -> dict[str, Any]:
 @app.get("/health/v58")
 async def health_v58() -> dict[str, Any]:
     return v58_health_snapshot()
+
+
+@app.get("/health/v59")
+async def health_v59() -> dict[str, Any]:
+    return v59_health_snapshot()
 
 
 @app.post("/internal/v50/live-refresh")

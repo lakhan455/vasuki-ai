@@ -88,6 +88,7 @@ from app.v53.intelligence_core import build_intelligence_contract
 from app.v54.knowledge_brain import assess_and_rank_sources
 from app.v57.coding_brain import build_coding_policy
 from app.v58.fresh_facts import fresh_fact_answer_policy
+from app.v59.fresh_fact_resolver import fresh_fact_evidence_context
 
 
 settings = get_settings()
@@ -915,6 +916,12 @@ async def chat(
     )
     web_sources = list(evidence.sources)
 
+    fresh_fact_resolution = fresh_fact_evidence_context(
+        query,
+        web_sources,
+        as_of=current_date,
+    )
+
     project_active = bool(
         str(getattr(request, "project_id", "") or "").strip()
     )
@@ -942,6 +949,7 @@ async def chat(
 
     web_context = _join_context(
         fresh_fact_policy,
+        fresh_fact_resolution,
         intelligence.context,
         evidence.context if web_sources else "",
         coding_policy,
