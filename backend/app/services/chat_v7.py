@@ -23,6 +23,11 @@ from app.v47.reliability_router import (
     provider_available as v47_provider_available,
     reliability_score as v47_reliability_score,
 )
+from app.v51.speed_lane import (
+    context_policy,
+    gemini_timeout_seconds,
+    provider_attempt_budget,
+)
 
 def _chunks(s,size=80): return [s[i:i+size] for i in range(0,len(s),size)]
 
@@ -169,14 +174,15 @@ async def route_chat_stream_v7(
     exclude_provider: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     started = time.perf_counter()
+    d = classify_route(messages, require_current=require_current)
+    context_chars, preserve_last = context_policy(d, settings)
     messages = compress_messages(
         messages,
-        max_chars=int(getattr(settings, "max_context_chars", 45000)),
-        preserve_last=12,
+        max_chars=context_chars,
+        preserve_last=preserve_last,
     )
-    d = classify_route(messages, require_current=require_current)
     q = last_user_query(messages)
-    max_attempts = max(1, min(7, int(getattr(settings, "max_provider_attempts", 7))))
+    max_attempts = provider_attempt_budget(d, settings, provider)
     excluded_family = _provider_family(exclude_provider)
     candidates, recovery_mode = _select_chat_candidates(
         d,
@@ -262,7 +268,7 @@ async def route_chat_stream_v7(
                         as_of=as_of,
                         temperature=0.0 if require_current else 0.2,
                     ),
-                    timeout=float(getattr(settings, "large_provider_timeout_seconds", 45)),
+                    timeout=gemini_timeout_seconds(d, settings),
                 )
                 if not answer.strip():
                     raise RuntimeError("Gemini returned an empty answer")

@@ -273,6 +273,25 @@ class Settings(BaseSettings):
     v50_cron_secret: str | None = None
     # VASUKI_V50_PRODUCTION_INTELLIGENCE_CORE_END
 
+    # VASUKI_V51_SPEED_LANE_START
+    # Latency-only policy layer. Truth/evidence rules remain unchanged.
+    v51_speed_lane_enabled: bool = True
+    v51_fast_context_chars: int = 16000
+    v51_general_context_chars: int = 28000
+    v51_strong_context_chars: int = 42000
+    v51_fast_provider_attempts: int = 3
+    v51_general_provider_attempts: int = 4
+    v51_strong_provider_attempts: int = 5
+    v51_gemini_fast_timeout_seconds: float = 7.5
+    v51_gemini_general_timeout_seconds: float = 11.0
+    v51_gemini_strong_timeout_seconds: float = 18.0
+    v51_memory_context_timeout_seconds: float = 1.0
+    v51_current_web_results: int = 6
+    v51_skip_unneeded_shared_lookup: bool = True
+    v51_startup_restore_budget_seconds: float = 0.7
+    v51_restored_failure_cooldown_seconds: float = 90.0
+    # VASUKI_V51_SPEED_LANE_END
+
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0
     error_alert_webhook_url: str | None = None

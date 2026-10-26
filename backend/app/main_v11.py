@@ -52,6 +52,10 @@ from app.v49.live_knowledge import background_loop as v49_live_knowledge_loop, r
 from app.v49.router import build_router as build_v49_router
 from app.v50.production_core import health_snapshot as v50_health_snapshot
 from app.v50.telemetry import record_degraded
+from app.v51.speed_lane import (
+    health_snapshot as v51_health_snapshot,
+    startup_restore_budget_seconds,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -106,12 +110,37 @@ async def _v11_release_guard_loop():
         except Exception as exc:
             record_degraded("release_guard", "auto_rollback", exc)
 
+async def _v51_restore_runtime_learning() -> None:
+    results = await asyncio.gather(
+        load_persisted_provider_learning(settings),
+        load_persisted_reliability(settings),
+        return_exceptions=True,
+    )
+    for index, result in enumerate(results):
+        if isinstance(result, Exception):
+            record_degraded(
+                "startup_restore",
+                "provider_quality" if index == 0 else "provider_reliability",
+                result,
+                severity="info",
+            )
+
+
+async def _v51_bounded_startup_restore() -> None:
+    task = asyncio.create_task(_v51_restore_runtime_learning())
+    done, _pending = await asyncio.wait(
+        {task},
+        timeout=startup_restore_budget_seconds(settings),
+    )
+    if task not in done:
+        _v11_background_tasks.append(task)
+
+
 @app.on_event("startup")
 async def v11_startup():
-    await load_persisted_provider_learning(settings)
-    # V47 restores sampled runtime latency/reliability without requiring a
-    # separate migration. If Supabase is unavailable, startup remains healthy.
-    await load_persisted_reliability(settings)
+    # V51 gives persistence restore a small startup budget, then lets any slow
+    # restore finish in the background. The router remains safe without it.
+    await _v51_bounded_startup_restore()
     if bool(getattr(settings, "v11_scheduler_enabled", True)):
         _v11_background_tasks.append(asyncio.create_task(_v11_scheduler_loop()))
     if bool(getattr(settings, "v49_live_knowledge_enabled", True)):
@@ -137,6 +166,11 @@ async def v11_shutdown():
 @app.get("/health/v50")
 async def health_v50() -> dict[str, Any]:
     return v50_health_snapshot(settings)
+
+
+@app.get("/health/v51")
+async def health_v51() -> dict[str, Any]:
+    return v51_health_snapshot(settings)
 
 
 @app.post("/internal/v50/live-refresh")
