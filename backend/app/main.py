@@ -87,6 +87,7 @@ from app.v51.speed_lane import (
 from app.v53.intelligence_core import build_intelligence_contract
 from app.v54.knowledge_brain import assess_and_rank_sources
 from app.v57.coding_brain import build_coding_policy
+from app.v58.fresh_facts import fresh_fact_answer_policy
 
 
 settings = get_settings()
@@ -934,7 +935,13 @@ async def chat(
         project_active=project_active,
     )
 
+    fresh_fact_policy = fresh_fact_answer_policy(
+        query,
+        as_of=current_date,
+    )
+
     web_context = _join_context(
+        fresh_fact_policy,
         intelligence.context,
         evidence.context if web_sources else "",
         coding_policy,
@@ -1180,6 +1187,10 @@ async def chat_stream(
         )
 
     web_context = _join_context(
+        fresh_fact_answer_policy(
+            query,
+            as_of=current_date,
+        ),
         shared_pack,
         private_pack,
         live_pack,

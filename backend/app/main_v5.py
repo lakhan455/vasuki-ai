@@ -18,6 +18,7 @@ from app.v13.critic import critic_review
 from app.v53.intelligence_core import build_intelligence_contract
 from app.v54.knowledge_brain import assess_and_rank_sources
 from app.v57.coding_brain import build_coding_policy
+from app.v58.fresh_facts import fresh_fact_answer_policy
 
 
 app = v4.app
@@ -248,6 +249,10 @@ async def chat_stream_v5(
             "mention material disagreement, and never invent citations or unsupported claims."
         )
     web_context = legacy._join_context(
+        fresh_fact_answer_policy(
+            query,
+            as_of=current_date,
+        ),
         intelligence.context,
         evidence.context if web_sources else "",
         coding_policy,

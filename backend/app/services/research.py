@@ -10,6 +10,10 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import Settings
+from app.v58.fresh_facts import (
+    build_fresh_fact_search_query,
+    is_volatile_person_status_query,
+)
 
 
 # Any answer in these categories can change without the model being updated.
@@ -393,6 +397,7 @@ def needs_live_web(query: str) -> bool:
         or any(term in normalized for term in DYNAMIC_FACT_TERMS)
         or _is_officeholder_query(query)
         or is_all_india_state_cm_query(query)
+        or is_volatile_person_status_query(query)
     )
 
 
@@ -698,17 +703,26 @@ async def search_web(
             f"{primary}. Then cross-check with trusted specialist sources: {reference}."
         )
 
-    base_query = (
-        f"As of {as_of}, verify the newest currently valid answer to this question: {query}. "
-        "Use primary sources where possible. Treat newer official updates, corrections, releases, "
-        "rankings, subscriber counts, availability changes, appointments and dated reports as "
-        "overriding older pages."
-        if require_current
-        else (
-            f"Research this question carefully: {query}. Prefer primary/official sources, then "
-            "cross-check important claims with trusted specialist sources."
+    if is_volatile_person_status_query(query):
+        base_query = (
+            build_fresh_fact_search_query(
+                query,
+                as_of=as_of,
+            )
+            + profile_instruction
         )
-    ) + profile_instruction
+    else:
+        base_query = (
+            f"As of {as_of}, verify the newest currently valid answer to this question: {query}. "
+            "Use primary sources where possible. Treat newer official updates, corrections, releases, "
+            "rankings, subscriber counts, availability changes, appointments and dated reports as "
+            "overriding older pages."
+            if require_current
+            else (
+                f"Research this question carefully: {query}. Prefer primary/official sources, then "
+                "cross-check important claims with trusted specialist sources."
+            )
+        ) + profile_instruction
 
     jobs: list = [
         tavily_search(
