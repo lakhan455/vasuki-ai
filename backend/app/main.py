@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -89,6 +90,7 @@ from app.v54.knowledge_brain import assess_and_rank_sources
 from app.v57.coding_brain import build_coding_policy
 from app.v58.fresh_facts import fresh_fact_answer_policy
 from app.v59.fresh_fact_resolver import fresh_fact_evidence_context
+from app.v67.reliability import observe_live_search
 
 
 settings = get_settings()
@@ -354,6 +356,8 @@ async def _web_context(
         research_mode=research_mode,
         require_current=require_current,
     )
+    search_started = time.perf_counter()
+    search_error = ""
     try:
         sources, _provider = await asyncio.wait_for(
             search_web(
@@ -367,7 +371,16 @@ async def _web_context(
         )
     except Exception as exc:
         record_degraded("live_search", "search_web", exc)
+        search_error = f"{type(exc).__name__}: {str(exc)[:120]}"
         sources = []
+
+    observe_live_search(
+        ok=bool(sources),
+        source_count=len(sources),
+        duration_ms=(time.perf_counter() - search_started) * 1000,
+        current_required=require_current,
+        error=search_error,
+    )
 
     if not sources:
         return require_current, [], ""

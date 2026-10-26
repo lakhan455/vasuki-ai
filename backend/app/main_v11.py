@@ -63,6 +63,19 @@ from app.v56.ui_contract import health_snapshot as v56_health_snapshot
 from app.v57.coding_brain import health_snapshot as v57_health_snapshot
 from app.v58.fresh_facts import health_snapshot as v58_health_snapshot
 from app.v59.fresh_fact_resolver import health_snapshot as v59_health_snapshot
+from app.v65.connectors import (
+    connector_snapshot as v65_connector_snapshot,
+    health_snapshot as v65_health_snapshot,
+)
+from app.v66.multimodal import (
+    health_snapshot as v66_health_snapshot,
+    multimodal_capabilities as v66_multimodal_capabilities,
+)
+from app.v67.reliability import (
+    health_snapshot as v67_health_snapshot,
+    observe_answer_quality as v67_observe_answer_quality,
+    reliability_snapshot as v67_reliability_snapshot,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -215,6 +228,52 @@ async def health_v59() -> dict[str, Any]:
     return v59_health_snapshot()
 
 
+@app.get("/health/v65")
+async def health_v65() -> dict[str, Any]:
+    return v65_health_snapshot(settings)
+
+
+@app.get("/health/v66")
+async def health_v66() -> dict[str, Any]:
+    return v66_health_snapshot(settings)
+
+
+@app.get("/health/v67")
+async def health_v67() -> dict[str, Any]:
+    return v67_health_snapshot()
+
+
+@app.get("/api/v65/connections")
+async def v65_connections(
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "connectors": v65_connector_snapshot(settings),
+    }
+
+
+@app.get("/api/v66/capabilities")
+async def v66_capabilities(
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "capabilities": v66_multimodal_capabilities(settings),
+    }
+
+
+@app.get("/api/owner/v67/reliability")
+async def v67_reliability(
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    await require_owner(user)
+    return {
+        "ok": True,
+        "reliability": v67_reliability_snapshot(),
+    }
+
+
 @app.post("/internal/v50/live-refresh")
 async def v50_external_live_refresh(
     x_vasuki_cron_secret: str = Header(default="", alias="X-Vasuki-Cron-Secret"),
@@ -290,6 +349,12 @@ async def route_chat_stream_v11(
             combined_score=min(
                 float(automatic["overall"]),
                 float(verification.score),
+            )
+            v67_observe_answer_quality(
+                score=combined_score,
+                current_required=require_current,
+                source_count=len(grounding_sources),
+                provider=final_provider,
             )
             await persist_provider_signal(
                 settings_arg,

@@ -5216,3 +5216,214 @@ html[data-pv-theme="light"] .pv-user-bubble {
 }
 /* VASUKI_V56_INTELLIGENCE_STATUS_END */
 
+/* VASUKI_V65_CONNECTIONS_UI */
+.pv-connections-page {
+  min-height: 100vh;
+  overflow-y: auto;
+  padding: 32px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(79, 134, 247, 0.11), transparent 32%),
+    var(--pv-main);
+  color: var(--pv-text);
+}
+
+.pv-connections-head {
+  display: flex;
+  width: min(100%, 1180px);
+  margin: 0 auto 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pv-connections-head h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(30px, 4vw, 46px);
+  letter-spacing: -0.04em;
+}
+
+.pv-connections-head p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--pv-muted);
+  line-height: 1.65;
+}
+
+.pv-connections-head nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pv-connections-head nav a {
+  padding: 9px 13px;
+  border: 1px solid var(--pv-border);
+  border-radius: 999px;
+  color: var(--pv-text);
+  text-decoration: none;
+}
+
+.pv-connections-summary,
+.pv-connections-grid,
+.pv-connections-voice {
+  width: min(100%, 1180px);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.pv-connections-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.pv-connections-summary article,
+.pv-connections-capability-grid article {
+  padding: 18px;
+  border: 1px solid var(--pv-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.pv-connections-summary span,
+.pv-connections-capability-grid span {
+  display: block;
+  color: var(--pv-muted);
+  font-size: 12px;
+}
+
+.pv-connections-summary strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 24px;
+}
+
+.pv-connections-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pv-connection-card {
+  padding: 20px;
+  border: 1px solid var(--pv-border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pv-connection-card.is-connected {
+  border-color: rgba(82, 196, 132, 0.28);
+  background: rgba(82, 196, 132, 0.045);
+}
+
+.pv-connection-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pv-connection-card-head small {
+  color: var(--pv-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pv-connection-card h2 {
+  margin: 4px 0 0;
+  font-size: 19px;
+}
+
+.pv-connection-state {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #d9d9d9;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pv-connection-card > p {
+  min-height: 44px;
+  color: var(--pv-muted);
+  line-height: 1.55;
+}
+
+.pv-connection-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pv-connection-capabilities span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(79, 134, 247, 0.11);
+  color: #bfd2ff;
+  font-size: 11px;
+}
+
+.pv-connection-card footer {
+  display: flex;
+  margin-top: 18px;
+  justify-content: space-between;
+  gap: 10px;
+  color: #8f8f8f;
+  font-size: 11px;
+}
+
+.pv-connections-voice {
+  margin-top: 22px;
+  margin-bottom: 48px;
+  padding: 22px;
+  border: 1px solid var(--pv-border);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pv-connections-voice h2 {
+  margin: 4px 0 7px;
+}
+
+.pv-connections-voice > div:first-child > p:last-child {
+  color: var(--pv-muted);
+}
+
+.pv-connections-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.pv-connections-capability-grid strong {
+  display: block;
+  margin-top: 6px;
+}
+
+.pv-connections-error {
+  width: min(100%, 1180px);
+  margin: 0 auto 18px;
+}
+
+@media (max-width: 760px) {
+  .pv-connections-page {
+    padding: 20px 14px;
+  }
+
+  .pv-connections-head {
+    flex-direction: column;
+  }
+
+  .pv-connections-summary,
+  .pv-connections-grid,
+  .pv-connections-capability-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pv-connection-card footer {
+    flex-direction: column;
+  }
+}
+/* VASUKI_V65_CONNECTIONS_UI_END */

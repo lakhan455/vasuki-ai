@@ -20,6 +20,7 @@ from app.v54.knowledge_brain import assess_and_rank_sources
 from app.v57.coding_brain import build_coding_policy
 from app.v58.fresh_facts import fresh_fact_answer_policy
 from app.v59.fresh_fact_resolver import fresh_fact_evidence_context
+from app.v67.reliability import observe_truth_guard
 
 
 app = v4.app
@@ -177,6 +178,7 @@ async def chat_stream_v5(
         )
 
     if require_current and not web_sources and not strong_hits:
+        observe_truth_guard("live-verification-unavailable")
         return legacy._direct_stream(
             (
                 "The live verification service is temporarily unavailable. "
@@ -204,6 +206,7 @@ async def chat_stream_v5(
     )
 
     if v50_block:
+        observe_truth_guard("v50-insufficient-current-evidence")
         return legacy._direct_stream(
             legacy.truth_guard_message(v50_assessment),
             provider="v50-truth-guard",

@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import {
   fetchOwnerPlatformV9,
   fetchOwnerReliabilityV12,
+  fetchOwnerReliabilityV67,
   updateOwnerFeatureFlagV9,
   type OwnerPlatformV9,
   type V12ReliabilitySnapshot,
+  type ReliabilityV67,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -20,6 +22,7 @@ async function token() {
 export default function OwnerPage() {
   const [data, setData] = useState<OwnerPlatformV9 | null>(null);
   const [v12, setV12] = useState<V12ReliabilitySnapshot | null>(null);
+  const [v67, setV67] = useState<ReliabilityV67 | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
 
@@ -33,6 +36,11 @@ export default function OwnerPage() {
         setV12(await fetchOwnerReliabilityV12(accessToken));
       } catch {
         setV12(null);
+      }
+      try {
+        setV67(await fetchOwnerReliabilityV67(accessToken));
+      } catch {
+        setV67(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Owner dashboard could not be loaded.");
@@ -93,6 +101,42 @@ export default function OwnerPage() {
             <article><span>429 / quota</span><strong>{usage?.quota_429 ?? 0}</strong></article>
             <article><span>Background jobs</span><strong>{data.jobs?.total ?? 0}</strong></article>
           </section>
+
+          {v67 ? (
+            <>
+              <section className="pv-v9-ops-stats">
+                <article>
+                  <span>V67 reliability</span>
+                  <strong>{(v67.score ?? 0).toFixed(1)}</strong>
+                </article>
+                <article>
+                  <span>Live-search availability</span>
+                  <strong>{(v67.metrics?.current_search_availability_pct ?? 0).toFixed(1)}%</strong>
+                </article>
+                <article>
+                  <span>Multi-source grounding</span>
+                  <strong>{(v67.metrics?.multi_source_grounding_pct ?? 0).toFixed(1)}%</strong>
+                </article>
+                <article>
+                  <span>Current-fact quality</span>
+                  <strong>{(v67.metrics?.current_fact_answer_quality ?? 0).toFixed(1)}</strong>
+                </article>
+                <article>
+                  <span>Truth-guard blocks</span>
+                  <strong>{v67.metrics?.truth_guard_blocks ?? 0}</strong>
+                </article>
+              </section>
+              <section className="pv-v9-owner-grid">
+                <article className="pv-v9-ops-card">
+                  <h2>V67 Reliability Scorecard</h2>
+                  <p className="pv-v9-ops-note">
+                    In-memory operational metrics only. Prompts, answers and user IDs are not stored here.
+                  </p>
+                  <pre>{JSON.stringify(v67, null, 2)}</pre>
+                </article>
+              </section>
+            </>
+          ) : null}
 
           {v12 ? (
             <>
