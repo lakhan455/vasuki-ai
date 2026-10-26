@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import Depends, Header, HTTPException, Request
-from pydantic import BaseModel, Field
+from fastapi import Depends, HTTPException
+from pydantic import BaseModel
 
 import app.main_v5 as v5
 from app.auth import AuthUser, get_current_user
@@ -25,12 +25,6 @@ app = v5.app
 settings = v5.settings
 
 
-class VerifyPaymentRequest(BaseModel):
-    razorpay_order_id: str = Field(min_length=4, max_length=120)
-    razorpay_payment_id: str = Field(min_length=4, max_length=120)
-    razorpay_signature: str = Field(min_length=16, max_length=300)
-
-
 class PuterContextRequest(BaseModel):
     use_memory: bool = True
 
@@ -38,34 +32,6 @@ class PuterContextRequest(BaseModel):
 @app.get("/api/account/plan")
 async def account_plan(current_user: AuthUser = Depends(get_current_user)) -> dict[str, Any]:
     return (await get_plan_status(current_user, settings)).to_dict()
-
-
-@app.post("/api/billing/create-order")
-async def billing_create_order(current_user: AuthUser = Depends(get_current_user)) -> dict[str, Any]:
-    return await create_razorpay_order(current_user, settings)
-
-
-@app.post("/api/billing/verify")
-async def billing_verify(
-    payload: VerifyPaymentRequest,
-    current_user: AuthUser = Depends(get_current_user),
-) -> dict[str, Any]:
-    return await verify_razorpay_payment(
-        current_user,
-        settings,
-        order_id=payload.razorpay_order_id,
-        payment_id=payload.razorpay_payment_id,
-        signature=payload.razorpay_signature,
-    )
-
-
-@app.post("/api/billing/webhook")
-async def billing_webhook(
-    request: Request,
-    x_razorpay_signature: str = Header(default="", alias="X-Razorpay-Signature"),
-) -> dict[str, Any]:
-    return await process_razorpay_webhook(await request.body(), x_razorpay_signature, settings)
-
 
 
 @app.post("/api/puter/image-quota")
@@ -82,7 +48,7 @@ async def puter_image_quota(
         raise HTTPException(
             status_code=429,
             detail=(
-                f"Today's limit of {quota.daily_limit} Vasuki Pro images "
+                f"Today's image limit of {quota.daily_limit} images "
                 "has been reached. Please generate again tomorrow."
             ),
         )

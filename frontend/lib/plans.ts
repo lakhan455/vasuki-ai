@@ -4,7 +4,7 @@ const API_URL = (
 ).replace(/\/$/, "");
 
 export type AccountPlan = {
-  plan: "free" | "pro" | "owner";
+  plan: "free" | "owner";
   is_owner: boolean;
   puter_access: boolean;
   pro_expires_at?: string | null;
@@ -20,32 +20,6 @@ export type PuterImageQuota = {
   persistent: boolean;
 };
 
-type RazorpayOrder = {
-  key_id: string;
-  order_id: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-};
-
-type RazorpayResult = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-};
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => {
-      open: () => void;
-      on: (
-        event: string,
-        handler: (response: { error?: { description?: string } }) => void,
-      ) => void;
-    };
-  }
-}
 
 async function readJson(response: Response) {
   const raw = await response.text();
@@ -129,108 +103,4 @@ export async function releasePuterImageQuota(
   );
 
   return (await readJson(response)) as unknown as PuterImageQuota;
-}
-
-async function createOrder(accessToken: string) {
-  const response = await fetch(`${API_URL}/api/billing/create-order`, {
-    method: "POST",
-    headers: headers(accessToken),
-    cache: "no-store",
-  });
-  return (await readJson(response)) as unknown as RazorpayOrder;
-}
-
-async function verifyPayment(
-  accessToken: string,
-  result: RazorpayResult,
-) {
-  const response = await fetch(`${API_URL}/api/billing/verify`, {
-    method: "POST",
-    headers: headers(accessToken, true),
-    body: JSON.stringify(result),
-    cache: "no-store",
-  });
-  return readJson(response);
-}
-
-function loadRazorpay() {
-  if (window.Razorpay) return Promise.resolve();
-
-  return new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
-    );
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("Razorpay checkout failed to load.")),
-        { once: true },
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () =>
-      reject(new Error("Razorpay checkout failed to load."));
-    document.head.appendChild(script);
-  });
-}
-
-export async function buyVasukiPro(
-  accessToken: string,
-  user: { name?: string; email?: string },
-) {
-  const order = await createOrder(accessToken);
-  await loadRazorpay();
-
-  if (!window.Razorpay) {
-    throw new Error("Razorpay checkout unavailable.");
-  }
-
-  return new Promise<Record<string, unknown>>((resolve, reject) => {
-    const RazorpayCtor = window.Razorpay;
-    if (!RazorpayCtor) {
-      reject(new Error("Razorpay checkout unavailable."));
-      return;
-    }
-
-    const checkout = new RazorpayCtor({
-      key: order.key_id,
-      amount: order.amount,
-      currency: order.currency,
-      name: order.name,
-      description: order.description,
-      order_id: order.order_id,
-      prefill: {
-        name: user.name || "",
-        email: user.email || "",
-      },
-      theme: { color: "#4f86f7" },
-      handler: async (result: RazorpayResult) => {
-        try {
-          resolve(await verifyPayment(accessToken, result));
-        } catch (error) {
-          reject(error);
-        }
-      },
-      modal: {
-        ondismiss: () =>
-          reject(new Error("Payment window was closed.")),
-      },
-    });
-
-    checkout.on("payment.failed", (response) => {
-      reject(
-        new Error(
-          response.error?.description ||
-            "Payment failed. Please try again.",
-        ),
-      );
-    });
-    checkout.open();
-  });
 }
