@@ -18,6 +18,52 @@ def normalize_project_memory(value: str) -> str:
     return clean.casefold()
 
 
+def _render_project_memory_for_context(row: dict[str, Any]) -> str:
+    text = str(row.get("memory_text") or "").strip()
+    source = str(row.get("source") or "").strip().casefold()
+    if not text.startswith("[V71]") and source != "v71":
+        return text
+
+    raw = text[len("[V71]"):].strip() if text.startswith("[V71]") else text
+    try:
+        payload = __import__("json").loads(raw)
+    except Exception:
+        return text
+    if not isinstance(payload, dict):
+        return text
+
+    kind = str(payload.get("kind") or "").strip().casefold()
+    if kind == "goal":
+        return f"PROJECT GOAL: {str(payload.get('text') or '').strip()}"
+    if kind == "decision":
+        title = str(payload.get("title") or "").strip()
+        rationale = str(payload.get("rationale") or "").strip()
+        return f"PROJECT DECISION: {title}" + (
+            f" — Reason: {rationale}" if rationale else ""
+        )
+    if kind == "task":
+        title = str(payload.get("title") or "").strip()
+        status = str(payload.get("status") or "pending").strip()
+        priority = str(payload.get("priority") or "normal").strip()
+        notes = str(payload.get("notes") or "").strip()
+        return (
+            f"PROJECT TASK [{status}/{priority}]: {title}"
+            + (f" — {notes}" if notes else "")
+        )
+    if kind == "last_work":
+        summary = str(payload.get("summary") or "").strip()
+        next_step = str(payload.get("next_step") or "").strip()
+        return (
+            f"PROJECT LAST WORK: {summary}"
+            + (f" — NEXT STEP: {next_step}" if next_step else "")
+        )
+    if kind == "repo":
+        label = str(payload.get("label") or "").strip()
+        url = str(payload.get("url") or "").strip()
+        return f"PROJECT REPOSITORY: {label} {url}".strip()
+    return text
+
+
 def _lexical_score(query: str, text: str) -> float:
     q = {token for token in re.findall(r"[\w-]+", query.casefold()) if len(token) > 2}
     t = {token for token in re.findall(r"[\w-]+", text.casefold()) if len(token) > 2}
@@ -260,5 +306,6 @@ async def project_context_v8(
     if instructions:
         lines.append(f"Project instructions: {instructions}")
     for index, row in enumerate(memories, 1):
-        lines.append(f"[PROJECT MEMORY {index}] {str(row.get('memory_text') or '').strip()}")
+        rendered = _render_project_memory_for_context(row)
+        lines.append(f"[PROJECT MEMORY {index}] {rendered}")
     return "\n".join(lines), memories

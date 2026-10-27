@@ -100,6 +100,17 @@ from app.v70.browser_agent import (
     get_browser_job as v70_get_browser_job,
     shutdown_browser_jobs as v70_shutdown_browser_jobs,
 )
+from app.v71.project_brain import (
+    add_decision as v71_add_decision,
+    add_repo as v71_add_repo,
+    add_task as v71_add_task,
+    delete_item as v71_delete_item,
+    health_snapshot as v71_health_snapshot,
+    project_brain_snapshot as v71_project_brain_snapshot,
+    set_goal as v71_set_goal,
+    set_last_work as v71_set_last_work,
+    update_task as v71_update_task,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -292,6 +303,11 @@ async def health_v69() -> dict[str, Any]:
 @app.get("/health/v70")
 async def health_v70() -> dict[str, Any]:
     return await v70_browser_runtime_snapshot(settings)
+
+
+@app.get("/health/v71")
+async def health_v71() -> dict[str, Any]:
+    return v71_health_snapshot()
 
 
 class V68WorkRequest(BaseModel):
@@ -497,6 +513,195 @@ async def v70_browser_cancel(
     if job is None:
         raise HTTPException(status_code=404, detail="Browser Agent job not found.")
     return job
+
+
+class V71GoalRequest(BaseModel):
+    text: str = Field(min_length=3, max_length=900)
+
+
+class V71LastWorkRequest(BaseModel):
+    summary: str = Field(min_length=3, max_length=700)
+    next_step: str = Field(default="", max_length=320)
+
+
+class V71DecisionRequest(BaseModel):
+    title: str = Field(min_length=3, max_length=420)
+    rationale: str = Field(default="", max_length=650)
+
+
+class V71RepoRequest(BaseModel):
+    label: str = Field(default="", max_length=180)
+    url: str = Field(min_length=10, max_length=700)
+
+
+class V71TaskCreateRequest(BaseModel):
+    title: str = Field(min_length=3, max_length=420)
+    status: str = Field(default="pending", max_length=40)
+    priority: str = Field(default="normal", max_length=40)
+    notes: str = Field(default="", max_length=560)
+
+
+class V71TaskUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=420)
+    status: str | None = Field(default=None, max_length=40)
+    priority: str | None = Field(default=None, max_length=40)
+    notes: str | None = Field(default=None, max_length=560)
+
+
+@app.get("/api/v71/projects/{project_id}/brain")
+async def v71_project_brain(
+    project_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await v71_project_brain_snapshot(
+            settings,
+            user_id=user.id,
+            project_id=project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.patch("/api/v71/projects/{project_id}/goal")
+async def v71_project_goal(
+    project_id: str,
+    payload: V71GoalRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return {
+            "item": await v71_set_goal(
+                settings,
+                user_id=user.id,
+                project_id=project_id,
+                text=payload.text,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/v71/projects/{project_id}/last-work")
+async def v71_project_last_work(
+    project_id: str,
+    payload: V71LastWorkRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return {
+            "item": await v71_set_last_work(
+                settings,
+                user_id=user.id,
+                project_id=project_id,
+                summary=payload.summary,
+                next_step=payload.next_step,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v71/projects/{project_id}/decisions")
+async def v71_project_decision(
+    project_id: str,
+    payload: V71DecisionRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return {
+            "item": await v71_add_decision(
+                settings,
+                user_id=user.id,
+                project_id=project_id,
+                title=payload.title,
+                rationale=payload.rationale,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v71/projects/{project_id}/repos")
+async def v71_project_repo(
+    project_id: str,
+    payload: V71RepoRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return {
+            "item": await v71_add_repo(
+                settings,
+                user_id=user.id,
+                project_id=project_id,
+                label=payload.label,
+                url=payload.url,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v71/projects/{project_id}/tasks")
+async def v71_project_task_create(
+    project_id: str,
+    payload: V71TaskCreateRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return {
+            "item": await v71_add_task(
+                settings,
+                user_id=user.id,
+                project_id=project_id,
+                title=payload.title,
+                status=payload.status,
+                priority=payload.priority,
+                notes=payload.notes,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/v71/projects/{project_id}/tasks/{item_id}")
+async def v71_project_task_update(
+    project_id: str,
+    item_id: str,
+    payload: V71TaskUpdateRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return {
+            "item": await v71_update_task(
+                settings,
+                user_id=user.id,
+                project_id=project_id,
+                item_id=item_id,
+                title=payload.title,
+                status=payload.status,
+                priority=payload.priority,
+                notes=payload.notes,
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/v71/projects/{project_id}/items/{item_id}")
+async def v71_project_item_delete(
+    project_id: str,
+    item_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return {
+        "ok": await v71_delete_item(
+            settings,
+            user_id=user.id,
+            project_id=project_id,
+            item_id=item_id,
+        )
+    }
 
 
 @app.get("/api/v65/connections")

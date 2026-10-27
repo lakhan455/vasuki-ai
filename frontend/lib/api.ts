@@ -2380,6 +2380,169 @@ export async function fetchOwnerReliabilityV67(
 }
 /* VASUKI_V65_V67_MODERN_AI_API_END */
 
+/* VASUKI_V71_PROJECT_BRAIN_3_API */
+export type ProjectBrainItemV71 = {
+  id: string;
+  kind: "goal" | "decision" | "task" | "last_work" | "repo";
+  text?: string;
+  title?: string;
+  rationale?: string;
+  summary?: string;
+  next_step?: string;
+  label?: string;
+  url?: string;
+  status?: "pending" | "in_progress" | "blocked" | "done";
+  priority?: "low" | "normal" | "high" | "critical";
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProjectBrainSnapshotV71 = {
+  ok?: boolean;
+  version?: string;
+  project?: VasukiProject;
+  goal?: ProjectBrainItemV71 | null;
+  last_work?: ProjectBrainItemV71 | null;
+  decisions?: ProjectBrainItemV71[];
+  tasks?: ProjectBrainItemV71[];
+  repos?: ProjectBrainItemV71[];
+  task_summary?: {
+    counts?: Record<string, number>;
+    total?: number;
+    open?: number;
+    completion_pct?: number;
+    next_actions?: ProjectBrainItemV71[];
+  };
+  files?: {
+    count?: number;
+    languages?: Record<string, number>;
+    latest_update?: string | null;
+    items?: ProjectKbFile[];
+  };
+  persistence?: Record<string, unknown>;
+};
+
+export async function fetchProjectBrainV71(
+  accessToken: string,
+  projectId: string,
+): Promise<ProjectBrainSnapshotV71> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/brain`,
+    accessToken,
+  )) as ProjectBrainSnapshotV71;
+}
+
+export async function setProjectGoalV71(
+  accessToken: string,
+  projectId: string,
+  text: string,
+) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/goal`,
+    { text },
+    accessToken,
+  );
+}
+
+export async function setProjectLastWorkV71(
+  accessToken: string,
+  projectId: string,
+  summary: string,
+  nextStep = "",
+) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/last-work`,
+    { summary, next_step: nextStep },
+    accessToken,
+  );
+}
+
+export async function addProjectDecisionV71(
+  accessToken: string,
+  projectId: string,
+  title: string,
+  rationale = "",
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/decisions`,
+    { title, rationale },
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function addProjectRepoV71(
+  accessToken: string,
+  projectId: string,
+  label: string,
+  url: string,
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/repos`,
+    { label, url },
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function addProjectTaskV71(
+  accessToken: string,
+  projectId: string,
+  title: string,
+  status = "pending",
+  priority = "normal",
+  notes = "",
+) {
+  return postJsonAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/tasks`,
+    { title, status, priority, notes },
+    20000,
+    1,
+    accessToken,
+  );
+}
+
+export async function updateProjectTaskV71(
+  accessToken: string,
+  projectId: string,
+  itemId: string,
+  payload: {
+    title?: string;
+    status?: string;
+    priority?: string;
+    notes?: string;
+  },
+) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(itemId)}`,
+    payload,
+    accessToken,
+  );
+}
+
+export async function deleteProjectBrainItemV71(
+  accessToken: string,
+  projectId: string,
+  itemId: string,
+) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/v71/projects/${encodeURIComponent(projectId)}/items/${encodeURIComponent(itemId)}`,
+    accessToken,
+  );
+}
+/* VASUKI_V71_PROJECT_BRAIN_3_API_END */
+
 /* VASUKI_V70_REAL_BROWSER_AGENT_API */
 export type BrowserJobV70 = {
   ok?: boolean;
