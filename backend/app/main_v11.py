@@ -84,6 +84,14 @@ from app.v68.work_mode import (
     health_snapshot as v68_health_snapshot,
     shutdown_work_jobs,
 )
+from app.v69.deep_research import (
+    cancel_research_job as v69_cancel_research_job,
+    create_research_job as v69_create_research_job,
+    create_research_plan as v69_create_research_plan,
+    get_research_job as v69_get_research_job,
+    health_snapshot as v69_health_snapshot,
+    shutdown_research_jobs as v69_shutdown_research_jobs,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -193,6 +201,10 @@ async def v11_shutdown():
         await shutdown_work_jobs()
     except Exception as exc:
         record_degraded("shutdown", "work_jobs", exc, severity="info")
+    try:
+        await v69_shutdown_research_jobs()
+    except Exception as exc:
+        record_degraded("shutdown", "research_jobs", exc, severity="info")
 
 
 @app.get("/health/v50")
@@ -260,6 +272,11 @@ async def health_v68() -> dict[str, Any]:
     return v68_health_snapshot()
 
 
+@app.get("/health/v69")
+async def health_v69() -> dict[str, Any]:
+    return v69_health_snapshot()
+
+
 class V68WorkRequest(BaseModel):
     goal: str = Field(min_length=3, max_length=20000)
     project_id: str | None = None
@@ -322,6 +339,69 @@ async def v68_work_cancel(
     job = await cancel_work_job(user_id=user.id, job_id=job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Work job not found.")
+    return job
+
+
+class V69ResearchPlanRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=12000)
+
+
+class V69ResearchRunRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=12000)
+    plan: dict[str, Any]
+    project_id: str | None = None
+    save_to_kb: bool = False
+    title: str = ""
+
+
+@app.post("/api/v69/research/plan")
+async def v69_research_plan(
+    payload: V69ResearchPlanRequest,
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await v69_create_research_plan(payload.query, settings)
+
+
+@app.post("/api/v69/research/run")
+async def v69_research_run(
+    payload: V69ResearchRunRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await v69_create_research_job(
+            settings,
+            user_id=user.id,
+            query=payload.query,
+            plan=payload.plan,
+            project_id=payload.project_id,
+            save_to_kb=payload.save_to_kb,
+            title=payload.title,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v69/research/{job_id}")
+async def v69_research_status(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v69_get_research_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Deep Research job not found.")
+    return job
+
+
+@app.delete("/api/v69/research/{job_id}")
+async def v69_research_cancel(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v69_cancel_research_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Deep Research job not found.")
     return job
 
 

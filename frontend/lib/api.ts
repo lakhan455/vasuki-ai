@@ -2380,6 +2380,110 @@ export async function fetchOwnerReliabilityV67(
 }
 /* VASUKI_V65_V67_MODERN_AI_API_END */
 
+/* VASUKI_V69_DEEP_RESEARCH_2_API */
+export type DeepResearchQuestionV69 = {
+  id: string;
+  question: string;
+  why?: string;
+  requires_current?: boolean;
+};
+
+export type DeepResearchPlanV69 = {
+  objective: string;
+  subquestions: DeepResearchQuestionV69[];
+  conflicts_to_check: string[];
+  editable?: boolean;
+  max_subquestions?: number;
+};
+
+export type DeepResearchJobV69 = {
+  ok?: boolean;
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "blocked" | "failed" | "cancelled";
+  stage?: string;
+  progress?: number;
+  message?: string;
+  error?: string | null;
+  query?: string;
+  plan?: DeepResearchPlanV69;
+  question_status?: Array<{
+    id?: string;
+    question?: string;
+    status?: string;
+    source_count?: number;
+    provider?: string;
+    error?: string;
+  }>;
+  result?: {
+    answer?: string;
+    sources?: unknown[];
+    provider?: string;
+    conflict_analysis?: Record<string, unknown>;
+    citation_check?: Record<string, unknown>;
+    execution_proof?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+};
+
+export async function createDeepResearchPlanV69(
+  accessToken: string,
+  query: string,
+): Promise<{ ok?: boolean; plan: DeepResearchPlanV69; planner_provider?: string }> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v69/research/plan",
+    { query },
+    90000,
+    1,
+    accessToken,
+  )) as { ok?: boolean; plan: DeepResearchPlanV69; planner_provider?: string };
+}
+
+export async function startDeepResearchV69(
+  accessToken: string,
+  query: string,
+  plan: DeepResearchPlanV69,
+  projectId?: string,
+): Promise<DeepResearchJobV69> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v69/research/run",
+    {
+      query,
+      plan,
+      project_id: projectId || null,
+      save_to_kb: false,
+      title: query.slice(0, 120),
+    },
+    30000,
+    1,
+    accessToken,
+  )) as DeepResearchJobV69;
+}
+
+export async function fetchDeepResearchV69(
+  accessToken: string,
+  jobId: string,
+): Promise<DeepResearchJobV69> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/v69/research/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as DeepResearchJobV69;
+}
+
+export async function cancelDeepResearchV69(
+  accessToken: string,
+  jobId: string,
+) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/v69/research/${encodeURIComponent(jobId)}`,
+    accessToken,
+  );
+}
+/* VASUKI_V69_DEEP_RESEARCH_2_API_END */
+
 /* VASUKI_V68_REAL_WORK_MODE_API */
 export type WorkEventV68 = {
   at?: number;
