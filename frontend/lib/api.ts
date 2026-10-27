@@ -2379,3 +2379,98 @@ export async function fetchOwnerReliabilityV67(
     : {};
 }
 /* VASUKI_V65_V67_MODERN_AI_API_END */
+
+/* VASUKI_V68_REAL_WORK_MODE_API */
+export type WorkEventV68 = {
+  at?: number;
+  step?: string;
+  state?: string;
+  detail?: string;
+  tool?: string;
+  evidence?: Record<string, unknown>;
+};
+
+export type WorkJobV68 = {
+  ok?: boolean;
+  job_id: string;
+  status: "queued" | "running" | "awaiting_approval" | "succeeded" | "blocked" | "failed" | "cancelled";
+  stage?: string;
+  progress?: number;
+  message?: string;
+  error?: string | null;
+  goal?: string;
+  project_id?: string | null;
+  plan?: Record<string, unknown> | null;
+  pending_action?: {
+    type?: string;
+    project_id?: string;
+    change_count?: number;
+    paths?: string[];
+    destructive?: boolean;
+    summary?: string;
+  } | null;
+  events?: WorkEventV68[];
+  result?: {
+    answer?: string;
+    provider?: string;
+    sources?: unknown[];
+    execution_proof?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+};
+
+export async function startWorkV68(
+  accessToken: string,
+  goal: string,
+  projectId?: string,
+): Promise<WorkJobV68> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v68/work",
+    {
+      goal,
+      project_id: projectId || null,
+    },
+    30000,
+    1,
+    accessToken,
+  )) as WorkJobV68;
+}
+
+export async function fetchWorkV68(
+  accessToken: string,
+  jobId: string,
+): Promise<WorkJobV68> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/v68/work/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as WorkJobV68;
+}
+
+export async function approveWorkV68(
+  accessToken: string,
+  jobId: string,
+  approve: boolean,
+): Promise<WorkJobV68> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    `/api/v68/work/${encodeURIComponent(jobId)}/approve`,
+    { approve },
+    20000,
+    1,
+    accessToken,
+  )) as WorkJobV68;
+}
+
+export async function cancelWorkV68(
+  accessToken: string,
+  jobId: string,
+): Promise<WorkJobV68> {
+  return (await deleteAt(
+    DIRECT_API_URL,
+    `/api/v68/work/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as WorkJobV68;
+}
+/* VASUKI_V68_REAL_WORK_MODE_API_END */

@@ -18,7 +18,9 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
+  approveWorkV68,
   cancelCodeBuildJobV17,
+  cancelWorkV68,
   createConversationBranch,
   startCodeBuildJobV17,
   startCodeModifyJobV17,
@@ -28,6 +30,8 @@ import {
   fetchProjects,
   generateImage,
   searchChatHistory,
+  startWorkV68,
+  fetchWorkV68,
   streamChat,
   submitResponseFeedback,
   warmBackend,
@@ -35,6 +39,7 @@ import {
   type ChatSearchResult,
   type SmartFileArtifact,
   type VasukiProject,
+  type WorkJobV68,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
@@ -294,6 +299,29 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function waitMilliseconds(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function workProofText(job: WorkJobV68) {
+  const proof = job.result?.execution_proof;
+  if (!proof || typeof proof !== "object") return "";
+
+  const tools = Array.isArray(proof.executed_tools)
+    ? proof.executed_tools.map(String).filter(Boolean)
+    : [];
+  const testNote =
+    typeof proof.test_note === "string" ? proof.test_note.trim() : "";
+
+  const lines = [
+    "**Work proof**",
+    tools.length > 0
+      ? `Executed: ${tools.join(" → ")}`
+      : "No external tool execution recorded.",
+  ];
+  if (testNote) lines.push(testNote);
+  return `\n\n${lines.join("\n")}`;
+}
 function fileSizeLabel(bytes: number) {
   if (bytes < 1024 * 1024) {
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -799,6 +827,7 @@ export default function ChatApp() {
   const [codeWorkspaceSnapshot, setCodeWorkspaceSnapshot] = useState<InlineCodeSnapshot | null>(null);
   const [codeBuildStatus, setCodeBuildStatus] = useState<CodeBuildJobStatus | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [workMode, setWorkMode] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historySearchInputRef = useRef<HTMLInputElement>(null);
@@ -807,6 +836,10 @@ export default function ChatApp() {
   const chatLoadTokenRef = useRef("");
   const codeIntentRef = useRef(false);
   const activeCodeJobRef = useRef<{
+    jobId: string;
+    accessToken: string;
+  } | null>(null);
+  const activeWorkJobRef = useRef<{
     jobId: string;
     accessToken: string;
   } | null>(null);
@@ -1343,7 +1376,7 @@ export default function ChatApp() {
       selectedAttachment && /\.zip$/i.test(selectedAttachment.file.name),
     );
     codeIntentRef.current = codingRequest;
-    if (codingRequest) {
+    if (codingRequest && !workMode) {
       setCodeWorkspaceOpen(true);
       setCodeWorkspaceTab("code");
       setCodeWorkspaceSnapshot(null);
@@ -1409,7 +1442,87 @@ const requestedDownload =
         );
 
 /* VASUKI_V17_PROJECT_JOB_FLOW */
-if (shouldUseCodeProject) {
+if (workMode && selectedAttachment) {
+  throw new Error(
+    "Work Mode V68 executes live research and active Project work. " +
+    "For a one-off attachment, switch to Chat; for project code, add the files to an active Project first.",
+  );
+} else if (workMode) {
+  setInstantIntent("Work · planning · 0%");
+  const started = await startWorkV68(
+    accessToken,
+    effectiveText,
+    activeProjectId || undefined,
+  );
+  activeWorkJobRef.current = {
+    jobId: started.job_id,
+    accessToken,
+  };
+
+  let current = started;
+  let approvalHandled = false;
+
+  while (true) {
+    setStreamingStarted(true);
+    setInstantIntent(
+      `Work · ${current.message || current.stage || current.status} · ${Math.max(0, Math.min(100, current.progress || 0))}%`,
+    );
+
+    if (current.status === "awaiting_approval" && !approvalHandled) {
+      approvalHandled = true;
+      const pending = current.pending_action;
+      const paths = Array.isArray(pending?.paths)
+        ? pending.paths.slice(0, 8).join("\n• ")
+        : "";
+      const approval = window.confirm(
+        [
+          "Vasuki Work Mode wants to change project files.",
+          `Changes: ${pending?.change_count || 0}`,
+          pending?.destructive ? "Warning: this plan includes file deletion." : "",
+          pending?.summary ? `Plan: ${pending.summary}` : "",
+          paths ? `Files:\n• ${paths}` : "",
+          "\nApprove these project file changes?",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+      );
+      current = await approveWorkV68(
+        accessToken,
+        current.job_id,
+        approval,
+      );
+      continue;
+    }
+
+    if (["succeeded", "blocked", "cancelled"].includes(current.status)) {
+      const answer =
+        typeof current.result?.answer === "string" && current.result.answer.trim()
+          ? current.result.answer.trim()
+          : current.message || "Work finished.";
+      const sources = normaliseSources(current.result?.sources);
+      finalMessages = [
+        ...nextMessages,
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `${answer}${workProofText(current)}`,
+          provider: "vasuki-work-v68",
+          sources,
+        },
+      ];
+      break;
+    }
+
+    if (current.status === "failed") {
+      throw new Error(
+        current.error || current.message || "Work Mode execution failed.",
+      );
+    }
+
+    await waitMilliseconds(700);
+    current = await fetchWorkV68(accessToken, current.job_id);
+  }
+} else if (shouldUseCodeProject) {
   const controller = new AbortController();
   streamAbortRef.current = controller;
 
@@ -1795,6 +1908,7 @@ if (shouldUseCodeProject) {
       streamAbortRef.current = null;
       activeCodeJobRef.current = null;
       setInstantIntent("");
+      activeWorkJobRef.current = null;
       setStreamingStarted(false);
       setBusy(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
@@ -1950,6 +2064,15 @@ if (shouldUseCodeProject) {
 
   function stopStreaming() {
     streamAbortRef.current?.abort();
+    const activeWork = activeWorkJobRef.current;
+    if (activeWork) {
+      void cancelWorkV68(
+        activeWork.accessToken,
+        activeWork.jobId,
+      ).catch((cancelError) =>
+        console.error("Work cancellation failed", cancelError),
+      );
+    }
     const activeJob = activeCodeJobRef.current;
     if (activeJob) {
       void cancelCodeBuildJobV17(
@@ -2255,6 +2378,26 @@ if (shouldUseCodeProject) {
               </div>
             </div>
 
+            <div className="pv-chat-work-toggle" role="group" aria-label="Vasuki mode">
+              <button
+                type="button"
+                className={!workMode ? "is-active" : ""}
+                aria-pressed={!workMode}
+                onClick={() => setWorkMode(false)}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                className={workMode ? "is-active" : ""}
+                aria-pressed={workMode}
+                onClick={() => setWorkMode(true)}
+                title="Plan and execute real supported work with proof"
+              >
+                Work
+              </button>
+            </div>
+
             {activeProject ? (
               <div
                 className="pv-project-context pv-desktop-only"
@@ -2293,7 +2436,9 @@ if (shouldUseCodeProject) {
                 <p>Vasuki Intelligence</p>
                 <h1>What can Vasuki help you build today?</h1>
                 <div className="pv-welcome-subline">
-                  Research, create, code and analyze in one focused workspace.
+                  {workMode
+                    ? "Work Mode plans, executes supported tools, asks before writes, and shows proof."
+                    : "Research, create, code and analyze in one focused workspace."}
                 </div>
               </div>
 

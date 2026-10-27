@@ -76,6 +76,14 @@ from app.v67.reliability import (
     observe_answer_quality as v67_observe_answer_quality,
     reliability_snapshot as v67_reliability_snapshot,
 )
+from app.v68.work_mode import (
+    approve_work_job,
+    cancel_work_job,
+    create_work_job,
+    get_work_job,
+    health_snapshot as v68_health_snapshot,
+    shutdown_work_jobs,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -181,6 +189,10 @@ async def v11_shutdown():
         await shutdown_build_jobs()
     except Exception as exc:
         record_degraded("shutdown", "build_jobs", exc, severity="info")
+    try:
+        await shutdown_work_jobs()
+    except Exception as exc:
+        record_degraded("shutdown", "work_jobs", exc, severity="info")
 
 
 @app.get("/health/v50")
@@ -241,6 +253,76 @@ async def health_v66() -> dict[str, Any]:
 @app.get("/health/v67")
 async def health_v67() -> dict[str, Any]:
     return v67_health_snapshot()
+
+
+@app.get("/health/v68")
+async def health_v68() -> dict[str, Any]:
+    return v68_health_snapshot()
+
+
+class V68WorkRequest(BaseModel):
+    goal: str = Field(min_length=3, max_length=20000)
+    project_id: str | None = None
+
+
+class V68ApprovalRequest(BaseModel):
+    approve: bool
+
+
+@app.post("/api/v68/work")
+async def v68_work_start(
+    payload: V68WorkRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await create_work_job(
+            settings,
+            user_id=user.id,
+            goal=payload.goal,
+            project_id=payload.project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v68/work/{job_id}")
+async def v68_work_status(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await get_work_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Work job not found.")
+    return job
+
+
+@app.post("/api/v68/work/{job_id}/approve")
+async def v68_work_approve(
+    job_id: str,
+    payload: V68ApprovalRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await approve_work_job(
+        user_id=user.id,
+        job_id=job_id,
+        approve=payload.approve,
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="Work job not found.")
+    return job
+
+
+@app.delete("/api/v68/work/{job_id}")
+async def v68_work_cancel(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await cancel_work_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Work job not found.")
+    return job
 
 
 @app.get("/api/v65/connections")

@@ -5427,3 +5427,48 @@ html[data-pv-theme="light"] .pv-user-bubble {
   }
 }
 /* VASUKI_V65_CONNECTIONS_UI_END */
+
+/* VASUKI_V68_WORK_MODE_UI */
+.pv-chat-work-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.pv-chat-work-toggle button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pv-muted);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pv-chat-work-toggle button.is-active {
+  background: rgba(79, 134, 247, 0.18);
+  color: #dce8ff;
+  box-shadow: inset 0 0 0 1px rgba(98, 152, 255, 0.22);
+}
+
+.pv-chat-work-toggle button:hover {
+  color: #ffffff;
+}
+
+@media (max-width: 520px) {
+  .pv-chat-work-toggle {
+    margin-left: 2px;
+  }
+
+  .pv-chat-work-toggle button {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+}
+/* VASUKI_V68_WORK_MODE_UI_END */
