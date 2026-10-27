@@ -143,6 +143,15 @@ class Settings(BaseSettings):
     v11_stt_model: str = "whisper-1"
     # VASUKI_V11_ALL_IN_ONE_END
 
+    # VASUKI_V70_REAL_BROWSER_AGENT_START
+    # Playwright package + Chromium binary are both required for runtime readiness.
+    # V70 never reports ready when Chromium is missing.
+    v70_browser_enabled: bool = True
+    v70_browser_headless: bool = True
+    v70_browser_timeout_seconds: float = 25.0
+    v70_browser_max_steps: int = 6
+    # VASUKI_V70_REAL_BROWSER_AGENT_END
+
     # VASUKI_V17_MISSION_CONTROL_START
     v17_max_concurrent_builds: int = 2
     v17_job_ttl_seconds: int = 3600

@@ -92,6 +92,14 @@ from app.v69.deep_research import (
     health_snapshot as v69_health_snapshot,
     shutdown_research_jobs as v69_shutdown_research_jobs,
 )
+from app.v70.browser_agent import (
+    approve_browser_job as v70_approve_browser_job,
+    browser_runtime_snapshot as v70_browser_runtime_snapshot,
+    cancel_browser_job as v70_cancel_browser_job,
+    create_browser_job as v70_create_browser_job,
+    get_browser_job as v70_get_browser_job,
+    shutdown_browser_jobs as v70_shutdown_browser_jobs,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -205,6 +213,10 @@ async def v11_shutdown():
         await v69_shutdown_research_jobs()
     except Exception as exc:
         record_degraded("shutdown", "research_jobs", exc, severity="info")
+    try:
+        await v70_shutdown_browser_jobs()
+    except Exception as exc:
+        record_degraded("shutdown", "browser_jobs", exc, severity="info")
 
 
 @app.get("/health/v50")
@@ -275,6 +287,11 @@ async def health_v68() -> dict[str, Any]:
 @app.get("/health/v69")
 async def health_v69() -> dict[str, Any]:
     return v69_health_snapshot()
+
+
+@app.get("/health/v70")
+async def health_v70() -> dict[str, Any]:
+    return await v70_browser_runtime_snapshot(settings)
 
 
 class V68WorkRequest(BaseModel):
@@ -402,6 +419,83 @@ async def v69_research_cancel(
     job = await v69_cancel_research_job(user_id=user.id, job_id=job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Deep Research job not found.")
+    return job
+
+
+class V70BrowserWorkRequest(BaseModel):
+    goal: str = Field(min_length=3, max_length=12000)
+    start_url: str | None = None
+    max_steps: int = Field(default=6, ge=1, le=10)
+
+
+class V70BrowserApprovalRequest(BaseModel):
+    approve: bool
+
+
+@app.get("/api/v70/browser/capabilities")
+async def v70_browser_capabilities(
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await v70_browser_runtime_snapshot(settings)
+
+
+@app.post("/api/v70/browser/jobs")
+async def v70_browser_start(
+    payload: V70BrowserWorkRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await v70_create_browser_job(
+            settings,
+            user_id=user.id,
+            goal=payload.goal,
+            start_url=payload.start_url,
+            max_steps=min(
+                payload.max_steps,
+                int(getattr(settings, "v70_browser_max_steps", 6)),
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v70/browser/jobs/{job_id}")
+async def v70_browser_status(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v70_get_browser_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Browser Agent job not found.")
+    return job
+
+
+@app.post("/api/v70/browser/jobs/{job_id}/approve")
+async def v70_browser_approve(
+    job_id: str,
+    payload: V70BrowserApprovalRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v70_approve_browser_job(
+        user_id=user.id,
+        job_id=job_id,
+        approve=payload.approve,
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="Browser Agent job not found.")
+    return job
+
+
+@app.delete("/api/v70/browser/jobs/{job_id}")
+async def v70_browser_cancel(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v70_cancel_browser_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Browser Agent job not found.")
     return job
 
 
