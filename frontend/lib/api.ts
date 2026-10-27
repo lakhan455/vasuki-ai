@@ -2380,6 +2380,107 @@ export async function fetchOwnerReliabilityV67(
 }
 /* VASUKI_V65_V67_MODERN_AI_API_END */
 
+/* VASUKI_V70_REAL_BROWSER_AGENT_API */
+export type BrowserJobV70 = {
+  ok?: boolean;
+  job_id: string;
+  status:
+    | "queued"
+    | "running"
+    | "awaiting_approval"
+    | "succeeded"
+    | "blocked"
+    | "failed"
+    | "cancelled";
+  stage?: string;
+  progress?: number;
+  message?: string;
+  error?: string | null;
+  goal?: string;
+  start_url?: string;
+  max_steps?: number;
+  pending_action?: {
+    type?: string;
+    action?: string;
+    target_id?: string;
+    target_text?: string;
+    target_tag?: string;
+    input_type?: string;
+    value_preview?: string;
+    key?: string;
+    reason?: string;
+    url?: string;
+  } | null;
+  result?: {
+    answer?: string;
+    sources?: unknown[];
+    screenshot_data_url?: string;
+    final_url?: string;
+    final_title?: string;
+    execution_proof?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+};
+
+export async function startBrowserJobV70(
+  accessToken: string,
+  goal: string,
+  maxSteps = 6,
+): Promise<BrowserJobV70> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v70/browser/jobs",
+    {
+      goal,
+      start_url: null,
+      max_steps: maxSteps,
+    },
+    30000,
+    1,
+    accessToken,
+  )) as BrowserJobV70;
+}
+
+export async function fetchBrowserJobV70(
+  accessToken: string,
+  jobId: string,
+): Promise<BrowserJobV70> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/v70/browser/jobs/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as BrowserJobV70;
+}
+
+export async function approveBrowserJobV70(
+  accessToken: string,
+  jobId: string,
+  approve: boolean,
+): Promise<BrowserJobV70> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    `/api/v70/browser/jobs/${encodeURIComponent(jobId)}/approve`,
+    {
+      approve,
+    },
+    30000,
+    1,
+    accessToken,
+  )) as BrowserJobV70;
+}
+
+export async function cancelBrowserJobV70(
+  accessToken: string,
+  jobId: string,
+) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/v70/browser/jobs/${encodeURIComponent(jobId)}`,
+    accessToken,
+  );
+}
+/* VASUKI_V70_REAL_BROWSER_AGENT_API_END */
+
 /* VASUKI_V69_DEEP_RESEARCH_2_API */
 export type DeepResearchQuestionV69 = {
   id: string;

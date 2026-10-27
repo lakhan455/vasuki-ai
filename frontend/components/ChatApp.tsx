@@ -18,7 +18,9 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
+  approveBrowserJobV70,
   approveWorkV68,
+  cancelBrowserJobV70,
   cancelCodeBuildJobV17,
   cancelDeepResearchV69,
   cancelWorkV68,
@@ -32,13 +34,16 @@ import {
   fetchProjects,
   generateImage,
   searchChatHistory,
+  startBrowserJobV70,
   startDeepResearchV69,
   startWorkV68,
+  fetchBrowserJobV70,
   fetchDeepResearchV69,
   fetchWorkV68,
   streamChat,
   submitResponseFeedback,
   warmBackend,
+  type BrowserJobV70,
   type ChatMessage,
   type ChatSearchResult,
   type DeepResearchJobV69,
@@ -307,6 +312,43 @@ function makeId() {
 
 function waitMilliseconds(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function isLikelyBrowserWorkRequestV70(value: string) {
+  const hasUrl =
+    /https?:\/\/[^\s]+/i.test(value) ||
+    /\b(?:www\.)?[a-z0-9][a-z0-9.-]+\.[a-z]{2,}(?:\/[^\s]*)?/i.test(value);
+
+  const browserIntent =
+    /\b(?:open|visit|browse|browser|website|site|page|click|fill|form|navigate|inspect|check|test)\b/i.test(
+      value,
+    );
+
+  return hasUrl && browserIntent;
+}
+
+function browserProofText(job: BrowserJobV70) {
+  const proof = job.result?.execution_proof;
+
+  if (!proof || typeof proof !== "object") {
+    return "";
+  }
+
+  const steps =
+    typeof proof.steps_executed === "number"
+      ? proof.steps_executed
+      : 0;
+
+  return [
+    "",
+    "",
+    "**Browser proof**",
+    `Engine: ${String(proof.engine || "playwright-chromium")}`,
+    `Steps executed: ${steps}`,
+    "Isolated browser context: yes",
+    "Interactive actions: approval required",
+    "Private-network access: blocked",
+  ].join("\n");
 }
 
 function researchProofText(job: DeepResearchJobV69) {
@@ -874,6 +916,10 @@ export default function ChatApp() {
     accessToken: string;
   } | null>(null);
   const activeResearchJobRef = useRef<{
+    jobId: string;
+    accessToken: string;
+  } | null>(null);
+  const activeBrowserJobRef = useRef<{
     jobId: string;
     accessToken: string;
   } | null>(null);
@@ -1495,7 +1541,141 @@ const requestedDownload =
         );
 
 /* VASUKI_V17_PROJECT_JOB_FLOW */
-if (workMode && selectedAttachment) {
+if (
+  workMode &&
+  !selectedAttachment &&
+  isLikelyBrowserWorkRequestV70(effectiveText)
+) {
+  setInstantIntent("Browser · launching · 0%");
+
+  let current = await startBrowserJobV70(
+    accessToken,
+    effectiveText,
+    6,
+  );
+
+  activeBrowserJobRef.current = {
+    jobId: current.job_id,
+    accessToken,
+  };
+
+  let approvalHandledFor = "";
+
+  while (true) {
+    setStreamingStarted(true);
+
+    setInstantIntent(
+      `Browser · ${current.message || current.stage || current.status} · ${Math.max(
+        0,
+        Math.min(
+          100,
+          current.progress || 0,
+        ),
+      )}%`,
+    );
+
+    if (
+      current.status === "awaiting_approval" &&
+      current.pending_action &&
+      approvalHandledFor !==
+        `${current.pending_action.type}:${current.pending_action.target_id}`
+    ) {
+      const pending = current.pending_action;
+
+      approvalHandledFor =
+        `${pending.type}:${pending.target_id}`;
+
+      const approval = window.confirm(
+        [
+          "Vasuki Browser Agent wants to perform an interactive action.",
+          pending.action
+            ? `Action: ${pending.action}`
+            : "",
+          pending.target_text
+            ? `Target: ${pending.target_text}`
+            : "",
+          pending.value_preview
+            ? `Value: ${pending.value_preview}`
+            : "",
+          pending.key
+            ? `Key: ${pending.key}`
+            : "",
+          pending.reason
+            ? `Reason: ${pending.reason}`
+            : "",
+          pending.url
+            ? `Page: ${pending.url}`
+            : "",
+          "",
+          "Approve this one browser action?",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+
+      current = await approveBrowserJobV70(
+        accessToken,
+        current.job_id,
+        approval,
+      );
+
+      continue;
+    }
+
+    if (
+      [
+        "succeeded",
+        "blocked",
+        "cancelled",
+      ].includes(
+        current.status,
+      )
+    ) {
+      const answer =
+        typeof current.result?.answer === "string" &&
+        current.result.answer.trim()
+          ? current.result.answer.trim()
+          : current.message || "Browser work finished.";
+
+      finalMessages = [
+        ...nextMessages,
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `${answer}${browserProofText(current)}`,
+          provider: "vasuki-browser-v70",
+          imageUrl:
+            typeof current.result?.screenshot_data_url === "string"
+              ? current.result.screenshot_data_url
+              : undefined,
+          sources: normaliseSources(
+            current.result?.sources,
+          ),
+        },
+      ];
+
+      break;
+    }
+
+    if (current.status === "failed") {
+      throw new Error(
+        current.error ||
+          current.message ||
+          "Browser Agent execution failed.",
+      );
+    }
+
+    await waitMilliseconds(
+      700,
+    );
+
+    current = await fetchBrowserJobV70(
+      accessToken,
+      current.job_id,
+    );
+  }
+
+} else if (workMode && selectedAttachment) {
   throw new Error(
     "Work Mode V68 executes live research and active Project work. " +
     "For a one-off attachment, switch to Chat; for project code, add the files to an active Project first.",
@@ -2023,6 +2203,7 @@ if (workMode && selectedAttachment) {
       setInstantIntent("");
       activeWorkJobRef.current = null;
       activeResearchJobRef.current = null;
+      activeBrowserJobRef.current = null;
       setStreamingStarted(false);
       setBusy(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
@@ -2196,6 +2377,18 @@ if (workMode && selectedAttachment) {
         console.error("Deep Research cancellation failed", cancelError),
       );
     }
+
+    const activeBrowser = activeBrowserJobRef.current;
+
+    if (activeBrowser) {
+      void cancelBrowserJobV70(
+        activeBrowser.accessToken,
+        activeBrowser.jobId,
+      ).catch((cancelError) =>
+        console.error("Browser Agent cancellation failed", cancelError),
+      );
+    }
+
     if (researchPlanResolverRef.current) {
       resolveResearchPlanV69(null);
     }
