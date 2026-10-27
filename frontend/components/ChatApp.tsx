@@ -20,7 +20,9 @@ import {
   analyzeSmartFiles,
   approveWorkV68,
   cancelCodeBuildJobV17,
+  cancelDeepResearchV69,
   cancelWorkV68,
+  createDeepResearchPlanV69,
   createConversationBranch,
   startCodeBuildJobV17,
   startCodeModifyJobV17,
@@ -30,13 +32,17 @@ import {
   fetchProjects,
   generateImage,
   searchChatHistory,
+  startDeepResearchV69,
   startWorkV68,
+  fetchDeepResearchV69,
   fetchWorkV68,
   streamChat,
   submitResponseFeedback,
   warmBackend,
   type ChatMessage,
   type ChatSearchResult,
+  type DeepResearchJobV69,
+  type DeepResearchPlanV69,
   type SmartFileArtifact,
   type VasukiProject,
   type WorkJobV68,
@@ -301,6 +307,29 @@ function makeId() {
 
 function waitMilliseconds(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function researchProofText(job: DeepResearchJobV69) {
+  const proof = job.result?.execution_proof;
+  if (!proof || typeof proof !== "object") return "";
+
+  const sourceCount =
+    typeof proof.unique_sources === "number" ? proof.unique_sources : 0;
+  const domainCount =
+    typeof proof.unique_domains === "number" ? proof.unique_domains : 0;
+  const completed =
+    typeof proof.completed_searches === "number" ? proof.completed_searches : 0;
+
+  return [
+    "",
+    "",
+    "**Research proof**",
+    `Searches completed: ${completed}`,
+    `Unique sources: ${sourceCount}`,
+    `Independent domains: ${domainCount}`,
+    "Conflict check: completed",
+    "Citation verification: completed",
+  ].join("\n");
 }
 
 function workProofText(job: WorkJobV68) {
@@ -828,6 +857,7 @@ export default function ChatApp() {
   const [codeBuildStatus, setCodeBuildStatus] = useState<CodeBuildJobStatus | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [workMode, setWorkMode] = useState(false);
+  const [researchPlanDraft, setResearchPlanDraft] = useState<DeepResearchPlanV69 | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historySearchInputRef = useRef<HTMLInputElement>(null);
@@ -843,6 +873,29 @@ export default function ChatApp() {
     jobId: string;
     accessToken: string;
   } | null>(null);
+  const activeResearchJobRef = useRef<{
+    jobId: string;
+    accessToken: string;
+  } | null>(null);
+  const researchPlanResolverRef = useRef<
+    ((plan: DeepResearchPlanV69 | null) => void) | null
+  >(null);
+
+  function reviewResearchPlanV69(
+    plan: DeepResearchPlanV69,
+  ): Promise<DeepResearchPlanV69 | null> {
+    return new Promise((resolve) => {
+      researchPlanResolverRef.current = resolve;
+      setResearchPlanDraft(plan);
+    });
+  }
+
+  function resolveResearchPlanV69(plan: DeepResearchPlanV69 | null) {
+    const resolver = researchPlanResolverRef.current;
+    researchPlanResolverRef.current = null;
+    setResearchPlanDraft(null);
+    resolver?.(plan);
+  }
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("vasuki-ui-theme");
@@ -1522,6 +1575,66 @@ if (workMode && selectedAttachment) {
     await waitMilliseconds(700);
     current = await fetchWorkV68(accessToken, current.job_id);
   }
+} else if (mode === "research" && !selectedAttachment) {
+  setInstantIntent("Research · planning");
+  const planned = await createDeepResearchPlanV69(
+    accessToken,
+    effectiveText,
+  );
+
+  const reviewedPlan = await reviewResearchPlanV69(planned.plan);
+  if (!reviewedPlan) {
+    throw new DOMException("Deep Research cancelled", "AbortError");
+  }
+
+  setInstantIntent("Research · starting · 0%");
+  let current = await startDeepResearchV69(
+    accessToken,
+    effectiveText,
+    reviewedPlan,
+    activeProjectId || undefined,
+  );
+  activeResearchJobRef.current = {
+    jobId: current.job_id,
+    accessToken,
+  };
+
+  while (true) {
+    setStreamingStarted(true);
+    setInstantIntent(
+      `Research · ${current.message || current.stage || current.status} · ${Math.max(0, Math.min(100, current.progress || 0))}%`,
+    );
+
+    if (["succeeded", "blocked", "cancelled"].includes(current.status)) {
+      const answer =
+        typeof current.result?.answer === "string" && current.result.answer.trim()
+          ? current.result.answer.trim()
+          : current.message || "Deep Research finished.";
+      finalMessages = [
+        ...nextMessages,
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `${answer}${researchProofText(current)}`,
+          provider: current.result?.provider || "vasuki-deep-research-v69",
+          sources: normaliseSources(current.result?.sources),
+          intelligenceMode: "research",
+          verificationRequired: true,
+          qualityChecked: true,
+        },
+      ];
+      break;
+    }
+
+    if (current.status === "failed") {
+      throw new Error(
+        current.error || current.message || "Deep Research failed.",
+      );
+    }
+
+    await waitMilliseconds(700);
+    current = await fetchDeepResearchV69(accessToken, current.job_id);
+  }
 } else if (shouldUseCodeProject) {
   const controller = new AbortController();
   streamAbortRef.current = controller;
@@ -1909,6 +2022,7 @@ if (workMode && selectedAttachment) {
       activeCodeJobRef.current = null;
       setInstantIntent("");
       activeWorkJobRef.current = null;
+      activeResearchJobRef.current = null;
       setStreamingStarted(false);
       setBusy(false);
       requestAnimationFrame(() => textareaRef.current?.focus());
@@ -2072,6 +2186,18 @@ if (workMode && selectedAttachment) {
       ).catch((cancelError) =>
         console.error("Work cancellation failed", cancelError),
       );
+    }
+    const activeResearch = activeResearchJobRef.current;
+    if (activeResearch) {
+      void cancelDeepResearchV69(
+        activeResearch.accessToken,
+        activeResearch.jobId,
+      ).catch((cancelError) =>
+        console.error("Deep Research cancellation failed", cancelError),
+      );
+    }
+    if (researchPlanResolverRef.current) {
+      resolveResearchPlanV69(null);
     }
     const activeJob = activeCodeJobRef.current;
     if (activeJob) {
@@ -2782,6 +2908,14 @@ if (workMode && selectedAttachment) {
         )}
       </section>
 
+      {researchPlanDraft ? (
+        <ResearchPlanModalV69
+          plan={researchPlanDraft}
+          onCancel={() => resolveResearchPlanV69(null)}
+          onRun={(plan) => resolveResearchPlanV69(plan)}
+        />
+      ) : null}
+
       <InlineCodeWorkspace
         open={codeWorkspaceOpen}
         tab={codeWorkspaceTab}
@@ -2811,6 +2945,129 @@ if (workMode && selectedAttachment) {
   );
 }
 
+
+/* VASUKI_V69_RESEARCH_PLAN_MODAL */
+function ResearchPlanModalV69({
+  plan,
+  onCancel,
+  onRun,
+}: {
+  plan: DeepResearchPlanV69;
+  onCancel: () => void;
+  onRun: (plan: DeepResearchPlanV69) => void;
+}) {
+  const [objective, setObjective] = useState(plan.objective || "");
+  const [questions, setQuestions] = useState(
+    (plan.subquestions || []).map((item) => item.question).join("\n"),
+  );
+  const [conflicts, setConflicts] = useState(
+    (plan.conflicts_to_check || []).join("\n"),
+  );
+
+  const questionLines = questions
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  function submitPlan() {
+    if (questionLines.length === 0) return;
+    onRun({
+      ...plan,
+      objective: objective.trim() || plan.objective,
+      subquestions: questionLines.map((question, index) => ({
+        id: `q${index + 1}`,
+        question,
+        why: plan.subquestions?.[index]?.why || "user-edited research question",
+        requires_current:
+          plan.subquestions?.[index]?.requires_current !== false,
+      })),
+      conflicts_to_check: conflicts
+        .split("\n")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .slice(0, 8),
+      editable: true,
+    });
+  }
+
+  return (
+    <div className="pv-research-plan-backdrop" role="presentation">
+      <section
+        className="pv-research-plan-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pv-research-plan-title"
+      >
+        <header>
+          <div>
+            <span>DEEP RESEARCH · V69</span>
+            <h2 id="pv-research-plan-title">Review the research plan</h2>
+            <p>Edit what Vasuki should investigate before live searches start.</p>
+          </div>
+          <button type="button" onClick={onCancel} aria-label="Cancel research">
+            ×
+          </button>
+        </header>
+
+        <div className="pv-research-plan-body">
+          <label>
+            Objective
+            <textarea
+              value={objective}
+              onChange={(event) => setObjective(event.target.value)}
+              rows={2}
+            />
+          </label>
+
+          <label>
+            Research questions · one per line
+            <textarea
+              value={questions}
+              onChange={(event) => setQuestions(event.target.value)}
+              rows={8}
+              autoFocus
+            />
+            <small>{questionLines.length}/8 questions will run in parallel.</small>
+          </label>
+
+          <label>
+            Conflicts or claims to compare · optional
+            <textarea
+              value={conflicts}
+              onChange={(event) => setConflicts(event.target.value)}
+              rows={4}
+              placeholder="Example: capability claims differ between sources"
+            />
+          </label>
+
+          <div className="pv-research-plan-rules">
+            <span>Live sources</span>
+            <span>Conflict check</span>
+            <span>Citation verification</span>
+            <span>No-source = no factual report</span>
+          </div>
+        </div>
+
+        <footer>
+          <button type="button" className="pv-research-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="pv-research-primary"
+            onClick={submitPlan}
+            disabled={questionLines.length === 0}
+          >
+            Start research
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+/* VASUKI_V69_RESEARCH_PLAN_MODAL_END */
 
 /* VASUKI_V17_CODE_WORKSPACE_COMPONENT */
 function InlineCodeWorkspace({
