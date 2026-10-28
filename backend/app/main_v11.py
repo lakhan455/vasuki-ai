@@ -141,6 +141,12 @@ from app.v76.live_workspace import (
     list_workspaces as v76_list_workspaces,
     update_workspace as v76_update_workspace,
 )
+from app.v77.approval_engine import (
+    consume_scoped_approval as v77_consume_scoped_approval,
+    create_approval_request as v77_create_approval_request,
+    decide_approval_request as v77_decide_approval_request,
+    health_snapshot as v77_health_snapshot,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -655,6 +661,55 @@ async def v73_agents_cancel(
     return job
 
 
+class V77ApprovalCreateRequest(BaseModel):
+    action: str = Field(min_length=3, max_length=140)
+    args: dict[str, Any] = Field(default_factory=dict)
+    summary: str = Field(default="", max_length=1200)
+
+
+class V77ApprovalDecisionRequest(BaseModel):
+    approve: bool
+
+
+@app.get("/health/v77")
+async def health_v77() -> dict[str, Any]:
+    return v77_health_snapshot(settings)
+
+
+@app.post("/api/v77/approvals")
+async def v77_approval_create(
+    payload: V77ApprovalCreateRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await v77_create_approval_request(
+            settings,
+            user_id=user.id,
+            action=payload.action,
+            args=payload.args,
+            summary=payload.summary,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/v77/approvals/{approval_id}/decision")
+async def v77_approval_decide(
+    approval_id: str,
+    payload: V77ApprovalDecisionRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    result = await v77_decide_approval_request(
+        settings,
+        user_id=user.id,
+        approval_id=approval_id,
+        approve=payload.approve,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Approval request not found.")
+    return result
+
+
 class V68WorkRequest(BaseModel):
     goal: str = Field(min_length=3, max_length=20000)
     project_id: str | None = None
@@ -662,6 +717,7 @@ class V68WorkRequest(BaseModel):
 
 class V68ApprovalRequest(BaseModel):
     approve: bool
+    approval_token: str | None = None
 
 
 @app.post("/api/v68/work")
@@ -699,6 +755,28 @@ async def v68_work_approve(
     payload: V68ApprovalRequest,
     user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
+    before = await get_work_job(user_id=user.id, job_id=job_id)
+    if before is None:
+        raise HTTPException(status_code=404, detail="Work job not found.")
+
+    if payload.approve:
+        pending = before.get("pending_action")
+        if not isinstance(pending, dict):
+            raise HTTPException(status_code=409, detail="No pending work action to approve.")
+        action = str(pending.get("type") or "project.code.apply")
+        allowed = await v77_consume_scoped_approval(
+            settings,
+            user_id=user.id,
+            action=action,
+            args=pending,
+            token=payload.approval_token,
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=403,
+                detail="Valid one-time V77 approval token required.",
+            )
+
     job = await approve_work_job(
         user_id=user.id,
         job_id=job_id,
@@ -791,6 +869,7 @@ class V70BrowserWorkRequest(BaseModel):
 
 class V70BrowserApprovalRequest(BaseModel):
     approve: bool
+    approval_token: str | None = None
 
 
 @app.get("/api/v70/browser/capabilities")
@@ -839,6 +918,31 @@ async def v70_browser_approve(
     payload: V70BrowserApprovalRequest,
     user: AuthUser = Depends(get_current_user),
 ) -> dict[str, Any]:
+    before = await v70_get_browser_job(user_id=user.id, job_id=job_id)
+    if before is None:
+        raise HTTPException(status_code=404, detail="Browser Agent job not found.")
+
+    if payload.approve:
+        pending = before.get("pending_action")
+        if not isinstance(pending, dict):
+            raise HTTPException(
+                status_code=409,
+                detail="No pending browser action to approve.",
+            )
+        action = str(pending.get("type") or "browser.interact")
+        allowed = await v77_consume_scoped_approval(
+            settings,
+            user_id=user.id,
+            action=action,
+            args=pending,
+            token=payload.approval_token,
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=403,
+                detail="Valid one-time V77 approval token required.",
+            )
+
     job = await v70_approve_browser_job(
         user_id=user.id,
         job_id=job_id,

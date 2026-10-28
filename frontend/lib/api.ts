@@ -2619,12 +2619,14 @@ export async function approveBrowserJobV70(
   accessToken: string,
   jobId: string,
   approve: boolean,
+  approvalToken?: string,
 ): Promise<BrowserJobV70> {
   return (await postJsonAt(
     DIRECT_API_URL,
     `/api/v70/browser/jobs/${encodeURIComponent(jobId)}/approve`,
     {
       approve,
+      approval_token: approvalToken || null,
     },
     30000,
     1,
@@ -3096,11 +3098,15 @@ export async function approveWorkV68(
   accessToken: string,
   jobId: string,
   approve: boolean,
+  approvalToken?: string,
 ): Promise<WorkJobV68> {
   return (await postJsonAt(
     DIRECT_API_URL,
     `/api/v68/work/${encodeURIComponent(jobId)}/approve`,
-    { approve },
+    {
+      approve,
+      approval_token: approvalToken || null,
+    },
     20000,
     1,
     accessToken,
@@ -3118,3 +3124,47 @@ export async function cancelWorkV68(
   )) as WorkJobV68;
 }
 /* VASUKI_V68_REAL_WORK_MODE_API_END */
+
+/* VASUKI_V77_SECURITY_APPROVAL_API_START */
+export type ApprovalRequestV77 = {
+  approval_id: string;
+  action?: string;
+  summary?: string;
+  risk?: "low" | "medium" | "high" | "critical" | string;
+  status?: string;
+  expires_in_seconds?: number;
+  approval_token?: string;
+  token_expires_at_epoch?: number;
+};
+
+export async function createApprovalV77(
+  accessToken: string,
+  action: string,
+  args: Record<string, unknown>,
+  summary: string,
+): Promise<ApprovalRequestV77> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v77/approvals",
+    { action, args, summary },
+    20000,
+    1,
+    accessToken,
+  )) as ApprovalRequestV77;
+}
+
+export async function decideApprovalV77(
+  accessToken: string,
+  approvalId: string,
+  approve: boolean,
+): Promise<ApprovalRequestV77> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    `/api/v77/approvals/${encodeURIComponent(approvalId)}/decision`,
+    { approve },
+    20000,
+    1,
+    accessToken,
+  )) as ApprovalRequestV77;
+}
+/* VASUKI_V77_SECURITY_APPROVAL_API_END */

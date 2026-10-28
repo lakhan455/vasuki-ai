@@ -1,0 +1,152 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 7, 12, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.dialog {
+  width: min(620px, 100%);
+  max-height: min(760px, 90vh);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  padding: 22px;
+  background: #11141b;
+  color: #f7f8fb;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header h2 {
+  margin: 6px 0 0;
+  font-size: 22px;
+}
+
+.kicker {
+  color: #aab1c2;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.risk {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.risk_low {
+  background: rgba(77, 217, 146, 0.14);
+}
+
+.risk_medium {
+  background: rgba(255, 194, 84, 0.16);
+}
+
+.risk_high,
+.risk_critical {
+  background: rgba(255, 92, 92, 0.17);
+}
+
+.summary {
+  margin: 18px 0 12px;
+  color: #e8ebf2;
+  line-height: 1.55;
+}
+
+.details {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #cbd1de;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.policy {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border: 1px solid rgba(111, 147, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(71, 105, 220, 0.08);
+  color: #cbd1de;
+  font-size: 13px;
+}
+
+.policy strong {
+  color: #f6f7fb;
+}
+
+.policy small {
+  color: #8f98ad;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.actions button {
+  min-width: 124px;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 15px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.deny {
+  background: #262b36;
+  color: #f1f3f8;
+}
+
+.approve {
+  background: #f5f7fb;
+  color: #11141b;
+}
+
+@media (max-width: 620px) {
+  .dialog {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .header {
+    flex-direction: column;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .actions button {
+    min-width: 0;
+  }
+}

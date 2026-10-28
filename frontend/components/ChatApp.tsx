@@ -15,6 +15,7 @@ import ReactMarkdown from "react-markdown";
 
 import MemoryKnowledgePanel from "@/components/MemoryKnowledgePanel";
 import SmartFileWorkspace from "@/components/SmartFileWorkspace";
+import ApprovalDialogV77, { type ApprovalPromptV77 } from "@/components/ApprovalDialogV77";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
@@ -27,6 +28,8 @@ import {
   cancelDeepResearchV69,
   cancelWorkV68,
   createDeepResearchPlanV69,
+  createApprovalV77,
+  decideApprovalV77,
   createConversationBranch,
   startCodeBuildJobV17,
   startCodeModifyJobV17,
@@ -983,6 +986,7 @@ export default function ChatApp() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [workMode, setWorkMode] = useState(false);
   const [researchPlanDraft, setResearchPlanDraft] = useState<DeepResearchPlanV69 | null>(null);
+  const [approvalPromptV77, setApprovalPromptV77] = useState<ApprovalPromptV77 | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const historySearchInputRef = useRef<HTMLInputElement>(null);
@@ -1013,6 +1017,25 @@ export default function ChatApp() {
   const researchPlanResolverRef = useRef<
     ((plan: DeepResearchPlanV69 | null) => void) | null
   >(null);
+  const approvalResolverV77Ref = useRef<
+    ((approved: boolean) => void) | null
+  >(null);
+
+  function reviewApprovalV77(
+    prompt: ApprovalPromptV77,
+  ): Promise<boolean> {
+    return new Promise((resolve) => {
+      approvalResolverV77Ref.current = resolve;
+      setApprovalPromptV77(prompt);
+    });
+  }
+
+  function resolveApprovalV77(approved: boolean) {
+    const resolver = approvalResolverV77Ref.current;
+    approvalResolverV77Ref.current = null;
+    setApprovalPromptV77(null);
+    resolver?.(approved);
+  }
 
   function reviewResearchPlanV69(
     plan: DeepResearchPlanV69,
@@ -1677,38 +1700,42 @@ if (
       approvalHandledFor =
         `${pending.type}:${pending.target_id}`;
 
-      const approval = window.confirm(
-        [
-          "Vasuki Browser Agent wants to perform an interactive action.",
-          pending.action
-            ? `Action: ${pending.action}`
-            : "",
-          pending.target_text
-            ? `Target: ${pending.target_text}`
-            : "",
-          pending.value_preview
-            ? `Value: ${pending.value_preview}`
-            : "",
-          pending.key
-            ? `Key: ${pending.key}`
-            : "",
-          pending.reason
-            ? `Reason: ${pending.reason}`
-            : "",
-          pending.url
-            ? `Page: ${pending.url}`
-            : "",
-          "",
-          "Approve this one browser action?",
-        ]
-          .filter(Boolean)
-          .join("\n"),
+      const approvalRequest = await createApprovalV77(
+        accessToken,
+        pending.type || `browser.${pending.action || "interact"}`,
+        pending as Record<string, unknown>,
+        "Browser Agent interactive action",
       );
+
+      const approval = await reviewApprovalV77({
+        title: "Browser action approval",
+        risk: approvalRequest.risk || "medium",
+        summary:
+          approvalRequest.summary ||
+          "Vasuki Browser Agent wants to perform one interactive action.",
+        expiresInSeconds: approvalRequest.expires_in_seconds,
+        details: [
+          pending.action ? `Action: ${pending.action}` : "",
+          pending.target_text ? `Target: ${pending.target_text}` : "",
+          pending.value_preview ? `Value: ${pending.value_preview}` : "",
+          pending.key ? `Key: ${pending.key}` : "",
+          pending.reason ? `Reason: ${pending.reason}` : "",
+          pending.url ? `Page: ${pending.url}` : "",
+        ],
+      });
+
+      const decision = await decideApprovalV77(
+        accessToken,
+        approvalRequest.approval_id,
+        approval,
+      );
+      const approved = approval && Boolean(decision.approval_token);
 
       current = await approveBrowserJobV70(
         accessToken,
         current.job_id,
-        approval,
+        approved,
+        decision.approval_token,
       );
 
       continue;
@@ -1799,22 +1826,46 @@ if (
       const paths = Array.isArray(pending?.paths)
         ? pending.paths.slice(0, 8).join("\n• ")
         : "";
-      const approval = window.confirm(
-        [
-          "Vasuki Work Mode wants to change project files.",
-          `Changes: ${pending?.change_count || 0}`,
-          pending?.destructive ? "Warning: this plan includes file deletion." : "",
-          pending?.summary ? `Plan: ${pending.summary}` : "",
-          paths ? `Files:\n• ${paths}` : "",
-          "\nApprove these project file changes?",
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
+      const pendingScope =
+        pending && typeof pending === "object"
+          ? (pending as Record<string, unknown>)
+          : {};
+      const approvalRequest = await createApprovalV77(
+        accessToken,
+        String(pending?.type || "project.code.apply"),
+        pendingScope,
+        "Apply proposed project file changes",
       );
+
+      const approval = await reviewApprovalV77({
+        title: "Project changes approval",
+        risk: approvalRequest.risk || (pending?.destructive ? "high" : "medium"),
+        summary:
+          pending?.summary ||
+          approvalRequest.summary ||
+          "Vasuki Work Mode wants to change project files.",
+        expiresInSeconds: approvalRequest.expires_in_seconds,
+        details: [
+          `Changes: ${pending?.change_count || 0}`,
+          pending?.destructive
+            ? "Warning: this plan includes file deletion."
+            : "",
+          paths ? `Files:\n• ${paths}` : "",
+        ],
+      });
+
+      const decision = await decideApprovalV77(
+        accessToken,
+        approvalRequest.approval_id,
+        approval,
+      );
+      const approved = approval && Boolean(decision.approval_token);
+
       current = await approveWorkV68(
         accessToken,
         current.job_id,
-        approval,
+        approved,
+        decision.approval_token,
       );
       continue;
     }
@@ -2569,6 +2620,9 @@ if (
       );
     }
 
+    if (approvalResolverV77Ref.current) {
+      resolveApprovalV77(false);
+    }
     if (researchPlanResolverRef.current) {
       resolveResearchPlanV69(null);
     }
@@ -2649,6 +2703,10 @@ if (
 
   return (
     <main className={codeWorkspaceOpen ? "pv-app pv-app--code-open" : "pv-app"}>
+      <ApprovalDialogV77
+        request={approvalPromptV77}
+        onDecision={resolveApprovalV77}
+      />
       {mobileSidebarOpen && (
         <button
           type="button"
