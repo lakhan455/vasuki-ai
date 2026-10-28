@@ -1,0 +1,245 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  background: #0b0d10;
+  color: #f5f7fa;
+}
+.sidebar {
+  border-right: 1px solid #242830;
+  padding: 18px 14px;
+  background: #101318;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.back {
+  color: #aab2c0;
+  text-decoration: none;
+  font-size: 13px;
+}
+.createGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.createGrid button,
+.toolbar button,
+.toolbar select,
+.language {
+  border: 1px solid #303641;
+  background: #171b22;
+  color: #eef2f7;
+  border-radius: 9px;
+  padding: 9px 10px;
+}
+.createGrid button,
+.toolbar button {
+  cursor: pointer;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow: auto;
+}
+.item,
+.activeItem {
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px;
+  color: #e7ebf1;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.item:hover {
+  background: #151920;
+}
+.activeItem {
+  background: #1b2028;
+  border-color: #343c49;
+}
+.item small,
+.activeItem small,
+.muted {
+  color: #8e98a8;
+  font-size: 12px;
+}
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.empty {
+  margin: auto;
+  max-width: 620px;
+  padding: 40px;
+  text-align: center;
+}
+.empty h1 {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+.empty p {
+  color: #a4adba;
+}
+.toolbar {
+  min-height: 66px;
+  border-bottom: 1px solid #242830;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.title {
+  min-width: 220px;
+  flex: 1 1 300px;
+  background: transparent;
+  color: #f7f8fa;
+  border: 0;
+  outline: 0;
+  font-size: 19px;
+  font-weight: 650;
+}
+.language {
+  width: 120px;
+}
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.danger {
+  color: #ffb6b6 !important;
+}
+.error {
+  margin: 10px 16px 0;
+  border: 1px solid #66383b;
+  background: #2b1719;
+  color: #ffc7c7;
+  border-radius: 9px;
+  padding: 10px 12px;
+}
+.versionBar {
+  min-height: 34px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #20242b;
+  color: #8e98a8;
+  font-size: 12px;
+}
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.editorPane,
+.previewPane {
+  min-width: 0;
+  min-height: calc(100vh - 101px);
+  display: flex;
+  flex-direction: column;
+}
+.editorPane {
+  border-right: 1px solid #242830;
+}
+.paneLabel {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: #9ba5b3;
+  font-size: 12px;
+  border-bottom: 1px solid #20242b;
+}
+.editorPane textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 500px;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: #0d1014;
+  color: #edf1f5;
+  padding: 18px;
+  font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.preview {
+  flex: 1;
+  overflow: auto;
+  padding: 22px;
+  color: #dfe4eb;
+}
+.preview h1,
+.preview h2,
+.preview h3 {
+  color: #fff;
+}
+.preview pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #11151a;
+  border: 1px solid #252b34;
+  border-radius: 10px;
+  padding: 14px;
+}
+.frame {
+  width: 100%;
+  min-height: 70vh;
+  border: 1px solid #303641;
+  border-radius: 10px;
+  background: white;
+}
+.tableWrap {
+  max-width: 100%;
+  overflow: auto;
+}
+.tableWrap table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.tableWrap th,
+.tableWrap td {
+  border: 1px solid #323944;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.tableWrap th {
+  background: #171b22;
+}
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #242830;
+    max-height: 320px;
+  }
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .editorPane {
+    border-right: 0;
+    border-bottom: 1px solid #242830;
+  }
+  .editorPane,
+  .previewPane {
+    min-height: 520px;
+  }
+}

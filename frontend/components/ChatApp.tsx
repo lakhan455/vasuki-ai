@@ -2752,6 +2752,7 @@ if (
           </button>
           <a className="pv-nav-button" href="/projects"><Icon name="project" /><span>Projects</span></a>
           <a className="pv-nav-button" href="/files"><Icon name="file" /><span>Files</span></a>
+          <a className="pv-nav-button" href="/workspace"><Icon name="file" /><span>Workspace</span></a>
           <a className="pv-nav-button" href="/images"><Icon name="image" /><span>Images</span></a>
           <a className="pv-nav-button" href="/connections"><Icon name="project" /><span>Connections</span></a>
           {accountPlan?.plan === "owner" && (
