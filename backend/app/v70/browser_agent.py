@@ -172,24 +172,45 @@ def interaction_policy(action: dict[str, Any], element: dict[str, Any] | None) -
 async def browser_runtime_snapshot(settings: Any) -> dict[str, Any]:
     enabled = bool(getattr(settings, "v70_browser_enabled", True))
     package_installed = importlib.util.find_spec("playwright") is not None
-    executable_path = ""
     browser_installed = False
+    launch_verified = False
     error = ""
 
+    # V70 uses Playwright regular Chromium via channel="chromium".
+    # A --no-shell install intentionally omits the separate headless-shell
+    # binary, so checking the default executable path can false-negative.
+    # Verify readiness by launching the exact same channel used by real jobs.
     if enabled and package_installed and async_playwright is not None:
+        manager = None
+        browser = None
         try:
             manager = await async_playwright().start()
-            try:
-                executable_path = str(manager.chromium.executable_path or "")
-                browser_installed = bool(
-                    executable_path and Path(executable_path).exists()
-                )
-            finally:
-                await manager.stop()
+            browser = await manager.chromium.launch(
+                channel="chromium",
+                headless=bool(getattr(settings, "v70_browser_headless", True)),
+                args=["--disable-dev-shm-usage"],
+            )
+            page = await browser.new_page()
+            await page.set_content(
+                "<!doctype html><title>vasuki-v70-runtime</title><h1>ready</h1>"
+            )
+            launch_verified = (await page.title()) == "vasuki-v70-runtime"
+            browser_installed = launch_verified
         except Exception as exc:
-            error = f"{type(exc).__name__}: {str(exc)[:500]}"
+            error = f"{type(exc).__name__}: {str(exc)[:900]}"
+        finally:
+            if browser is not None:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+            if manager is not None:
+                try:
+                    await manager.stop()
+                except Exception:
+                    pass
 
-    ready = bool(enabled and package_installed and browser_installed)
+    ready = bool(enabled and package_installed and launch_verified)
     return {
         "ok": True,
         "version": "v70",
@@ -199,6 +220,7 @@ async def browser_runtime_snapshot(settings: Any) -> dict[str, Any]:
         "playwright_package_installed": package_installed,
         "chromium_installed": browser_installed,
         "chromium_executable_present": browser_installed,
+        "runtime_launch_verified": launch_verified,
         "runtime_error": error or None,
         "features": {
             "navigate_public_web": ready,

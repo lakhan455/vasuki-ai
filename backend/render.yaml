@@ -3,7 +3,7 @@ services:
     name: power-vasuki-ai-api
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 python -m playwright install --no-shell chromium
     startCommand: uvicorn app.main_v11:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

@@ -123,3 +123,26 @@ def test_v70_does_not_fake_browser_availability():
     assert "chromium_installed" in text
     assert "fake_ready_state_allowed" in text
     assert '"fake_ready_state_allowed": False' in text
+
+
+
+def test_v70_runtime_health_probes_same_chromium_channel_as_jobs():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "app/v70/browser_agent.py"
+    ).read_text(encoding="utf-8")
+
+    health_start = source.index("async def browser_runtime_snapshot")
+    execute_start = source.index("async def _execute")
+    health_source = source[health_start:execute_start]
+
+    assert 'channel="chromium"' in health_source
+    assert "runtime_launch_verified" in health_source
+    assert "manager.chromium.executable_path" not in health_source
+
+
+def test_v70_render_build_installs_regular_chromium_without_shell():
+    repo = Path(__file__).resolve().parents[2]
+    render_yaml = (repo / "backend/render.yaml").read_text(encoding="utf-8")
+    assert "python -m playwright install --no-shell chromium" in render_yaml
+    assert "playwright install --with-deps" not in render_yaml
