@@ -5,10 +5,12 @@ import {
   fetchOwnerPlatformV9,
   fetchOwnerReliabilityV12,
   fetchOwnerReliabilityV67,
+  fetchOwnerSelfEvaluationV78,
   updateOwnerFeatureFlagV9,
   type OwnerPlatformV9,
   type V12ReliabilitySnapshot,
   type ReliabilityV67,
+  type SelfEvaluationV78,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -23,6 +25,7 @@ export default function OwnerPage() {
   const [data, setData] = useState<OwnerPlatformV9 | null>(null);
   const [v12, setV12] = useState<V12ReliabilitySnapshot | null>(null);
   const [v67, setV67] = useState<ReliabilityV67 | null>(null);
+  const [v78, setV78] = useState<SelfEvaluationV78 | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
 
@@ -41,6 +44,11 @@ export default function OwnerPage() {
         setV67(await fetchOwnerReliabilityV67(accessToken));
       } catch {
         setV67(null);
+      }
+      try {
+        setV78(await fetchOwnerSelfEvaluationV78(accessToken));
+      } catch {
+        setV78(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Owner dashboard could not be loaded.");
@@ -133,6 +141,42 @@ export default function OwnerPage() {
                     In-memory operational metrics only. Prompts, answers and user IDs are not stored here.
                   </p>
                   <pre>{JSON.stringify(v67, null, 2)}</pre>
+                </article>
+              </section>
+            </>
+          ) : null}
+
+          {v78 ? (
+            <>
+              <section className="pv-v9-ops-stats">
+                <article>
+                  <span>V78 Self-Evaluation</span>
+                  <strong>{v78.release_gate?.fails_ci_on_regression ? "ENFORCED" : "CHECK"}</strong>
+                </article>
+                <article>
+                  <span>Fixed eval cases</span>
+                  <strong>{v78.release_gate?.fixed_eval_cases ?? 0}</strong>
+                </article>
+                <article>
+                  <span>Minimum score</span>
+                  <strong>{v78.release_gate?.default_min_score ?? 0}</strong>
+                </article>
+                <article>
+                  <span>Category floor</span>
+                  <strong>{v78.release_gate?.default_min_category_score ?? 0}</strong>
+                </article>
+                <article>
+                  <span>Regression suites</span>
+                  <strong>{Object.keys(v78.release_gate?.regression_suites || {}).length}</strong>
+                </article>
+              </section>
+              <section className="pv-v9-owner-grid">
+                <article className="pv-v9-ops-card">
+                  <h2>V78 Self-Evaluation 2.0</h2>
+                  <p className="pv-v9-ops-note">
+                    Deterministic release gate for V70-V77 regressions, fixed eval quality and frontend production readiness.
+                  </p>
+                  <pre>{JSON.stringify(v78, null, 2)}</pre>
                 </article>
               </section>
             </>

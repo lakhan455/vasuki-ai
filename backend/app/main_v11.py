@@ -147,6 +147,10 @@ from app.v77.approval_engine import (
     decide_approval_request as v77_decide_approval_request,
     health_snapshot as v77_health_snapshot,
 )
+from app.v78.self_eval import (
+    health_snapshot as v78_health_snapshot,
+    run_release_eval as v78_run_release_eval,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -674,6 +678,35 @@ class V77ApprovalDecisionRequest(BaseModel):
 @app.get("/health/v77")
 async def health_v77() -> dict[str, Any]:
     return v77_health_snapshot(settings)
+
+
+@app.get("/health/v78")
+async def health_v78() -> dict[str, Any]:
+    return v78_health_snapshot()
+
+
+@app.get("/api/owner/v78/self-evaluation")
+async def v78_owner_self_evaluation(
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    await require_owner(user)
+    return {"ok": True, "evaluation": v78_health_snapshot()}
+
+
+@app.post("/api/owner/v78/evals/run")
+async def v78_owner_eval_run(
+    live: bool = Query(False),
+    limit: int = Query(400, ge=1, le=400),
+    release: str = Query("v78", max_length=100),
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    await require_owner(user)
+    return await v78_run_release_eval(
+        settings,
+        release=release,
+        live=live,
+        limit=limit,
+    )
 
 
 @app.post("/api/v77/approvals")
