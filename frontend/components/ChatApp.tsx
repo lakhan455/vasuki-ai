@@ -19,6 +19,7 @@ import {
   analyzeAttachment,
   analyzeSmartFiles,
   analyzeDataV72,
+  cancelMultiAgentV73,
   approveBrowserJobV70,
   approveWorkV68,
   cancelBrowserJobV70,
@@ -33,10 +34,12 @@ import {
   type CodeBuildJobStatus,
   extractProjectMemories,
   fetchProjects,
+  fetchMultiAgentV73,
   generateImage,
   searchChatHistory,
   startBrowserJobV70,
   startDeepResearchV69,
+  startMultiAgentV73,
   startWorkV68,
   fetchBrowserJobV70,
   fetchDeepResearchV69,
@@ -49,6 +52,7 @@ import {
   type ChatSearchResult,
   type DeepResearchJobV69,
   type DeepResearchPlanV69,
+  type MultiAgentJobV73,
   type SmartFileArtifact,
   type VasukiProject,
   type WorkJobV68,
@@ -179,7 +183,7 @@ type PendingAttachment = {
   kind: "image" | "document";
 };
 
-type ActionMode = "chat" | "image" | "write" | "web" | "analyze" | "research";
+type ActionMode = "chat" | "image" | "write" | "web" | "analyze" | "research" | "agents";
 
 /* VASUKI_V45_PROVIDER_BADGE_START */
 function providerDisplayName(value?: string) {
@@ -320,6 +324,12 @@ const actionItems: Array<{
     prompt: "",
     icon: "research",
   },
+  {
+    mode: "agents",
+    label: "Multi-agent",
+    prompt: "",
+    icon: "research",
+  },
 ];
 
 function makeId() {
@@ -365,6 +375,36 @@ function browserProofText(job: BrowserJobV70) {
     "Interactive actions: approval required",
     "Private-network access: blocked",
   ].join("\n");
+}
+
+function multiAgentProofText(job: MultiAgentJobV73) {
+  const proof = job.result?.execution_proof;
+  if (!proof || typeof proof !== "object") return "";
+
+  const roles = Array.isArray(proof.agent_roles)
+    ? proof.agent_roles.map(String).filter(Boolean)
+    : [];
+  const completed =
+    typeof proof.specialist_agents_completed === "number"
+      ? proof.specialist_agents_completed
+      : 0;
+  const sourceCount =
+    typeof proof.live_research_source_count === "number"
+      ? proof.live_research_source_count
+      : 0;
+
+  return [
+    "",
+    "",
+    "**Multi-agent proof**",
+    `Specialists completed: ${completed}`,
+    roles.length ? `Roles: ${roles.join(", ")}` : "",
+    `Live research sources: ${sourceCount}`,
+    `Repair pass: ${proof.repair_pass_used === true ? "used" : "not needed"}`,
+    "External writes: none",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function researchProofText(job: DeepResearchJobV69) {
@@ -737,6 +777,7 @@ function instantIntentStatus(
 
   if (currentMode === "image") return "Intent: Image creation · starting…";
   if (currentMode === "research") return "Intent: Deep research · starting…";
+  if (currentMode === "agents") return "Intent: Multi-agent · starting…";
   if (currentMode === "web") return "Intent: Live web search · starting…";
   if (currentMode === "write") return "Intent: Writing · starting…";
   if (currentMode === "analyze") return "Intent: Analysis · starting…";
@@ -958,6 +999,10 @@ export default function ChatApp() {
     accessToken: string;
   } | null>(null);
   const activeResearchJobRef = useRef<{
+    jobId: string;
+    accessToken: string;
+  } | null>(null);
+  const activeMultiAgentJobRef = useRef<{
     jobId: string;
     accessToken: string;
   } | null>(null);
@@ -1802,6 +1847,62 @@ if (
     await waitMilliseconds(700);
     current = await fetchWorkV68(accessToken, current.job_id);
   }
+} else if (mode === "agents" && !selectedAttachment) {
+  setInstantIntent("Agents · planning · 0%");
+  let current = await startMultiAgentV73(
+    accessToken,
+    effectiveText,
+    activeProjectId || undefined,
+  );
+  activeMultiAgentJobRef.current = {
+    jobId: current.job_id,
+    accessToken,
+  };
+
+  while (true) {
+    setStreamingStarted(true);
+    setInstantIntent(
+      `Agents · ${current.message || current.stage || current.status} · ${Math.max(
+        0,
+        Math.min(100, current.progress || 0),
+      )}%`,
+    );
+
+    if (["succeeded", "blocked", "cancelled"].includes(current.status)) {
+      const answer =
+        typeof current.result?.answer === "string" &&
+        current.result.answer.trim()
+          ? current.result.answer.trim()
+          : current.message || "Multi-agent work finished.";
+
+      finalMessages = [
+        ...nextMessages,
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `${answer}${multiAgentProofText(current)}`,
+          provider: current.result?.provider || "vasuki-multi-agent-v73",
+          sources: normaliseSources(current.result?.sources),
+          intelligenceMode: "multi-agent",
+          verificationRequired: true,
+          qualityChecked: true,
+        },
+      ];
+      break;
+    }
+
+    if (current.status === "failed") {
+      throw new Error(
+        current.error || current.message || "Multi-agent execution failed.",
+      );
+    }
+
+    await waitMilliseconds(650);
+    current = await fetchMultiAgentV73(
+      accessToken,
+      current.job_id,
+    );
+  }
 } else if (mode === "research" && !selectedAttachment) {
   setInstantIntent("Research · planning");
   const planned = await createDeepResearchPlanV69(
@@ -2271,6 +2372,7 @@ if (
       setInstantIntent("");
       activeWorkJobRef.current = null;
       activeResearchJobRef.current = null;
+      activeMultiAgentJobRef.current = null;
       activeBrowserJobRef.current = null;
       setStreamingStarted(false);
       setBusy(false);
@@ -2443,6 +2545,16 @@ if (
         activeResearch.jobId,
       ).catch((cancelError) =>
         console.error("Deep Research cancellation failed", cancelError),
+      );
+    }
+
+    const activeMultiAgent = activeMultiAgentJobRef.current;
+    if (activeMultiAgent) {
+      void cancelMultiAgentV73(
+        activeMultiAgent.accessToken,
+        activeMultiAgent.jobId,
+      ).catch((cancelError) =>
+        console.error("Multi-agent cancellation failed", cancelError),
       );
     }
 
@@ -3928,7 +4040,9 @@ function Composer({
                     ? "Search web"
                     : mode === "research"
                       ? "Deep research"
-                      : "Analyze"}
+                      : mode === "agents"
+                        ? "Multi-agent"
+                        : "Analyze"}
             </span>
           ) : null}
         </div>

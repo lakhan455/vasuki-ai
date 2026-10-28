@@ -2686,6 +2686,74 @@ export async function analyzeDataV72(
 }
 /* VASUKI_V72_ADVANCED_DATA_ANALYST_API_END */
 
+/* VASUKI_V73_MULTI_AGENT_BRAIN_API_START */
+export type MultiAgentJobV73 = {
+  ok?: boolean;
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | "blocked";
+  stage?: string;
+  progress?: number;
+  message?: string;
+  error?: string | null;
+  goal?: string;
+  project_id?: string | null;
+  plan?: Record<string, unknown> | null;
+  agent_status?: Array<{
+    role?: string;
+    status?: string;
+    provider?: string;
+    error?: string | null;
+  }>;
+  result?: {
+    answer?: string;
+    provider?: string;
+    sources?: unknown[];
+    mode?: string;
+    critic?: Record<string, unknown>;
+    execution_proof?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+};
+
+export async function startMultiAgentV73(
+  accessToken: string,
+  goal: string,
+  projectId?: string,
+): Promise<MultiAgentJobV73> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v73/agents/jobs",
+    { goal, project_id: projectId || null },
+    30000,
+    1,
+    accessToken,
+  )) as MultiAgentJobV73;
+}
+
+export async function fetchMultiAgentV73(
+  accessToken: string,
+  jobId: string,
+): Promise<MultiAgentJobV73> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/v73/agents/jobs/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as MultiAgentJobV73;
+}
+
+export async function cancelMultiAgentV73(
+  accessToken: string,
+  jobId: string,
+): Promise<MultiAgentJobV73> {
+  return (await deleteAt(
+    DIRECT_API_URL,
+    `/api/v73/agents/jobs/${encodeURIComponent(jobId)}`,
+    accessToken,
+  )) as MultiAgentJobV73;
+}
+/* VASUKI_V73_MULTI_AGENT_BRAIN_API_END */
+
+
 /* VASUKI_V70_REAL_BROWSER_AGENT_API_END */
 
 /* VASUKI_V69_DEEP_RESEARCH_2_API */
