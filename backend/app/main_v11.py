@@ -123,6 +123,15 @@ from app.v73.multi_agent import (
     health_snapshot as v73_health_snapshot,
     shutdown_multi_agent_jobs as v73_shutdown_multi_agent_jobs,
 )
+from app.v75.autonomous_tasks import (
+    cancel_task as v75_cancel_task,
+    create_task as v75_create_task,
+    execute_scheduled_task as v75_execute_scheduled_task,
+    health_snapshot as v75_health_snapshot,
+    list_tasks as v75_list_tasks,
+    pause_task as v75_pause_task,
+    resume_task as v75_resume_task,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -336,6 +345,11 @@ async def health_v73() -> dict[str, Any]:
     return v73_health_snapshot(settings)
 
 
+@app.get("/health/v75")
+async def health_v75() -> dict[str, Any]:
+    return v75_health_snapshot(settings)
+
+
 @app.get("/api/v72/capabilities")
 async def v72_capabilities(
     _user: AuthUser = Depends(get_current_user),
@@ -378,6 +392,97 @@ async def v72_python(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class V75TaskRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    prompt: str = Field(min_length=1, max_length=12000)
+    mode: str = "chat"
+    run_at: str | None = None
+    cron: str | None = None
+
+
+class V75ResumeRequest(BaseModel):
+    run_at: str | None = None
+
+
+@app.get("/api/v75/tasks")
+async def v75_tasks_list(
+    limit: int = Query(default=50, ge=1, le=100),
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "tasks": await v75_list_tasks(settings, user_id=user.id, limit=limit),
+        "runtime": v75_health_snapshot(settings)["runtime"],
+    }
+
+
+@app.post("/api/v75/tasks")
+async def v75_tasks_create(
+    payload: V75TaskRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        task = await v75_create_task(
+            settings,
+            user_id=user.id,
+            title=payload.title,
+            prompt=payload.prompt,
+            mode=payload.mode,
+            run_at=payload.run_at,
+            cron=payload.cron,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"ok": True, "task": task}
+
+
+@app.patch("/api/v75/tasks/{task_id}/pause")
+async def v75_tasks_pause(
+    task_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        task = await v75_pause_task(settings, user_id=user.id, task_id=task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return {"ok": True, "task": task}
+
+
+@app.patch("/api/v75/tasks/{task_id}/resume")
+async def v75_tasks_resume(
+    task_id: str,
+    payload: V75ResumeRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        task = await v75_resume_task(
+            settings,
+            user_id=user.id,
+            task_id=task_id,
+            run_at=payload.run_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return {"ok": True, "task": task}
+
+
+@app.delete("/api/v75/tasks/{task_id}")
+async def v75_tasks_cancel(
+    task_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    task = await v75_cancel_task(settings, user_id=user.id, task_id=task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return {"ok": True, "task": task}
 
 
 class V73MultiAgentRequest(BaseModel):
@@ -1497,8 +1602,7 @@ Reason jointly across the request and all supplied context. Clearly state if an 
     return {"ok":True,"answer":answer,"provider":provider,"files":len(files),"contract":multimodal_contract()}
 
 async def _scheduled_executor(row: dict[str,Any])->dict[str,Any]:
-    answer,provider=await route_chat_v10("auto",[{"role":"user","content":str(row.get("prompt") or "")}],settings,"")
-    return {"answer":answer[:40000],"provider":provider}
+    return await v75_execute_scheduled_task(settings, row)
 
 @app.post("/api/owner/v11/scheduler/tick")
 async def scheduler_manual_tick(user: AuthUser=Depends(get_current_user)):

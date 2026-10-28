@@ -2753,6 +2753,79 @@ export async function cancelMultiAgentV73(
 }
 /* VASUKI_V73_MULTI_AGENT_BRAIN_API_END */
 
+/* VASUKI_V75_AUTONOMOUS_TASKS_API_START */
+export type AutonomousTaskV75 = {
+  id: string;
+  title: string;
+  prompt: string;
+  mode: "chat" | "research" | "multi_agent";
+  run_at?: string | null;
+  cron?: string | null;
+  status: string;
+  last_run_at?: string | null;
+  result?: Record<string, unknown> | null;
+  created_at?: string;
+};
+
+export async function fetchAutonomousTasksV75(
+  accessToken: string,
+): Promise<{ ok?: boolean; tasks: AutonomousTaskV75[]; runtime?: Record<string, unknown> }> {
+  const data = await getAt(DIRECT_API_URL, "/api/v75/tasks?limit=50", accessToken);
+  return {
+    ok: data.ok === true,
+    tasks: Array.isArray(data.tasks) ? (data.tasks as AutonomousTaskV75[]) : [],
+    runtime:
+      data.runtime && typeof data.runtime === "object"
+        ? (data.runtime as Record<string, unknown>)
+        : {},
+  };
+}
+
+export async function createAutonomousTaskV75(
+  accessToken: string,
+  payload: {
+    title: string;
+    prompt: string;
+    mode: "chat" | "research" | "multi_agent";
+    run_at?: string | null;
+    cron?: string | null;
+  },
+) {
+  return postJsonAt(DIRECT_API_URL, "/api/v75/tasks", payload, 30000, 1, accessToken);
+}
+
+export async function pauseAutonomousTaskV75(accessToken: string, taskId: string) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/v75/tasks/${encodeURIComponent(taskId)}/pause`,
+    {},
+    accessToken,
+  );
+}
+
+export async function resumeAutonomousTaskV75(
+  accessToken: string,
+  taskId: string,
+  runAt?: string,
+) {
+  return patchJsonAt(
+    DIRECT_API_URL,
+    `/api/v75/tasks/${encodeURIComponent(taskId)}/resume`,
+    { run_at: runAt || null },
+    accessToken,
+  );
+}
+
+export async function cancelAutonomousTaskV75(accessToken: string, taskId: string) {
+  return deleteAt(
+    DIRECT_API_URL,
+    `/api/v75/tasks/${encodeURIComponent(taskId)}`,
+    accessToken,
+  );
+}
+/* VASUKI_V75_AUTONOMOUS_TASKS_API_END */
+
+
 
 /* VASUKI_V70_REAL_BROWSER_AGENT_API_END */
 

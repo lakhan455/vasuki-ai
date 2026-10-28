@@ -10,6 +10,12 @@ import {
   recordExperimentConversionV9,
   recordExperimentExposureV9,
   type PlatformSnapshotV9,
+  type AutonomousTaskV75,
+  cancelAutonomousTaskV75,
+  createAutonomousTaskV75,
+  fetchAutonomousTasksV75,
+  pauseAutonomousTaskV75,
+  resumeAutonomousTaskV75,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
@@ -33,6 +39,13 @@ export default function OperationsPage() {
   const [count, setCount] = useState(2);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [scheduledTasks, setScheduledTasks] = useState<AutonomousTaskV75[]>([]);
+  const [taskRuntimeNote, setTaskRuntimeNote] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskPrompt, setTaskPrompt] = useState("");
+  const [taskMode, setTaskMode] = useState<"chat" | "research" | "multi_agent">("chat");
+  const [taskSchedule, setTaskSchedule] = useState("daily");
+  const [taskRunAt, setTaskRunAt] = useState("");
   const exposureSentRef = useRef("");
 
   const refreshMs =
@@ -41,7 +54,17 @@ export default function OperationsPage() {
   async function load(showError = true) {
     try {
       const accessToken = await token();
-      setData(await fetchPlatformSnapshotV9(accessToken, 30));
+      const [platform, tasks] = await Promise.all([
+        fetchPlatformSnapshotV9(accessToken, 30),
+        fetchAutonomousTasksV75(accessToken),
+      ]);
+      setData(platform);
+      setScheduledTasks(tasks.tasks);
+      setTaskRuntimeNote(
+        tasks.runtime && typeof tasks.runtime.note === "string"
+          ? tasks.runtime.note
+          : "",
+      );
     } catch (err) {
       if (showError) {
         setError(err instanceof Error ? err.message : "Operations Center could not be loaded.");
@@ -85,6 +108,89 @@ export default function OperationsPage() {
     () => new Set(data?.policy?.allowed_background_kinds || []),
     [data?.policy?.allowed_background_kinds],
   );
+
+  function taskSchedulePayload() {
+    if (taskSchedule === "once") {
+      if (!taskRunAt) throw new Error("Choose a future date and time.");
+      const date = new Date(taskRunAt);
+      if (Number.isNaN(date.getTime())) throw new Error("Invalid task date/time.");
+      return { run_at: date.toISOString(), cron: null };
+    }
+    if (taskSchedule === "hourly") return { run_at: null, cron: "*/60 * * * *" };
+    if (taskSchedule === "six-hourly") return { run_at: null, cron: "*/360 * * * *" };
+    return { run_at: null, cron: "0 9 * * *" };
+  }
+
+  async function createScheduledTask() {
+    if (!taskTitle.trim() || !taskPrompt.trim()) {
+      setError("Task title and instruction are required.");
+      return;
+    }
+    setBusy("v75-create");
+    setError("");
+    try {
+      const accessToken = await token();
+      const schedule = taskSchedulePayload();
+      await createAutonomousTaskV75(accessToken, {
+        title: taskTitle.trim(),
+        prompt: taskPrompt.trim(),
+        mode: taskMode,
+        run_at: schedule.run_at,
+        cron: schedule.cron,
+      });
+      setTaskTitle("");
+      setTaskPrompt("");
+      setTaskRunAt("");
+      await load(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Autonomous task could not be created.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function pauseScheduledTask(taskId: string) {
+    setBusy(`pause-${taskId}`);
+    try {
+      const accessToken = await token();
+      await pauseAutonomousTaskV75(accessToken, taskId);
+      await load(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Task could not be paused.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function resumeScheduledTask(task: AutonomousTaskV75) {
+    setBusy(`resume-${task.id}`);
+    try {
+      const accessToken = await token();
+      let runAt: string | undefined;
+      if (!task.cron && task.run_at && new Date(task.run_at).getTime() <= Date.now()) {
+        runAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      }
+      await resumeAutonomousTaskV75(accessToken, task.id, runAt);
+      await load(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Task could not be resumed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function cancelScheduledTask(taskId: string) {
+    setBusy(`cancel-${taskId}`);
+    try {
+      const accessToken = await token();
+      await cancelAutonomousTaskV75(accessToken, taskId);
+      await load(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Task could not be cancelled.");
+    } finally {
+      setBusy("");
+    }
+  }
 
   async function submitJob() {
     if (!prompt.trim()) return setError("Write an instruction first.");
@@ -176,6 +282,133 @@ export default function OperationsPage() {
       </section>
 
       <section className="pv-v9-ops-grid">
+        <article className="pv-v9-ops-card">
+          <div className="pv-v9-ops-title">
+            <div><p className="pv-v8-kicker">V75</p><h2>Autonomous tasks</h2></div>
+            <button type="button" onClick={() => void load(false)}>Refresh</button>
+          </div>
+
+          <label>
+            <span>Task title</span>
+            <input
+              value={taskTitle}
+              onChange={(event) => setTaskTitle(event.target.value)}
+              placeholder="Example: Daily competitor summary"
+            />
+          </label>
+
+          <label>
+            <span>Instruction</span>
+            <textarea
+              rows={4}
+              value={taskPrompt}
+              onChange={(event) => setTaskPrompt(event.target.value)}
+              placeholder="What should Vasuki do when this task runs?"
+            />
+          </label>
+
+          <div className="pv-v9-ops-fields">
+            <label>
+              <span>Mode</span>
+              <select
+                value={taskMode}
+                onChange={(event) =>
+                  setTaskMode(event.target.value as "chat" | "research" | "multi_agent")
+                }
+              >
+                <option value="chat">AI task</option>
+                <option value="research">Live research</option>
+                <option value="multi_agent">Multi-agent</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Schedule</span>
+              <select value={taskSchedule} onChange={(event) => setTaskSchedule(event.target.value)}>
+                <option value="daily">Daily at 09:00 UTC</option>
+                <option value="hourly">Every hour</option>
+                <option value="six-hourly">Every 6 hours</option>
+                <option value="once">One time</option>
+              </select>
+            </label>
+
+            {taskSchedule === "once" ? (
+              <label>
+                <span>Run at</span>
+                <input
+                  type="datetime-local"
+                  value={taskRunAt}
+                  onChange={(event) => setTaskRunAt(event.target.value)}
+                />
+              </label>
+            ) : null}
+          </div>
+
+          <button
+            className="pv-v9-primary"
+            type="button"
+            disabled={busy === "v75-create" || !taskTitle.trim() || !taskPrompt.trim()}
+            onClick={() => void createScheduledTask()}
+          >
+            {busy === "v75-create" ? "Creating..." : "Create autonomous task"}
+          </button>
+
+          <p className="pv-v9-ops-note">
+            {taskRuntimeNote || "Tasks run from the persistent scheduler. Connector event triggers are not enabled yet."}
+          </p>
+
+          <div className="pv-v9-job-list">
+            {!scheduledTasks.length ? <div className="pv-v8-empty">No autonomous tasks yet.</div> : null}
+            {scheduledTasks.map((task) => (
+              <article key={task.id} className={`is-${task.status}`}>
+                <div className="pv-v9-job-top">
+                  <div>
+                    <strong>{task.title}</strong>
+                    <small>{task.mode.replace(/_/g, " ")} · {statusLabel(task.status)}</small>
+                  </div>
+                  <strong>{task.cron ? "Recurring" : "One time"}</strong>
+                </div>
+                <p>{task.prompt}</p>
+                <small>
+                  Next: {task.run_at ? new Date(task.run_at).toLocaleString() : "-"}
+                  {task.last_run_at ? ` · Last: ${new Date(task.last_run_at).toLocaleString()}` : ""}
+                </small>
+                {task.result && typeof task.result.answer === "string" ? (
+                  <p>{String(task.result.answer).slice(0, 320)}</p>
+                ) : null}
+                <div className="pv-v9-inline-actions">
+                  {task.status === "scheduled" ? (
+                    <button
+                      type="button"
+                      disabled={busy === `pause-${task.id}`}
+                      onClick={() => void pauseScheduledTask(task.id)}
+                    >
+                      Pause
+                    </button>
+                  ) : null}
+                  {task.status === "paused" ? (
+                    <button
+                      type="button"
+                      disabled={busy === `resume-${task.id}`}
+                      onClick={() => void resumeScheduledTask(task)}
+                    >
+                      Resume
+                    </button>
+                  ) : null}
+                  {!["completed", "cancelled"].includes(task.status) ? (
+                    <button
+                      type="button"
+                      disabled={busy === `cancel-${task.id}`}
+                      onClick={() => void cancelScheduledTask(task.id)}
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </article>
         <article className="pv-v9-ops-card">
           <div className="pv-v9-ops-title">
             <div><p className="pv-v8-kicker">Queue</p><h2>Create background job</h2></div>
