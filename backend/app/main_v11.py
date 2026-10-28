@@ -3177,6 +3177,88 @@ v10.legacy.route_image = _v40_route_image
 v10.legacy._private_context = _v40_private_context
 
 
+# VASUKI_V74_MEMORY_3_INTEGRATION
+from app.v74.memory3 import (
+    health_snapshot as v74_memory_health,
+    memory3_snapshot as v74_memory_snapshot,
+)
+
+_v74_base_private_context = v10.legacy._private_context
+
+
+def _v74_request_messages(request) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in list(getattr(request, "messages", []) or []):
+        if hasattr(item, "model_dump"):
+            rows.append(item.model_dump())
+        elif isinstance(item, dict):
+            rows.append(dict(item))
+    return rows
+
+
+async def _v74_private_context(
+    *,
+    user_id: str,
+    access_token: str,
+    query: str,
+    request,
+):
+    base_context, document_sources = await _v74_base_private_context(
+        user_id=user_id,
+        access_token=access_token,
+        query=query,
+        request=request,
+    )
+    project_id = str(getattr(request, "project_id", "") or "").strip() or None
+    try:
+        snapshot = await asyncio.wait_for(
+            v74_memory_snapshot(
+                settings,
+                user_id=user_id,
+                query=query,
+                project_id=project_id,
+                messages=_v74_request_messages(request),
+            ),
+            timeout=3.5,
+        )
+        memory_context = str(snapshot.get("context") or "")
+    except Exception:
+        memory_context = ""
+
+    return (
+        v10.legacy._join_context(base_context, memory_context),
+        document_sources,
+    )
+
+
+v10.legacy._private_context = _v74_private_context
+
+
+class V74MemoryInspectRequest(BaseModel):
+    query: str = Field(default="", max_length=12000)
+    project_id: str | None = Field(default=None, max_length=120)
+    messages: list[dict[str, Any]] = Field(default_factory=list)
+
+
+@app.get("/health/v74")
+async def health_v74() -> dict[str, Any]:
+    return v74_memory_health()
+
+
+@app.post("/api/v74/memory/inspect")
+async def v74_memory_inspect(
+    payload: V74MemoryInspectRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return await v74_memory_snapshot(
+        settings,
+        user_id=user.id,
+        query=payload.query,
+        project_id=payload.project_id,
+        messages=payload.messages,
+    )
+
+
 class V40CreatorInspectRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=30000)
     provider: str = Field(default="auto", max_length=80)
