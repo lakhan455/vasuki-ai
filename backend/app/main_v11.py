@@ -116,6 +116,13 @@ from app.v72.data_analyst import (
     execute_bounded_python as v72_execute_bounded_python,
     health_snapshot as v72_health_snapshot,
 )
+from app.v73.multi_agent import (
+    cancel_multi_agent_job as v73_cancel_multi_agent_job,
+    create_multi_agent_job as v73_create_multi_agent_job,
+    get_multi_agent_job as v73_get_multi_agent_job,
+    health_snapshot as v73_health_snapshot,
+    shutdown_multi_agent_jobs as v73_shutdown_multi_agent_jobs,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -233,6 +240,10 @@ async def v11_shutdown():
         await v70_shutdown_browser_jobs()
     except Exception as exc:
         record_degraded("shutdown", "browser_jobs", exc, severity="info")
+    try:
+        await v73_shutdown_multi_agent_jobs()
+    except Exception as exc:
+        record_degraded("shutdown", "multi_agent_jobs", exc, severity="info")
 
 
 @app.get("/health/v50")
@@ -320,6 +331,11 @@ async def health_v72() -> dict[str, Any]:
     return v72_health_snapshot()
 
 
+@app.get("/health/v73")
+async def health_v73() -> dict[str, Any]:
+    return v73_health_snapshot(settings)
+
+
 @app.get("/api/v72/capabilities")
 async def v72_capabilities(
     _user: AuthUser = Depends(get_current_user),
@@ -362,6 +378,51 @@ async def v72_python(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class V73MultiAgentRequest(BaseModel):
+    goal: str = Field(min_length=3, max_length=20000)
+    project_id: str | None = None
+
+
+@app.post("/api/v73/agents/jobs")
+async def v73_agents_start(
+    payload: V73MultiAgentRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await v73_create_multi_agent_job(
+            settings,
+            user_id=user.id,
+            goal=payload.goal,
+            project_id=payload.project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v73/agents/jobs/{job_id}")
+async def v73_agents_status(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v73_get_multi_agent_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Multi-agent job not found.")
+    return job
+
+
+@app.delete("/api/v73/agents/jobs/{job_id}")
+async def v73_agents_cancel(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await v73_cancel_multi_agent_job(user_id=user.id, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Multi-agent job not found.")
+    return job
 
 
 class V68WorkRequest(BaseModel):

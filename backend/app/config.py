@@ -152,6 +152,12 @@ class Settings(BaseSettings):
     v70_browser_max_steps: int = 6
     # VASUKI_V70_REAL_BROWSER_AGENT_END
 
+    # VASUKI_V73_MULTI_AGENT_BRAIN_START
+    v73_max_agents: int = 3
+    v73_max_parallel_agents: int = 3
+    v73_agent_timeout_seconds: float = 35.0
+    # VASUKI_V73_MULTI_AGENT_BRAIN_END
+
     # VASUKI_V17_MISSION_CONTROL_START
     v17_max_concurrent_builds: int = 2
     v17_job_ttl_seconds: int = 3600
