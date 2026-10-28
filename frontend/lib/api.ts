@@ -2378,6 +2378,36 @@ export async function fetchOwnerReliabilityV67(
     ? (data.reliability as ReliabilityV67)
     : {};
 }
+
+
+export type SelfEvaluationV78 = {
+  ok?: boolean;
+  version?: string;
+  name?: string;
+  features?: string[];
+  release_gate?: {
+    fixed_eval_cases?: number;
+    default_min_score?: number;
+    default_min_category_score?: number;
+    fails_ci_on_regression?: boolean;
+    regression_suites?: Record<string, string[]>;
+  };
+  privacy?: Record<string, unknown>;
+  last_runtime_summary?: Record<string, unknown> | null;
+};
+
+export async function fetchOwnerSelfEvaluationV78(
+  accessToken: string,
+): Promise<SelfEvaluationV78> {
+  const data = await getAt(
+    DIRECT_API_URL,
+    "/api/owner/v78/self-evaluation",
+    accessToken,
+  );
+  return data.evaluation && typeof data.evaluation === "object"
+    ? (data.evaluation as SelfEvaluationV78)
+    : {};
+}
 /* VASUKI_V65_V67_MODERN_AI_API_END */
 
 /* VASUKI_V71_PROJECT_BRAIN_3_API */
