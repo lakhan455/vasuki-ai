@@ -111,6 +111,11 @@ from app.v71.project_brain import (
     set_last_work as v71_set_last_work,
     update_task as v71_update_task,
 )
+from app.v72.data_analyst import (
+    analyze_data_file as v72_analyze_data_file,
+    execute_bounded_python as v72_execute_bounded_python,
+    health_snapshot as v72_health_snapshot,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -308,6 +313,55 @@ async def health_v70() -> dict[str, Any]:
 @app.get("/health/v71")
 async def health_v71() -> dict[str, Any]:
     return v71_health_snapshot()
+
+
+@app.get("/health/v72")
+async def health_v72() -> dict[str, Any]:
+    return v72_health_snapshot()
+
+
+@app.get("/api/v72/capabilities")
+async def v72_capabilities(
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return v72_health_snapshot()
+
+
+@app.post("/api/v72/analyze")
+async def v72_analyze(
+    prompt: str = Form("Analyze this dataset and highlight the most important findings."),
+    file: UploadFile = File(...),
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    data = await file.read()
+    try:
+        return await v72_analyze_data_file(
+            settings,
+            filename=file.filename or "data.csv",
+            data=data,
+            prompt=prompt,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/v72/python")
+async def v72_python(
+    code: str = Form(...),
+    file: UploadFile = File(...),
+    _user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    data = await file.read()
+    try:
+        return await v72_execute_bounded_python(
+            filename=file.filename or "data.csv",
+            data=data,
+            code=code,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 class V68WorkRequest(BaseModel):

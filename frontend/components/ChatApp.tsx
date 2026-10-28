@@ -18,6 +18,7 @@ import SmartFileWorkspace from "@/components/SmartFileWorkspace";
 import {
   analyzeAttachment,
   analyzeSmartFiles,
+  analyzeDataV72,
   approveBrowserJobV70,
   approveWorkV68,
   cancelBrowserJobV70,
@@ -75,6 +76,10 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "application/x-zip-compressed",
   "text/plain",
   "text/markdown",
+  "text/csv",
+  "text/tab-separated-values",
+  "application/json",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
 const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
@@ -88,7 +93,18 @@ const ALLOWED_ATTACHMENT_EXTENSIONS = new Set([
   ".txt",
   ".md",
   ".zip",
+  ".csv",
+  ".tsv",
+  ".json",
+  ".xlsx",
 ]);
+
+function isTabularDataFile(file: File) {
+  const lower = file.name.toLowerCase();
+  return [".csv", ".tsv", ".json", ".xlsx"].some((extension) =>
+    lower.endsWith(extension),
+  );
+}
 
 type SourceInfo = {
   title?: string;
@@ -393,6 +409,32 @@ function workProofText(job: WorkJobV68) {
   if (testNote) lines.push(testNote);
   return `\n\n${lines.join("\n")}`;
 }
+function dataProofText(data: {
+  analysis?: {
+    rows?: number;
+    columns_count?: number;
+    missing_cells?: number;
+    duplicate_rows?: number;
+  };
+  execution_proof?: Record<string, unknown>;
+}) {
+  const analysis = data.analysis || {};
+  const proof = data.execution_proof || {};
+  return [
+    "",
+    "",
+    "**Data analysis proof**",
+    `Rows analyzed: ${analysis.rows ?? 0}`,
+    `Columns analyzed: ${analysis.columns_count ?? 0}`,
+    `Missing cells: ${analysis.missing_cells ?? 0}`,
+    `Duplicate rows: ${analysis.duplicate_rows ?? 0}`,
+    "Statistics: computed from uploaded data",
+    `Bounded Python sandbox available: ${
+      proof.bounded_python_sandbox_available === true ? "yes" : "no"
+    }`,
+  ].join("\n");
+}
+
 function fileSizeLabel(bytes: number) {
   if (bytes < 1024 * 1024) {
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -1533,6 +1575,11 @@ const requestedDownload =
           zipProjectAttachment ||
           requestedDownload
         );
+      const shouldUseDataAnalyst =
+        mode === "analyze" &&
+        selectedAttachment
+          ? isTabularDataFile(selectedAttachment.file)
+          : false;
       const shouldUseSmartFiles =
         !shouldUseCodeProject &&
         (
@@ -1878,6 +1925,27 @@ if (
       artifacts: data.files,
     },
   ];
+} else if (shouldUseDataAnalyst && selectedAttachment) {
+        setInstantIntent("Analyze · computing dataset");
+        setStreamingStarted(true);
+
+        const data = await analyzeDataV72(
+          accessToken,
+          selectedAttachment.file,
+          effectiveText,
+        );
+
+        finalMessages = [
+          ...nextMessages,
+          {
+            id: makeId(),
+            role: "assistant",
+            content: `${data.answer || "Dataset analysis completed."}${dataProofText(data)}`,
+            provider: data.provider || "vasuki-data-v72",
+            intelligenceMode: "analysis",
+            qualityChecked: true,
+          },
+        ];
 } else if (shouldUseSmartFiles) {
 
         const data = await analyzeSmartFiles(
@@ -3668,7 +3736,7 @@ function Composer({
         ref={fileInputRef}
         className="pv-file-input"
         type="file"
-        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed,text/plain,text/markdown,.pdf,.docx,.txt,.md,.zip"
+        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json,application/zip,application/x-zip-compressed,text/plain,text/markdown,text/csv,text/tab-separated-values,.pdf,.docx,.txt,.md,.zip,.csv,.tsv,.json,.xlsx"
         onChange={handleFileChange}
       />
 

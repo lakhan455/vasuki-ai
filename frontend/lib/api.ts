@@ -2642,6 +2642,50 @@ export async function cancelBrowserJobV70(
     accessToken,
   );
 }
+/* VASUKI_V72_ADVANCED_DATA_ANALYST_API_START */
+export type DataAnalysisV72 = {
+  ok?: boolean;
+  version?: string;
+  answer: string;
+  provider?: string;
+  analysis?: {
+    file?: string;
+    format?: string;
+    rows?: number;
+    columns_count?: number;
+    missing_cells?: number;
+    duplicate_rows?: number;
+    headers?: string[];
+    columns?: Array<Record<string, unknown>>;
+    correlations?: Array<Record<string, unknown>>;
+    group_insights?: Array<Record<string, unknown>>;
+    trend?: Record<string, unknown> | null;
+    preview?: Array<Record<string, unknown>>;
+  };
+  execution_proof?: Record<string, unknown>;
+};
+
+export async function analyzeDataV72(
+  accessToken: string,
+  file: File,
+  prompt: string,
+): Promise<DataAnalysisV72> {
+  return (await postFormAt(
+    DIRECT_API_URL,
+    "/api/v72/analyze",
+    () => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      form.append("prompt", prompt);
+      return form;
+    },
+    180000,
+    1,
+    accessToken,
+  )) as DataAnalysisV72;
+}
+/* VASUKI_V72_ADVANCED_DATA_ANALYST_API_END */
+
 /* VASUKI_V70_REAL_BROWSER_AGENT_API_END */
 
 /* VASUKI_V69_DEEP_RESEARCH_2_API */
