@@ -2825,6 +2825,97 @@ export async function cancelAutonomousTaskV75(accessToken: string, taskId: strin
 }
 /* VASUKI_V75_AUTONOMOUS_TASKS_API_END */
 
+/* VASUKI_V76_LIVE_WORKSPACE_API_START */
+export type WorkspaceKindV76 =
+  | "document"
+  | "markdown"
+  | "code"
+  | "html"
+  | "spreadsheet";
+
+export type WorkspaceItemV76 = {
+  id: string;
+  title: string;
+  kind: WorkspaceKindV76;
+  language?: string;
+  version: number;
+  size_bytes?: number;
+  created_at?: string;
+  updated_at?: string;
+  content?: string;
+};
+
+export async function fetchWorkspacesV76(
+  accessToken: string,
+): Promise<{ ok?: boolean; version?: string; items: WorkspaceItemV76[] }> {
+  return (await getAt(
+    DIRECT_API_URL,
+    "/api/v76/workspaces",
+    accessToken,
+  )) as { ok?: boolean; version?: string; items: WorkspaceItemV76[] };
+}
+
+export async function fetchWorkspaceV76(
+  accessToken: string,
+  workspaceId: string,
+): Promise<WorkspaceItemV76> {
+  return (await getAt(
+    DIRECT_API_URL,
+    `/api/v76/workspaces/${encodeURIComponent(workspaceId)}`,
+    accessToken,
+  )) as WorkspaceItemV76;
+}
+
+export async function createWorkspaceV76(
+  accessToken: string,
+  payload: {
+    title: string;
+    kind: WorkspaceKindV76;
+    content?: string;
+    language?: string;
+  },
+): Promise<WorkspaceItemV76> {
+  return (await postJsonAt(
+    DIRECT_API_URL,
+    "/api/v76/workspaces",
+    payload,
+    30000,
+    1,
+    accessToken,
+  )) as WorkspaceItemV76;
+}
+
+export async function saveWorkspaceV76(
+  accessToken: string,
+  workspaceId: string,
+  payload: {
+    title?: string;
+    kind?: WorkspaceKindV76;
+    content?: string;
+    language?: string;
+    expected_version?: number;
+  },
+): Promise<WorkspaceItemV76> {
+  return (await patchJsonAt(
+    DIRECT_API_URL,
+    `/api/v76/workspaces/${encodeURIComponent(workspaceId)}`,
+    payload,
+    accessToken,
+  )) as WorkspaceItemV76;
+}
+
+export async function deleteWorkspaceV76(
+  accessToken: string,
+  workspaceId: string,
+): Promise<{ ok?: boolean; deleted?: boolean; id?: string }> {
+  return (await deleteAt(
+    DIRECT_API_URL,
+    `/api/v76/workspaces/${encodeURIComponent(workspaceId)}`,
+    accessToken,
+  )) as { ok?: boolean; deleted?: boolean; id?: string };
+}
+/* VASUKI_V76_LIVE_WORKSPACE_API_END */
+
 
 
 /* VASUKI_V70_REAL_BROWSER_AGENT_API_END */

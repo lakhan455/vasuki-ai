@@ -132,6 +132,15 @@ from app.v75.autonomous_tasks import (
     pause_task as v75_pause_task,
     resume_task as v75_resume_task,
 )
+from app.v76.live_workspace import (
+    WorkspaceConflict as V76WorkspaceConflict,
+    create_workspace as v76_create_workspace,
+    delete_workspace as v76_delete_workspace,
+    get_workspace as v76_get_workspace,
+    health_snapshot as v76_health_snapshot,
+    list_workspaces as v76_list_workspaces,
+    update_workspace as v76_update_workspace,
+)
 from app.v50.truth import extract_sources_from_context
 from app.v47.reliability_router import (
     flush_persistence as flush_v47_persistence,
@@ -350,6 +359,11 @@ async def health_v75() -> dict[str, Any]:
     return v75_health_snapshot(settings)
 
 
+@app.get("/health/v76")
+async def health_v76() -> dict[str, Any]:
+    return v76_health_snapshot(settings)
+
+
 @app.get("/api/v72/capabilities")
 async def v72_capabilities(
     _user: AuthUser = Depends(get_current_user),
@@ -392,6 +406,117 @@ async def v72_python(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class V76WorkspaceCreateRequest(BaseModel):
+    title: str = Field(default="Untitled workspace", max_length=180)
+    kind: str = Field(default="document", max_length=40)
+    content: str = Field(default="", max_length=2_100_000)
+    language: str = Field(default="", max_length=40)
+
+
+class V76WorkspaceUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=180)
+    kind: str | None = Field(default=None, max_length=40)
+    content: str | None = Field(default=None, max_length=2_100_000)
+    language: str | None = Field(default=None, max_length=40)
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+@app.get("/api/v76/workspaces")
+async def v76_workspaces_list(
+    limit: int = Query(default=50, ge=1, le=100),
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "version": "v76",
+        "items": await v76_list_workspaces(
+            settings,
+            user_id=user.id,
+            limit=limit,
+        ),
+    }
+
+
+@app.post("/api/v76/workspaces")
+async def v76_workspaces_create(
+    payload: V76WorkspaceCreateRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        return await v76_create_workspace(
+            settings,
+            user_id=user.id,
+            title=payload.title,
+            kind=payload.kind,
+            content=payload.content,
+            language=payload.language,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/v76/workspaces/{workspace_id}")
+async def v76_workspaces_get(
+    workspace_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        item = await v76_get_workspace(
+            settings,
+            user_id=user.id,
+            workspace_id=workspace_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if item is None:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+    return item
+
+
+@app.patch("/api/v76/workspaces/{workspace_id}")
+async def v76_workspaces_update(
+    workspace_id: str,
+    payload: V76WorkspaceUpdateRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        item = await v76_update_workspace(
+            settings,
+            user_id=user.id,
+            workspace_id=workspace_id,
+            title=payload.title,
+            kind=payload.kind,
+            content=payload.content,
+            language=payload.language,
+            expected_version=payload.expected_version,
+        )
+    except V76WorkspaceConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if item is None:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+    return item
+
+
+@app.delete("/api/v76/workspaces/{workspace_id}")
+async def v76_workspaces_delete(
+    workspace_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    try:
+        deleted = await v76_delete_workspace(
+            settings,
+            user_id=user.id,
+            workspace_id=workspace_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+    return {"ok": True, "deleted": True, "id": workspace_id}
 
 
 class V75TaskRequest(BaseModel):
