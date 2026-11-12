@@ -56,9 +56,17 @@ class Settings(BaseSettings):
 
     # VASUKI_CLOUD_INFERENCE_V1_START
     vasuki_cloud_enabled: bool = False
+    vasuki_cloud_transport: str = "openai"
     vasuki_cloud_base_url: str = ""
     vasuki_cloud_api_key: str | None = None
     vasuki_cloud_model: str = "vasuki-main"
+
+    # Hugging Face / Gradio transport.
+    vasuki_cloud_space_id: str = ""
+    vasuki_cloud_gradio_api_name: str = "/chat"
+    vasuki_cloud_hf_token: str | None = None
+    vasuki_cloud_gradio_timeout_seconds: float = 50.0
+    vasuki_cloud_gradio_first_token_timeout_seconds: float = 50.0
     # VASUKI_CLOUD_INFERENCE_V1_END
 
     tavily_api_key: str | None = None

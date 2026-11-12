@@ -215,6 +215,46 @@ def first_token_timeout_for_provider(
     settings: Any,
     recovery_mode: bool = False,
 ) -> float:
+    if (
+        provider == "vasuki_cloud"
+        and str(
+            getattr(
+                settings,
+                "vasuki_cloud_transport",
+                "openai",
+            )
+            or "openai"
+        ).strip().casefold()
+        == "gradio"
+    ):
+        configured = max(
+            8.0,
+            float(
+                getattr(
+                    settings,
+                    "vasuki_cloud_gradio_first_token_timeout_seconds",
+                    50.0,
+                )
+            ),
+        )
+
+        total_budget = max(
+            10.0,
+            float(
+                getattr(
+                    settings,
+                    "total_chat_timeout_seconds",
+                    55.0,
+                )
+            )
+            - 2.0,
+        )
+
+        return round(
+            min(configured, total_budget),
+            3,
+        )
+
     if tier == "strong":
         base = float(getattr(settings, "v46_large_first_token_timeout_seconds", 3.0))
         ceiling = float(getattr(settings, "v47_large_first_token_timeout_max_seconds", 7.0))

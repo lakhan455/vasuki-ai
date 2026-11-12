@@ -48,9 +48,67 @@ def configured_provider(name: str, s: Settings) -> bool:
     return {
         "vasuki_cloud": bool(
             getattr(s, "vasuki_cloud_enabled", False)
-            and str(getattr(s, "vasuki_cloud_base_url", "") or "").strip()
-            and getattr(s, "vasuki_cloud_api_key", None)
-            and str(getattr(s, "vasuki_cloud_model", "") or "").strip()
+            and (
+                (
+                    str(
+                        getattr(
+                            s,
+                            "vasuki_cloud_transport",
+                            "openai",
+                        )
+                        or "openai"
+                    ).strip().casefold()
+                    == "gradio"
+                    and str(
+                        getattr(
+                            s,
+                            "vasuki_cloud_space_id",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+                    and str(
+                        getattr(
+                            s,
+                            "vasuki_cloud_gradio_api_name",
+                            "/chat",
+                        )
+                        or ""
+                    ).strip()
+                )
+                or (
+                    str(
+                        getattr(
+                            s,
+                            "vasuki_cloud_transport",
+                            "openai",
+                        )
+                        or "openai"
+                    ).strip().casefold()
+                    == "openai"
+                    and str(
+                        getattr(
+                            s,
+                            "vasuki_cloud_base_url",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+                    and getattr(
+                        s,
+                        "vasuki_cloud_api_key",
+                        None,
+                    )
+                    and str(
+                        getattr(
+                            s,
+                            "vasuki_cloud_model",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+                )
+            )
         ),
         "groq_fast": bool(getattr(s, "groq_api_key", None)),
         "groq": bool(getattr(s, "groq_api_key", None)),

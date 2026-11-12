@@ -634,6 +634,149 @@ async def chat_gemini(
     return complete.strip()
 
 
+def _vasuki_cloud_transport(settings: Settings) -> str:
+    return str(
+        getattr(
+            settings,
+            "vasuki_cloud_transport",
+            "openai",
+        )
+        or "openai"
+    ).strip().casefold()
+
+
+def _vasuki_cloud_gradio_prompt(
+    messages: list[dict],
+    web_context: str,
+    *,
+    require_current: bool,
+    as_of: str | None,
+) -> str:
+    system = _system_message(
+        web_context,
+        require_current=require_current,
+        as_of=as_of,
+    )
+
+    conversation = "\n\n".join(
+        (
+            f"{str(item.get('role') or 'user').upper()}: "
+            f"{str(item.get('content') or '')}"
+        )
+        for item in messages
+    )
+
+    return (
+        f"{system}\n\n"
+        f"CONVERSATION:\n{conversation}\n\n"
+        "Answer the latest USER message. "
+        "Follow the system rules above. "
+        "When evidence is supplied, use that evidence."
+    )
+
+
+async def _chat_vasuki_cloud_gradio(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str,
+    *,
+    require_current: bool,
+    as_of: str | None,
+) -> str:
+    space_id = str(
+        getattr(
+            settings,
+            "vasuki_cloud_space_id",
+            "",
+        )
+        or ""
+    ).strip()
+
+    api_name = str(
+        getattr(
+            settings,
+            "vasuki_cloud_gradio_api_name",
+            "/chat",
+        )
+        or "/chat"
+    ).strip()
+
+    hf_token = str(
+        getattr(
+            settings,
+            "vasuki_cloud_hf_token",
+            "",
+        )
+        or ""
+    ).strip()
+
+    timeout_seconds = max(
+        5.0,
+        float(
+            getattr(
+                settings,
+                "vasuki_cloud_gradio_timeout_seconds",
+                50.0,
+            )
+        ),
+    )
+
+    if not space_id:
+        raise RuntimeError(
+            "VASUKI_CLOUD_SPACE_ID is not configured"
+        )
+
+    if not api_name.startswith("/"):
+        api_name = "/" + api_name
+
+    prompt = _vasuki_cloud_gradio_prompt(
+        messages,
+        web_context,
+        require_current=require_current,
+        as_of=as_of,
+    )
+
+    def invoke() -> str:
+        try:
+            from gradio_client import Client
+        except ImportError as exc:
+            raise RuntimeError(
+                "gradio-client is required for "
+                "Vasuki Cloud Gradio transport"
+            ) from exc
+
+        client = Client(
+            space_id,
+            token=hf_token or None,
+            verbose=False,
+        )
+
+        result = client.predict(
+            prompt,
+            api_name=api_name,
+        )
+
+        return str(result or "").strip()
+
+    try:
+        answer = await asyncio.wait_for(
+            asyncio.to_thread(invoke),
+            timeout=timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise RuntimeError(
+            "Vasuki ZeroGPU request timed out after "
+            f"{timeout_seconds:.0f}s"
+        ) from exc
+
+    if not answer:
+        raise RuntimeError(
+            "Vasuki ZeroGPU returned an empty answer"
+        )
+
+    return answer
+
+
 async def chat_vasuki_cloud(
     messages: list[dict],
     settings: Settings,
@@ -645,6 +788,22 @@ async def chat_vasuki_cloud(
 ) -> str:
     if not bool(getattr(settings, "vasuki_cloud_enabled", False)):
         raise RuntimeError("Vasuki Cloud inference is disabled")
+
+    transport = _vasuki_cloud_transport(settings)
+
+    if transport == "gradio":
+        return await _chat_vasuki_cloud_gradio(
+            messages,
+            settings,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        )
+
+    if transport != "openai":
+        raise RuntimeError(
+            f"Unsupported Vasuki Cloud transport: {transport}"
+        )
 
     base_url = str(
         getattr(settings, "vasuki_cloud_base_url", "") or ""
