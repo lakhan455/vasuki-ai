@@ -47,6 +47,7 @@ def _provider_order(
         order = base_candidates(decision, "auto")
 
     stream_capable = {
+        "vasuki_cloud",
         "groq_fast",
         "groq",
         "sambanova",

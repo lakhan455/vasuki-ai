@@ -4,6 +4,7 @@ from typing import Any
 
 
 _FALLBACK_ATTRS = {
+    "vasuki_cloud": "v50_vasuki_cloud_fallback_models",
     "groq_fast": "v50_groq_fast_fallback_models",
     "groq": "v50_groq_fallback_models",
     "sambanova": "v50_sambanova_fallback_models",
@@ -63,6 +64,7 @@ def should_try_model_fallback(
 
 def configured_model_snapshot(settings: Any) -> dict[str, Any]:
     primary = {
+        "vasuki_cloud": getattr(settings, "vasuki_cloud_model", ""),
         "groq_fast": getattr(settings, "groq_fast_model", ""),
         "groq": getattr(settings, "groq_model", ""),
         "sambanova": getattr(settings, "sambanova_model", ""),

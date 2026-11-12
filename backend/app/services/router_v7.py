@@ -46,6 +46,12 @@ def classify_route(messages: list[dict[str, Any]], *, require_current: bool=Fals
 
 def configured_provider(name: str, s: Settings) -> bool:
     return {
+        "vasuki_cloud": bool(
+            getattr(s, "vasuki_cloud_enabled", False)
+            and str(getattr(s, "vasuki_cloud_base_url", "") or "").strip()
+            and getattr(s, "vasuki_cloud_api_key", None)
+            and str(getattr(s, "vasuki_cloud_model", "") or "").strip()
+        ),
         "groq_fast": bool(getattr(s, "groq_api_key", None)),
         "groq": bool(getattr(s, "groq_api_key", None)),
         "sambanova": bool(getattr(s, "sambanova_api_key", None)),
@@ -58,9 +64,12 @@ def configured_provider(name: str, s: Settings) -> bool:
     }.get(name, False)
 
 def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
-    if provider != "auto": return [provider]
+    if provider != "auto":
+        return [provider]
+
     if d.tier == "fast":
         return [
+            "vasuki_cloud",
             "groq_fast",
             "cerebras",
             "mistral",
@@ -69,6 +78,35 @@ def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
             "sambanova",
             "gemini",
         ]
-    if d.task_type == "code": return ["opencode_zen","zai_glm","groq","openrouter","gemini","mistral","cerebras","sambanova"]
-    if d.task_type in {"research","reasoning"}: return ["groq","gemini","sambanova","cerebras","openrouter"]
-    return ["groq","gemini","openrouter","sambanova","cerebras"]
+
+    if d.task_type == "code":
+        return [
+            "vasuki_cloud",
+            "opencode_zen",
+            "zai_glm",
+            "groq",
+            "openrouter",
+            "gemini",
+            "mistral",
+            "cerebras",
+            "sambanova",
+        ]
+
+    if d.task_type in {"research", "reasoning"}:
+        return [
+            "vasuki_cloud",
+            "groq",
+            "gemini",
+            "sambanova",
+            "cerebras",
+            "openrouter",
+        ]
+
+    return [
+        "vasuki_cloud",
+        "groq",
+        "gemini",
+        "openrouter",
+        "sambanova",
+        "cerebras",
+    ]

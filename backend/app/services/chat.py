@@ -634,7 +634,55 @@ async def chat_gemini(
     return complete.strip()
 
 
+async def chat_vasuki_cloud(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str = "",
+    *,
+    require_current: bool = False,
+    as_of: str | None = None,
+    temperature: float = 0.0,
+) -> str:
+    if not bool(getattr(settings, "vasuki_cloud_enabled", False)):
+        raise RuntimeError("Vasuki Cloud inference is disabled")
+
+    base_url = str(
+        getattr(settings, "vasuki_cloud_base_url", "") or ""
+    ).strip().rstrip("/")
+
+    api_key = str(
+        getattr(settings, "vasuki_cloud_api_key", "") or ""
+    ).strip()
+
+    model = str(
+        getattr(settings, "vasuki_cloud_model", "") or ""
+    ).strip()
+
+    if not base_url:
+        raise RuntimeError("VASUKI_CLOUD_BASE_URL is not configured")
+    if not api_key:
+        raise RuntimeError("VASUKI_CLOUD_API_KEY is not configured")
+    if not model:
+        raise RuntimeError("VASUKI_CLOUD_MODEL is not configured")
+
+    return await _openai_compatible(
+        f"{base_url}/chat/completions",
+        api_key,
+        model,
+        _openai_messages(
+            messages,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        ),
+        settings,
+        temperature=temperature,
+        token_field="max_tokens",
+    )
+
+
 PROVIDERS = {
+    "vasuki_cloud": chat_vasuki_cloud,
     "groq_fast": chat_groq_fast,
     "groq": chat_groq,
     "sambanova": chat_sambanova,
@@ -875,6 +923,15 @@ def _stream_provider_config(
     name: str,
     settings: Settings,
 ) -> tuple[str, str, str, str, dict[str, str]]:
+    if name == "vasuki_cloud":
+        return (
+            f"{str(getattr(settings, 'vasuki_cloud_base_url', '') or '').rstrip('/')}/chat/completions",
+            str(getattr(settings, "vasuki_cloud_api_key", "") or ""),
+            str(getattr(settings, "vasuki_cloud_model", "") or ""),
+            "max_tokens",
+            {},
+        )
+
     if name == "groq_fast":
         return (
             "https://api.groq.com/openai/v1/chat/completions",
