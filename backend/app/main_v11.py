@@ -4133,3 +4133,82 @@ for _v49_route in _v49_runtime_router.routes:
 app.openapi_schema = None
 # VASUKI_V49_DIRECT_ROUTE_FALLBACK_END
 
+
+
+
+# VASUKI_CLOUD_SMOKE_TEST_START
+@app.post("/internal/cloud-smoke")
+async def vasuki_cloud_smoke_test(
+    payload: dict[str, str] = Body(...),
+    x_vasuki_test_key: str | None = Header(
+        default=None,
+        alias="X-Vasuki-Test-Key",
+    ),
+) -> dict:
+    import os
+
+    expected = os.getenv(
+        "VASUKI_CLOUD_TEST_KEY",
+        "",
+    ).strip()
+
+    if not expected:
+        raise HTTPException(
+            status_code=404,
+            detail="Cloud smoke test is disabled.",
+        )
+
+    if (
+        not x_vasuki_test_key
+        or not secrets.compare_digest(
+            x_vasuki_test_key,
+            expected,
+        )
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid test key.",
+        )
+
+    prompt = str(
+        payload.get("prompt") or ""
+    ).strip()
+
+    if not prompt:
+        raise HTTPException(
+            status_code=400,
+            detail="prompt is required",
+        )
+
+    from app.services.chat import chat_vasuki_cloud
+
+    answer = await chat_vasuki_cloud(
+        [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+        settings,
+    )
+
+    return {
+        "ok": True,
+        "provider": "vasuki_cloud",
+        "transport": str(
+            getattr(
+                settings,
+                "vasuki_cloud_transport",
+                "",
+            )
+        ),
+        "space_id": str(
+            getattr(
+                settings,
+                "vasuki_cloud_space_id",
+                "",
+            )
+        ),
+        "answer": answer,
+    }
+# VASUKI_CLOUD_SMOKE_TEST_END
