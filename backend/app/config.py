@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     crawler_respect_robots: bool = True
     crawler_user_agent: str = "VasukiAI-Crawler/1.0 (+https://vasuki-ai-psi.vercel.app)"
     crawler_rss_feeds: str = ""
+
+    # V1.1 live-search race
+    live_search_race_budget_seconds: float = 7.0
+    live_search_race_min_sources: int = 4
+    live_search_race_min_domains: int = 2
+    live_search_crawler_hedge_delay_seconds: float = 0.35
     # VASUKI_ASYNC_WEB_CRAWLER_V1_END
 
     deepai_api: str | None = None
