@@ -4180,9 +4180,8 @@ async def vasuki_cloud_smoke_test(
             detail="prompt is required",
         )
 
-    from app.services.chat import chat_vasuki_cloud
-
-    answer = await chat_vasuki_cloud(
+    answer, provider = await route_chat_v10(
+        "auto",
         [
             {
                 "role": "user",
@@ -4190,11 +4189,15 @@ async def vasuki_cloud_smoke_test(
             }
         ],
         settings,
+        "",
+        require_current=False,
+        as_of=None,
     )
 
     return {
         "ok": True,
-        "provider": "vasuki_cloud",
+        "provider": provider,
+        "router": "v10-auto",
         "transport": str(
             getattr(
                 settings,
