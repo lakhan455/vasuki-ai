@@ -112,15 +112,6 @@ async def _stream_provider_segment(
         and legacy_chat._vasuki_cloud_transport(settings)
         == "gradio"
     ):
-        answer = await legacy_chat.chat_vasuki_cloud(
-            messages,
-            settings,
-            web_context,
-            require_current=require_current,
-            as_of=as_of,
-            temperature=0.0 if require_current else 0.2,
-        )
-
         model = str(
             getattr(
                 settings,
@@ -130,16 +121,19 @@ async def _stream_provider_segment(
             or "vasuki-zero-gpu"
         )
 
-        for start in range(0, len(answer), 80):
-            chunk = answer[start:start + 80]
-
+        async for chunk in legacy_chat._stream_vasuki_cloud_gradio(
+            messages,
+            settings,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+        ):
             if chunk:
                 yield {
                     "type": "token",
                     "token": chunk,
                     "model": model,
                 }
-                await asyncio.sleep(0)
 
         yield {
             "type": "finish",

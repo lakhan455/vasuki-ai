@@ -777,6 +777,223 @@ async def _chat_vasuki_cloud_gradio(
     return answer
 
 
+def _gradio_stream_text(value: Any) -> str:
+    if isinstance(value, (list, tuple)) and len(value) == 1:
+        value = value[0]
+    return str(value or "")
+
+
+def _gradio_stream_delta(
+    previous: str,
+    current: str,
+) -> tuple[str, str]:
+    """Accept both cumulative Gradio outputs and raw token chunks."""
+    if not current:
+        return "", previous
+
+    if current.startswith(previous):
+        return current[len(previous):], current
+
+    return current, previous + current
+
+
+def _next_gradio_job_output(
+    iterator: Any,
+) -> tuple[bool, Any]:
+    try:
+        return False, next(iterator)
+    except StopIteration:
+        return True, None
+
+
+async def _stream_vasuki_cloud_gradio(
+    messages: list[dict],
+    settings: Settings,
+    web_context: str,
+    *,
+    require_current: bool,
+    as_of: str | None,
+):
+    """Stream a Gradio generator endpoint without blocking asyncio.
+
+    Generator Spaces emit values live through Client.submit()/Job iteration.
+    A non-generator endpoint remains backward compatible and emits its final
+    answer as one chunk.
+    """
+    space_id = str(
+        getattr(
+            settings,
+            "vasuki_cloud_space_id",
+            "",
+        )
+        or ""
+    ).strip()
+
+    api_name = str(
+        getattr(
+            settings,
+            "vasuki_cloud_gradio_api_name",
+            "/chat",
+        )
+        or "/chat"
+    ).strip()
+
+    hf_token = str(
+        getattr(
+            settings,
+            "vasuki_cloud_hf_token",
+            "",
+        )
+        or ""
+    ).strip()
+
+    timeout_seconds = max(
+        5.0,
+        float(
+            getattr(
+                settings,
+                "vasuki_cloud_gradio_timeout_seconds",
+                50.0,
+            )
+        ),
+    )
+
+    if not space_id:
+        raise RuntimeError(
+            "VASUKI_CLOUD_SPACE_ID is not configured"
+        )
+
+    if not api_name.startswith("/"):
+        api_name = "/" + api_name
+
+    prompt = _vasuki_cloud_gradio_prompt(
+        messages,
+        web_context,
+        require_current=require_current,
+        as_of=as_of,
+    )
+
+    def submit_job():
+        try:
+            from gradio_client import Client
+        except ImportError as exc:
+            raise RuntimeError(
+                "gradio-client is required for "
+                "Vasuki Cloud Gradio transport"
+            ) from exc
+
+        client = Client(
+            space_id,
+            token=hf_token or None,
+            verbose=False,
+        )
+
+        return client.submit(
+            prompt,
+            api_name=api_name,
+        )
+
+    try:
+        job = await asyncio.wait_for(
+            asyncio.to_thread(submit_job),
+            timeout=timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise RuntimeError(
+            "Vasuki ZeroGPU stream submission timed out after "
+            f"{timeout_seconds:.0f}s"
+        ) from exc
+
+    iterator = iter(job)
+    deadline = time.monotonic() + timeout_seconds
+    previous = ""
+    emitted = False
+
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+
+            if remaining <= 0:
+                try:
+                    job.cancel()
+                except Exception:
+                    pass
+
+                raise RuntimeError(
+                    "Vasuki ZeroGPU stream timed out after "
+                    f"{timeout_seconds:.0f}s"
+                )
+
+            try:
+                done, value = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        _next_gradio_job_output,
+                        iterator,
+                    ),
+                    timeout=remaining,
+                )
+            except asyncio.TimeoutError as exc:
+                try:
+                    job.cancel()
+                except Exception:
+                    pass
+
+                raise RuntimeError(
+                    "Vasuki ZeroGPU stream timed out after "
+                    f"{timeout_seconds:.0f}s"
+                ) from exc
+
+            if done:
+                break
+
+            current = _gradio_stream_text(value)
+
+            delta, previous = _gradio_stream_delta(
+                previous,
+                current,
+            )
+
+            if delta:
+                emitted = True
+                yield delta
+
+        # Backward compatibility:
+        # non-generator Gradio endpoints may expose only final result.
+        if not emitted:
+            remaining = max(
+                0.1,
+                deadline - time.monotonic(),
+            )
+
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.to_thread(job.result),
+                    timeout=remaining,
+                )
+            except asyncio.TimeoutError as exc:
+                raise RuntimeError(
+                    "Vasuki ZeroGPU final result timed out"
+                ) from exc
+
+            final_text = _gradio_stream_text(result).strip()
+
+            if final_text:
+                emitted = True
+                yield final_text
+
+    finally:
+        if not getattr(job, "done", lambda: True)():
+            try:
+                job.cancel()
+            except Exception:
+                pass
+
+    if not emitted:
+        raise RuntimeError(
+            "Vasuki ZeroGPU returned an empty stream"
+        )
+
+
 async def chat_vasuki_cloud(
     messages: list[dict],
     settings: Settings,
