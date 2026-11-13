@@ -131,3 +131,67 @@ def test_auth_cache_ttl_is_bounded():
             auth_cache_ttl_seconds=5000,
         )
     ) == 600.0
+
+
+def test_multiturn_casual_chat_skips_remote_context():
+    from types import SimpleNamespace
+
+    from app.main_v5 import (
+        _should_skip_simple_context,
+    )
+
+    request = SimpleNamespace(
+        use_web=False,
+        use_memory=True,
+        use_documents=False,
+        document_ids=[],
+        project_id=None,
+        research_mode=False,
+    )
+
+    messages = [
+        {
+            "role": "user",
+            "content": "hii",
+        },
+        {
+            "role": "assistant",
+            "content": "Hello! How can I help you today?",
+        },
+        {
+            "role": "user",
+            "content": "kse ho",
+        },
+    ]
+
+    assert _should_skip_simple_context(
+        messages,
+        request,
+    ) is True
+
+
+def test_roman_hindi_memory_recall_keeps_remote_context():
+    from types import SimpleNamespace
+
+    from app.main_v5 import (
+        _should_skip_simple_context,
+    )
+
+    request = SimpleNamespace(
+        use_web=False,
+        use_memory=True,
+        use_documents=False,
+        document_ids=[],
+        project_id=None,
+        research_mode=False,
+    )
+
+    assert _should_skip_simple_context(
+        [
+            {
+                "role": "user",
+                "content": "mera naam kya hai",
+            }
+        ],
+        request,
+    ) is False
