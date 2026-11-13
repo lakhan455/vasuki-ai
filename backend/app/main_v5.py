@@ -14,6 +14,7 @@ from app.services.error_monitoring import record_error_event
 from app.services.memory_v5 import remember_with_conflict_resolution
 from app.services.quota_v5 import check_chat_quota
 from app.services.rate_limit import QuotaExceeded
+from app.services.router_v7 import classify_route
 from app.v13.critic import critic_review
 from app.v53.intelligence_core import build_intelligence_contract
 from app.v54.knowledge_brain import assess_and_rank_sources
@@ -25,6 +26,74 @@ from app.v67.reliability import observe_truth_guard
 
 app = v4.app
 settings = v4.settings
+
+
+def _should_skip_simple_context(
+    messages: list[dict],
+    chat_request,
+) -> bool:
+    """Skip remote context work only for trivial fast-lane chat.
+
+    Memory-sensitive/general, project, document, web and research
+    requests keep the complete context pipeline.
+    """
+    if bool(
+        getattr(
+            chat_request,
+            "use_web",
+            False,
+        )
+    ):
+        return False
+
+    if bool(
+        getattr(
+            chat_request,
+            "use_documents",
+            False,
+        )
+    ):
+        return False
+
+    if bool(
+        getattr(
+            chat_request,
+            "document_ids",
+            [],
+        )
+    ):
+        return False
+
+    if str(
+        getattr(
+            chat_request,
+            "project_id",
+            "",
+        )
+        or ""
+    ).strip():
+        return False
+
+    if bool(
+        getattr(
+            chat_request,
+            "research_mode",
+            False,
+        )
+    ):
+        return False
+
+    decision = classify_route(
+        messages,
+        require_current=False,
+    )
+
+    return (
+        decision.task_type == "simple"
+        and decision.tier == "fast"
+        and not decision.needs_web
+    )
+
 
 # Keep v4 diagnostics middleware and parallel-context helpers, but replace
 # only its stream route.
@@ -38,8 +107,24 @@ async def chat_stream_v5(
     current_user: AuthUser = Depends(get_current_user),
 ) -> StreamingResponse:
     request_id = v4._request_id(http_request)
-    minute_limit = int(getattr(settings, "rate_limit_per_minute", 15))
-    daily_limit = int(getattr(settings, "daily_message_limit", 250))
+    handler_started = time.perf_counter()
+
+    minute_limit = int(
+        getattr(
+            settings,
+            "rate_limit_per_minute",
+            15,
+        )
+    )
+    daily_limit = int(
+        getattr(
+            settings,
+            "daily_message_limit",
+            250,
+        )
+    )
+
+    quota_started = time.perf_counter()
 
     try:
         quota = await check_chat_quota(
@@ -55,7 +140,24 @@ async def chat_stream_v5(
             headers={"Retry-After": str(exc.retry_after_seconds)},
         ) from exc
 
-    raw_messages = [item.model_dump() for item in chat_request.messages]
+    v4._log(
+        "chat_prestream_stage",
+        request_id=request_id,
+        stage="quota",
+        duration_ms=round(
+            (
+                time.perf_counter()
+                - quota_started
+            )
+            * 1000,
+            1,
+        ),
+    )
+
+    raw_messages = [
+        item.model_dump()
+        for item in chat_request.messages
+    ]
     query = next(
         (
             item["content"]
@@ -142,19 +244,53 @@ async def chat_stream_v5(
             memory_followup,
         )
 
-    (
-        strong_hits,
-        shared_sources,
-        shared_pack,
-        private_pack,
-        document_sources,
-        require_current,
-        web_sources,
-        live_pack,
-    ) = await v4._parallel_context(
-        user=current_user,
-        query=query,
-        chat_request=chat_request,
+    context_started = time.perf_counter()
+
+    simple_context_bypass = (
+        _should_skip_simple_context(
+            raw_messages,
+            chat_request,
+        )
+    )
+
+    if simple_context_bypass:
+        strong_hits = []
+        shared_sources = []
+        shared_pack = ""
+        private_pack = ""
+        document_sources = []
+        require_current = False
+        web_sources = []
+        live_pack = ""
+    else:
+        (
+            strong_hits,
+            shared_sources,
+            shared_pack,
+            private_pack,
+            document_sources,
+            require_current,
+            web_sources,
+            live_pack,
+        ) = await v4._parallel_context(
+            user=current_user,
+            query=query,
+            chat_request=chat_request,
+        )
+
+    v4._log(
+        "chat_prestream_stage",
+        request_id=request_id,
+        stage="context",
+        bypass=simple_context_bypass,
+        duration_ms=round(
+            (
+                time.perf_counter()
+                - context_started
+            )
+            * 1000,
+            1,
+        ),
     )
 
     # V59 defense-in-depth: classification remains current-sensitive even if a
@@ -292,7 +428,27 @@ async def chat_stream_v5(
         max_chars=available_message_chars,
         max_single_message_chars=settings.max_single_message_chars,
     )
-    all_sources = shared_sources + document_sources + web_sources
+    all_sources = (
+        shared_sources
+        + document_sources
+        + web_sources
+    )
+
+    v4._log(
+        "chat_prestream_ready",
+        request_id=request_id,
+        simple_context_bypass=(
+            simple_context_bypass
+        ),
+        handler_duration_ms=round(
+            (
+                time.perf_counter()
+                - handler_started
+            )
+            * 1000,
+            1,
+        ),
+    )
 
     async def generate():
         provider_name = ""

@@ -334,6 +334,10 @@ class Settings(BaseSettings):
     v51_restored_failure_cooldown_seconds: float = 90.0
     # VASUKI_V51_SPEED_LANE_END
 
+    # Cache already-verified Supabase sessions briefly so active
+    # conversations do not re-check auth over the network every 45s.
+    auth_cache_ttl_seconds: float = 300.0
+
     rate_limit_per_minute: int = 60
     daily_message_limit: int = 0
     error_alert_webhook_url: str | None = None
