@@ -317,29 +317,6 @@ async def v11_shutdown():
         record_degraded("shutdown", "multi_agent_jobs", exc, severity="info")
 
 
-# Preserve every lifecycle hook registered by lower Vasuki versions,
-# then add V11 startup/shutdown around that existing lifecycle.
-_v11_previous_lifespan_context = (
-    app.router.lifespan_context
-)
-
-
-@asynccontextmanager
-async def _v11_lifespan(app_instance):
-    async with _v11_previous_lifespan_context(
-        app_instance
-    ):
-        await v11_startup()
-
-        try:
-            yield
-        finally:
-            await v11_shutdown()
-
-
-app.router.lifespan_context = _v11_lifespan
-
-
 @app.get("/health/v50")
 async def health_v50() -> dict[str, Any]:
     return v50_health_snapshot(settings)
@@ -1946,6 +1923,32 @@ app.include_router(build_v49_router(settings))
 
 # VASUKI_V12_CORE_RELIABILITY
 app.include_router(v12_router)
+
+
+# Install V11 lifecycle only after all included routers have
+# contributed their own lifespan contexts. This prevents FastAPI
+# from wrapping V11 again in a later merged_lifespan.
+# Lower-version lifecycle behavior remains preserved inside it.
+_v11_previous_lifespan_context = (
+    app.router.lifespan_context
+)
+
+
+@asynccontextmanager
+async def _v11_lifespan(app_instance):
+    async with _v11_previous_lifespan_context(
+        app_instance
+    ):
+        await v11_startup()
+
+        try:
+            yield
+        finally:
+            await v11_shutdown()
+
+
+app.router.lifespan_context = _v11_lifespan
+
 
 # VASUKI_V13_BATCH2_AUTONOMY
 class V13MessagesRequest(BaseModel):
