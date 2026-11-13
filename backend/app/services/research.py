@@ -703,6 +703,112 @@ async def _crawler_search_fallback(
         return []
 
 
+
+async def _delayed_crawler_search(
+    query: str,
+    settings: Settings,
+    max_results: int,
+    *,
+    profile: ResearchProfile | None,
+) -> list[dict]:
+    delay = max(
+        0.0,
+        min(
+            2.0,
+            float(getattr(settings, "live_search_crawler_hedge_delay_seconds", 0.35)),
+        ),
+    )
+    if delay:
+        await asyncio.sleep(delay)
+    return await _crawler_search_fallback(
+        query,
+        settings,
+        max_results,
+        profile=profile,
+    )
+
+
+async def _run_live_search_race(
+    jobs: list[tuple[str, object]],
+    settings: Settings,
+    max_results: int,
+) -> tuple[list[dict], list[str], set[str]]:
+    budget = max(
+        1.0,
+        min(12.0, float(getattr(settings, "live_search_race_budget_seconds", 7.0))),
+    )
+    min_sources = max(
+        1,
+        min(max_results, int(getattr(settings, "live_search_race_min_sources", 4))),
+    )
+    min_domains = max(
+        1,
+        min(min_sources, int(getattr(settings, "live_search_race_min_domains", 2))),
+    )
+
+    task_map: dict[asyncio.Task, str] = {
+        asyncio.create_task(coro): name
+        for name, coro in jobs
+    }
+
+    collected: list[dict] = []
+    errors: list[str] = []
+    providers: set[str] = set()
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + budget
+
+    try:
+        pending: set[asyncio.Task] = set(task_map)
+        while pending:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+
+            done, pending = await asyncio.wait(
+                pending,
+                timeout=remaining,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if not done:
+                break
+
+            for task in done:
+                name = task_map[task]
+                try:
+                    batch = task.result()
+                except asyncio.CancelledError:
+                    continue
+                except Exception as exc:
+                    errors.append(f"{name}: {exc}")
+                    continue
+
+                if isinstance(batch, list) and batch:
+                    providers.add(name)
+                    collected.extend(
+                        item for item in batch
+                        if isinstance(item, dict)
+                    )
+
+            ranked = _dedupe_and_rank(collected, max_results)
+            domains = {
+                str(item.get("domain") or _host(item.get("url", ""))).strip()
+                for item in ranked
+                if str(item.get("domain") or _host(item.get("url", ""))).strip()
+            }
+
+            if len(ranked) >= min_sources and len(domains) >= min_domains:
+                collected = ranked
+                break
+
+        return _dedupe_and_rank(collected, max_results), errors, providers
+    finally:
+        leftovers = [task for task in task_map if not task.done()]
+        for task in leftovers:
+            task.cancel()
+        if leftovers:
+            await asyncio.gather(*leftovers, return_exceptions=True)
+
+
 async def search_web(
     query: str,
     settings: Settings,
@@ -775,53 +881,50 @@ async def search_web(
                 )
             )
 
-        collected: list[dict] = []
-        errors: list[str] = []
-        completed = await asyncio.gather(*jobs, return_exceptions=True)
-        for result in completed:
-            if isinstance(result, Exception):
-                errors.append(str(result))
-            else:
-                collected.extend(result)
+        race_jobs: list[tuple[str, object]] = [
+            ("tavily", job)
+            for job in jobs
+        ]
 
-        ranked = _dedupe_and_rank(collected, max_results)
-
-        if len(ranked) < min(4, max_results) and variants:
-            try:
-                ranked = _dedupe_and_rank(
-                    ranked
-                    + await exa_search(
+        if variants and str(getattr(settings, "exa_api", "") or "").strip():
+            race_jobs.append(
+                (
+                    "exa",
+                    exa_search(
                         variants[0],
                         settings,
                         max_results=max_results,
                         content_limit=2000,
                     ),
-                    max_results,
                 )
-            except Exception as exc:
-                errors.append(f"exa: {exc}")
-
-        crawler_used = False
-        if len(ranked) < min(4, max_results):
-            crawled = await _crawler_search_fallback(
-                query,
-                settings,
-                max_results,
-                profile=profile,
             )
-            if crawled:
-                crawler_used = True
-                ranked = _dedupe_and_rank(ranked + crawled, max_results)
+
+        if bool(getattr(settings, "crawler_enabled", True)):
+            race_jobs.append(
+                (
+                    "crawler",
+                    _delayed_crawler_search(
+                        query,
+                        settings,
+                        max_results,
+                        profile=profile,
+                    ),
+                )
+            )
+
+        ranked, errors, used = await _run_live_search_race(
+            race_jobs,
+            settings,
+            max_results,
+        )
 
         if ranked:
-            parts = []
-            if settings.tavily_api_key:
-                parts.append("tavily")
-            if settings.exa_api:
-                parts.append("exa")
-            if crawler_used:
-                parts.append("crawler")
-            return ranked, f"fresh-fact:{plan.kind}:{'+'.join(parts) or 'crawler'}"
+            providers = "+".join(
+                name
+                for name in ("tavily", "exa", "crawler")
+                if name in used
+            ) or "unknown"
+            return ranked, f"fresh-fact:{plan.kind}:{providers}"
 
         return [], "; ".join(errors) if errors else "No fresh-fact evidence returned"
 
@@ -909,54 +1012,50 @@ async def search_web(
             )
         )
 
-    collected: list[dict] = []
-    errors: list[str] = []
-    completed = await asyncio.gather(*jobs, return_exceptions=True)
-    for result in completed:
-        if isinstance(result, Exception):
-            errors.append(str(result))
-        else:
-            collected.extend(result)
+    race_jobs: list[tuple[str, object]] = [
+        ("tavily", job)
+        for job in jobs
+    ]
 
-    ranked = _dedupe_and_rank(collected, max_results)
-    if len(ranked) < min(4, max_results):
-        try:
-            ranked = _dedupe_and_rank(
-                ranked
-                + await exa_search(
+    if str(getattr(settings, "exa_api", "") or "").strip():
+        race_jobs.append(
+            (
+                "exa",
+                exa_search(
                     base_query,
                     settings,
                     max_results=max_results,
                     content_limit=1800,
                 ),
-                max_results,
             )
-        except Exception as exc:
-            errors.append(f"exa: {exc}")
-
-    crawler_used = False
-    if len(ranked) < min(4, max_results):
-        crawled = await _crawler_search_fallback(
-            query,
-            settings,
-            max_results,
-            profile=profile,
         )
-        if crawled:
-            crawler_used = True
-            ranked = _dedupe_and_rank(ranked + crawled, max_results)
+
+    if bool(getattr(settings, "crawler_enabled", True)):
+        race_jobs.append(
+            (
+                "crawler",
+                _delayed_crawler_search(
+                    query,
+                    settings,
+                    max_results,
+                    profile=profile,
+                ),
+            )
+        )
+
+    ranked, errors, used = await _run_live_search_race(
+        race_jobs,
+        settings,
+        max_results,
+    )
 
     if ranked:
         profile_name = profile.key if profile else "general"
-        parts = []
-        if settings.tavily_api_key:
-            parts.append("tavily")
-        if settings.exa_api:
-            parts.append("exa")
-        if crawler_used:
-            parts.append("crawler")
-        return ranked, f"domain-router:{profile_name}:{'+'.join(parts) or 'crawler'}"
+        providers = "+".join(
+            name
+            for name in ("tavily", "exa", "crawler")
+            if name in used
+        ) or "unknown"
+        return ranked, f"domain-router:{profile_name}:{providers}"
 
-    if bool(getattr(settings, "crawler_enabled", True)):
-        errors.append("crawler returned no relevant public-feed evidence")
     return [], "; ".join(errors) if errors else "No research source returned evidence"
