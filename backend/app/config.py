@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # Optional one-shot operational probe on backend startup.
     # Keep disabled except during a controlled production canary.
     vasuki_cloud_startup_probe: bool = False
+
+    # Controlled one-deploy canary for real Gradio generator streaming.
+    # Disabled during normal production operation.
+    vasuki_cloud_stream_startup_probe: bool = False
+
     vasuki_cloud_transport: str = "openai"
     vasuki_cloud_base_url: str = ""
     vasuki_cloud_api_key: str | None = None
