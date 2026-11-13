@@ -35,6 +35,23 @@ def _server_key() -> str:
     )
 
 
+def _cache_ttl_seconds(settings) -> float:
+    return max(
+        45.0,
+        min(
+            600.0,
+            float(
+                getattr(
+                    settings,
+                    "auth_cache_ttl_seconds",
+                    300.0,
+                )
+                or 300.0
+            ),
+        ),
+    )
+
+
 async def get_current_user(
     authorization: str | None = Header(default=None),
 ) -> AuthUser:
@@ -107,7 +124,10 @@ async def get_current_user(
     )
 
     async with _CACHE_LOCK:
-        _CACHE[cache_key] = (now + 45.0, user)
+        _CACHE[cache_key] = (
+            now + _cache_ttl_seconds(settings),
+            user,
+        )
         if len(_CACHE) > 5000:
             expired = [
                 key for key, value in _CACHE.items() if value[0] <= now
