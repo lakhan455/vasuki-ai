@@ -54,6 +54,21 @@ class Settings(BaseSettings):
     mistral_ai_api: str | None = None
     mistral_model: str = "mistral-small-latest"
 
+    # VASUKI_CLOUD_INFERENCE_V1_START
+    vasuki_cloud_enabled: bool = False
+    vasuki_cloud_transport: str = "openai"
+    vasuki_cloud_base_url: str = ""
+    vasuki_cloud_api_key: str | None = None
+    vasuki_cloud_model: str = "vasuki-main"
+
+    # Hugging Face / Gradio transport.
+    vasuki_cloud_space_id: str = ""
+    vasuki_cloud_gradio_api_name: str = "/chat"
+    vasuki_cloud_hf_token: str | None = None
+    vasuki_cloud_gradio_timeout_seconds: float = 50.0
+    vasuki_cloud_gradio_first_token_timeout_seconds: float = 50.0
+    # VASUKI_CLOUD_INFERENCE_V1_END
+
     tavily_api_key: str | None = None
     exa_api: str | None = None
     news_api: str | None = None
@@ -275,6 +290,7 @@ class Settings(BaseSettings):
 
     # Model fallbacks are attempted only when a selected model is unavailable
     # or quota-gated. Provider/API-key auth failures still fail fast.
+    v50_vasuki_cloud_fallback_models: str = ""
     v50_groq_fast_fallback_models: str = ""
     v50_groq_fallback_models: str = ""
     v50_sambanova_fallback_models: str = ""

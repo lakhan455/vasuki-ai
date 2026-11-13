@@ -47,6 +47,7 @@ def _provider_order(
         order = base_candidates(decision, "auto")
 
     stream_capable = {
+        "vasuki_cloud",
         "groq_fast",
         "groq",
         "sambanova",
@@ -106,6 +107,47 @@ async def _stream_provider_segment(
     as_of: str | None,
     large_request: bool,
 ) -> AsyncIterator[dict[str, str]]:
+    if (
+        name == "vasuki_cloud"
+        and legacy_chat._vasuki_cloud_transport(settings)
+        == "gradio"
+    ):
+        answer = await legacy_chat.chat_vasuki_cloud(
+            messages,
+            settings,
+            web_context,
+            require_current=require_current,
+            as_of=as_of,
+            temperature=0.0 if require_current else 0.2,
+        )
+
+        model = str(
+            getattr(
+                settings,
+                "vasuki_cloud_space_id",
+                "",
+            )
+            or "vasuki-zero-gpu"
+        )
+
+        for start in range(0, len(answer), 80):
+            chunk = answer[start:start + 80]
+
+            if chunk:
+                yield {
+                    "type": "token",
+                    "token": chunk,
+                    "model": model,
+                }
+                await asyncio.sleep(0)
+
+        yield {
+            "type": "finish",
+            "reason": "stop",
+            "model": model,
+        }
+        return
+
     url, api_key, primary_model, token_field, extra_headers = (
         legacy_chat._stream_provider_config(name, settings)
     )
