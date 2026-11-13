@@ -15,6 +15,7 @@ from app.v58.fresh_facts import (
     is_volatile_person_status_query,
 )
 from app.v59.fresh_fact_resolver import build_fresh_fact_plan
+from app.services.web_crawler import crawl_live_web
 
 
 # Any answer in these categories can change without the model being updated.
@@ -682,6 +683,26 @@ async def search_all_india_state_cms(settings: Settings, as_of: str) -> tuple[li
     return results, provider
 
 
+async def _crawler_search_fallback(
+    query: str,
+    settings: Settings,
+    max_results: int,
+    *,
+    profile: ResearchProfile | None,
+) -> list[dict]:
+    if not bool(getattr(settings, "crawler_enabled", True)):
+        return []
+    try:
+        return await crawl_live_web(
+            query,
+            settings,
+            max_results=max_results,
+            profile_key=profile.key if profile else None,
+        )
+    except Exception:
+        return []
+
+
 async def search_web(
     query: str,
     settings: Settings,
@@ -780,9 +801,27 @@ async def search_web(
             except Exception as exc:
                 errors.append(f"exa: {exc}")
 
+        crawler_used = False
+        if len(ranked) < min(4, max_results):
+            crawled = await _crawler_search_fallback(
+                query,
+                settings,
+                max_results,
+                profile=profile,
+            )
+            if crawled:
+                crawler_used = True
+                ranked = _dedupe_and_rank(ranked + crawled, max_results)
+
         if ranked:
-            providers = "tavily+exa" if settings.exa_api else "tavily"
-            return ranked, f"fresh-fact:{plan.kind}:{providers}"
+            parts = []
+            if settings.tavily_api_key:
+                parts.append("tavily")
+            if settings.exa_api:
+                parts.append("exa")
+            if crawler_used:
+                parts.append("crawler")
+            return ranked, f"fresh-fact:{plan.kind}:{'+'.join(parts) or 'crawler'}"
 
         return [], "; ".join(errors) if errors else "No fresh-fact evidence returned"
 
@@ -895,9 +934,29 @@ async def search_web(
         except Exception as exc:
             errors.append(f"exa: {exc}")
 
+    crawler_used = False
+    if len(ranked) < min(4, max_results):
+        crawled = await _crawler_search_fallback(
+            query,
+            settings,
+            max_results,
+            profile=profile,
+        )
+        if crawled:
+            crawler_used = True
+            ranked = _dedupe_and_rank(ranked + crawled, max_results)
+
     if ranked:
         profile_name = profile.key if profile else "general"
-        providers = "tavily+exa" if settings.exa_api else "tavily"
-        return ranked, f"domain-router:{profile_name}:{providers}"
-    return [], "; ".join(errors) if errors else "No research API configured"
+        parts = []
+        if settings.tavily_api_key:
+            parts.append("tavily")
+        if settings.exa_api:
+            parts.append("exa")
+        if crawler_used:
+            parts.append("crawler")
+        return ranked, f"domain-router:{profile_name}:{'+'.join(parts) or 'crawler'}"
 
+    if bool(getattr(settings, "crawler_enabled", True)):
+        errors.append("crawler returned no relevant public-feed evidence")
+    return [], "; ".join(errors) if errors else "No research source returned evidence"

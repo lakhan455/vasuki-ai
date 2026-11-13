@@ -84,6 +84,21 @@ class Settings(BaseSettings):
     exa_api: str | None = None
     news_api: str | None = None
 
+    # VASUKI_ASYNC_WEB_CRAWLER_V1_START
+    crawler_enabled: bool = True
+    crawler_timeout_seconds: float = 5.0
+    crawler_total_budget_seconds: float = 8.0
+    crawler_concurrency: int = 16
+    crawler_per_host_concurrency: int = 2
+    crawler_max_feed_sources: int = 16
+    crawler_max_pages: int = 12
+    crawler_max_bytes: int = 1500000
+    crawler_max_content_chars: int = 6500
+    crawler_respect_robots: bool = True
+    crawler_user_agent: str = "VasukiAI-Crawler/1.0 (+https://vasuki-ai-psi.vercel.app)"
+    crawler_rss_feeds: str = ""
+    # VASUKI_ASYNC_WEB_CRAWLER_V1_END
+
     deepai_api: str | None = None
     hugging_face_inference_api: str | None = None
     hf_image_model: str = "black-forest-labs/FLUX.1-dev"
