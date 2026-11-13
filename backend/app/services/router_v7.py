@@ -139,9 +139,9 @@ def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
 
     if d.task_type == "code":
         return [
-            "vasuki_cloud",
             "opencode_zen",
             "zai_glm",
+            "vasuki_cloud",
             "groq",
             "openrouter",
             "gemini",
