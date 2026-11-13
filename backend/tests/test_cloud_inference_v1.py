@@ -259,3 +259,100 @@ def test_vasuki_cloud_startup_probe_failure_is_nonfatal(
     assert result["ok"] is False
     assert result["status"] == "failed"
     assert result["error_type"] == "RuntimeError"
+
+
+def test_vasuki_cloud_gradio_stream_delta_modes():
+    from app.services.chat import _gradio_stream_delta
+
+    delta, state = _gradio_stream_delta("", "Hel")
+    assert delta == "Hel"
+    assert state == "Hel"
+
+    # Cumulative generator output.
+    delta, state = _gradio_stream_delta(
+        state,
+        "Hello",
+    )
+    assert delta == "lo"
+    assert state == "Hello"
+
+    # Raw incremental token output.
+    delta, state = _gradio_stream_delta(
+        state,
+        " world",
+    )
+    assert delta == " world"
+    assert state == "Hello world"
+
+
+def test_vasuki_cloud_stream_provider_segment_uses_live_gradio(
+    monkeypatch,
+):
+    import asyncio
+
+    from app.services import chat as legacy_chat
+    from app.services.chat_v5 import _stream_provider_segment
+
+    async def fake_live_stream(
+        messages,
+        settings,
+        web_context="",
+        *,
+        require_current,
+        as_of,
+    ):
+        assert messages[-1]["content"] == "hello"
+        yield "Hello"
+        yield " "
+        yield "world"
+
+    monkeypatch.setattr(
+        legacy_chat,
+        "_stream_vasuki_cloud_gradio",
+        fake_live_stream,
+    )
+
+    settings = _settings(
+        vasuki_cloud_enabled=True,
+        vasuki_cloud_transport="gradio",
+        vasuki_cloud_space_id=(
+            "lakhan455/vasuki-ai-zerogpu"
+        ),
+    )
+
+    async def collect():
+        return [
+            event
+            async for event in _stream_provider_segment(
+                name="vasuki_cloud",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "hello",
+                    }
+                ],
+                settings=settings,
+                web_context="",
+                require_current=False,
+                as_of=None,
+                large_request=False,
+            )
+        ]
+
+    events = asyncio.run(collect())
+
+    tokens = [
+        event["token"]
+        for event in events
+        if event.get("type") == "token"
+    ]
+
+    assert tokens == [
+        "Hello",
+        " ",
+        "world",
+    ]
+
+    assert events[-1]["type"] == "finish"
+    assert events[-1]["reason"] == "stop"
+
