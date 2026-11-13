@@ -167,3 +167,95 @@ def test_vasuki_cloud_gradio_gets_queue_aware_timeout():
     )
 
     assert timeout == 50.0
+def test_vasuki_cloud_startup_probe_disabled(monkeypatch):
+    import asyncio
+    from app.services import cloud_probe
+
+    async def should_not_run(*args, **kwargs):
+        raise AssertionError(
+            "cloud provider should not run while probe is disabled"
+        )
+
+    monkeypatch.setattr(
+        cloud_probe,
+        "chat_vasuki_cloud",
+        should_not_run,
+    )
+
+    settings = _settings(
+        vasuki_cloud_enabled=True,
+        vasuki_cloud_startup_probe=False,
+    )
+
+    result = asyncio.run(
+        cloud_probe.run_cloud_startup_probe(settings)
+    )
+
+    assert result["ran"] is False
+    assert result["status"] == "disabled"
+
+
+def test_vasuki_cloud_startup_probe_success(monkeypatch):
+    import asyncio
+    from app.services import cloud_probe
+
+    async def fake_cloud(
+        messages,
+        settings,
+        web_context="",
+        **kwargs,
+    ):
+        assert messages[-1]["content"] == (
+            "Reply only with: VASUKI CLOUD READY"
+        )
+        return "VASUKI CLOUD READY"
+
+    monkeypatch.setattr(
+        cloud_probe,
+        "chat_vasuki_cloud",
+        fake_cloud,
+    )
+
+    settings = _settings(
+        vasuki_cloud_enabled=True,
+        vasuki_cloud_startup_probe=True,
+    )
+
+    result = asyncio.run(
+        cloud_probe.run_cloud_startup_probe(settings)
+    )
+
+    assert result["ran"] is True
+    assert result["ok"] is True
+    assert result["status"] == "success"
+    assert result["latency_ms"] >= 0
+
+
+def test_vasuki_cloud_startup_probe_failure_is_nonfatal(
+    monkeypatch,
+):
+    import asyncio
+    from app.services import cloud_probe
+
+    async def failing_cloud(*args, **kwargs):
+        raise RuntimeError("simulated provider failure")
+
+    monkeypatch.setattr(
+        cloud_probe,
+        "chat_vasuki_cloud",
+        failing_cloud,
+    )
+
+    settings = _settings(
+        vasuki_cloud_enabled=True,
+        vasuki_cloud_startup_probe=True,
+    )
+
+    result = asyncio.run(
+        cloud_probe.run_cloud_startup_probe(settings)
+    )
+
+    assert result["ran"] is True
+    assert result["ok"] is False
+    assert result["status"] == "failed"
+    assert result["error_type"] == "RuntimeError"

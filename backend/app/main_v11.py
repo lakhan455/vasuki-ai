@@ -18,6 +18,7 @@ import app.main_v10_omni as v10
 import app.services.chat_v7 as chat_v7
 from app.auth import AuthUser, get_current_user
 from app.services.chat_v10 import route_chat_stream_v10, route_chat_v10
+from app.services.cloud_probe import run_cloud_startup_probe
 from app.services.router_v7 import classify_route, last_user_query
 from app.services.image_v10 import route_image_v10
 from app.services.vision import process_vision_request
@@ -236,6 +237,22 @@ async def v11_startup():
     # V51 gives persistence restore a small startup budget, then lets any slow
     # restore finish in the background. The router remains safe without it.
     await _v51_bounded_startup_restore()
+
+    if (
+        bool(getattr(settings, "vasuki_cloud_enabled", False))
+        and bool(
+            getattr(
+                settings,
+                "vasuki_cloud_startup_probe",
+                False,
+            )
+        )
+    ):
+        _v11_background_tasks.append(
+            asyncio.create_task(
+                run_cloud_startup_probe(settings)
+            )
+        )
     if bool(getattr(settings, "v11_scheduler_enabled", True)):
         _v11_background_tasks.append(asyncio.create_task(_v11_scheduler_loop()))
     if bool(getattr(settings, "v49_live_knowledge_enabled", True)):
