@@ -118,6 +118,11 @@ class Settings(BaseSettings):
     omniroute_base_url: str = ""
     omniroute_api_key: str | None = None
     omniroute_timeout_seconds: int = 65
+
+    # Short/simple requests should avoid an unnecessary
+    # OmniRoute network hop and use Vasuki's fast lane directly.
+    omniroute_fast_lane_bypass: bool = True
+
     omniroute_compression: str = "default"
     omniroute_budget_usd: float = 0.0
     omniroute_budget_fallback: str = "cheapest"

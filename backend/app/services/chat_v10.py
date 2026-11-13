@@ -19,6 +19,22 @@ def _join_context(*parts: str) -> str:
     return "\n\n".join(part.strip() for part in parts if part and part.strip())
 
 
+def _should_bypass_omniroute(
+    decision: Any,
+    settings: Settings,
+) -> bool:
+    """Use Vasuki's direct fast lane for low-latency prompts."""
+    return bool(
+        getattr(
+            settings,
+            "omniroute_fast_lane_bypass",
+            True,
+        )
+    ) and str(
+        getattr(decision, "tier", "") or ""
+    ).casefold() == "fast"
+
+
 async def route_chat_stream_v10(
     provider: str,
     messages: list[dict[str, Any]],
@@ -31,13 +47,41 @@ async def route_chat_stream_v10(
     exclude_provider: str | None = None,
 ) -> AsyncIterator[dict[str, str]]:
     query = last_user_query(messages)
-    decision = classify_route(messages, require_current=require_current)
+    decision = classify_route(
+        messages,
+        require_current=require_current,
+    )
+
+    fast_lane_bypass = (
+        provider == "auto"
+        and _should_bypass_omniroute(
+            decision,
+            settings,
+        )
+    )
 
     knowledge = ""
-    if bool(getattr(settings, "omniroute_knowledge_enabled", True)):
-        knowledge = omniroute_context(query, limit=4, max_chars=9000)
 
-    enriched_context = _join_context(web_context, knowledge)
+    if (
+        not fast_lane_bypass
+        and bool(
+            getattr(
+                settings,
+                "omniroute_knowledge_enabled",
+                True,
+            )
+        )
+    ):
+        knowledge = omniroute_context(
+            query,
+            limit=4,
+            max_chars=9000,
+        )
+
+    enriched_context = _join_context(
+        web_context,
+        knowledge,
+    )
 
     # Respect an explicitly selected Vasuki provider.
     if provider != "auto":
@@ -54,7 +98,10 @@ async def route_chat_stream_v10(
             yield event
         return
 
-    if not omniroute_configured(settings):
+    if (
+        fast_lane_bypass
+        or not omniroute_configured(settings)
+    ):
         async for event in route_chat_stream_v7(
             provider,
             messages,
