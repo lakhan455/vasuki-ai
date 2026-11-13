@@ -28,14 +28,78 @@ app = v4.app
 settings = v4.settings
 
 
+_REMOTE_MEMORY_HINTS = (
+    "my name",
+    "what is my",
+    "who am i",
+    "what do you know about me",
+    "do you remember",
+    "remember what",
+    "what did i tell",
+    "what did i say",
+    "what have i told",
+    "last time",
+    "previous chat",
+    "previous conversation",
+    "earlier conversation",
+    "my goal",
+    "my goals",
+    "my preference",
+    "my preferences",
+    "my address",
+    "mera naam",
+    "mera goal",
+    "mere goal",
+    "meri preference",
+    "meri pasand",
+    "mere baare",
+    "mere bare",
+    "tumhe yaad",
+    "aapko yaad",
+    "yaad hai",
+    "yaad he",
+    "maine kya",
+    "maine tumhe",
+    "maine aapko",
+    "mujhe kya pasand",
+)
+
+
+def _latest_user_turn(
+    messages: list[dict],
+) -> str:
+    return next(
+        (
+            str(item.get("content") or "").strip()
+            for item in reversed(messages)
+            if item.get("role") == "user"
+        ),
+        "",
+    )
+
+
+def _needs_remote_memory_context(
+    text: str,
+) -> bool:
+    normalized = " ".join(
+        str(text or "").casefold().split()
+    )
+
+    return any(
+        hint in normalized
+        for hint in _REMOTE_MEMORY_HINTS
+    )
+
+
 def _should_skip_simple_context(
     messages: list[dict],
     chat_request,
 ) -> bool:
-    """Skip remote context work only for trivial fast-lane chat.
+    """Skip remote context for low-risk fast conversational turns.
 
-    Memory-sensitive/general, project, document, web and research
-    requests keep the complete context pipeline.
+    Immediate conversation history still goes to the model.
+    Stored memory/project/document/web context remains enabled whenever
+    the current turn actually needs it.
     """
     if bool(
         getattr(
@@ -83,14 +147,42 @@ def _should_skip_simple_context(
     ):
         return False
 
+    latest = _latest_user_turn(messages)
+
+    if not latest:
+        return False
+
+    use_memory = bool(
+        getattr(
+            chat_request,
+            "use_memory",
+            True,
+        )
+    )
+
+    if (
+        use_memory
+        and _needs_remote_memory_context(latest)
+    ):
+        return False
+
+    # Classify the current turn for latency decisions.
+    # Previous chat messages are still passed to the model itself,
+    # so normal conversational continuity is preserved.
     decision = classify_route(
-        messages,
+        [
+            {
+                "role": "user",
+                "content": latest,
+            }
+        ],
         require_current=False,
     )
 
     return (
-        decision.task_type == "simple"
-        and decision.tier == "fast"
+        decision.tier == "fast"
+        and decision.task_type
+        in {"simple", "general"}
         and not decision.needs_web
     )
 
