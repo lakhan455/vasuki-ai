@@ -9,6 +9,7 @@ from app.v47.reliability_router import (
 )
 from app.services.router_v7 import (
     RoutingDecision,
+    apply_auto_provider_policy,
     base_candidates,
     configured_provider,
 )
@@ -45,7 +46,7 @@ def test_vasuki_cloud_configuration():
     assert headers == {}
 
 
-def test_vasuki_cloud_is_primary_auto_candidate():
+def test_vasuki_cloud_auto_policy_defaults_to_fallback():
     decision = RoutingDecision(
         task_type="general",
         difficulty="normal",
@@ -53,8 +54,48 @@ def test_vasuki_cloud_is_primary_auto_candidate():
         language="en",
         needs_web=False,
     )
+    settings = _settings()
 
-    assert base_candidates(decision, "auto")[0] == "vasuki_cloud"
+    base = base_candidates(decision, "auto")
+    ordered = apply_auto_provider_policy(
+        base,
+        "auto",
+        settings,
+    )
+
+    assert ordered[-1] == "vasuki_cloud"
+    assert ordered[0] != "vasuki_cloud"
+
+
+def test_vasuki_cloud_auto_primary_can_be_enabled():
+    decision = RoutingDecision(
+        task_type="general",
+        difficulty="normal",
+        tier="general",
+        language="en",
+        needs_web=False,
+    )
+    settings = _settings(
+        vasuki_cloud_auto_primary=True,
+    )
+
+    ordered = apply_auto_provider_policy(
+        base_candidates(decision, "auto"),
+        "auto",
+        settings,
+    )
+
+    assert ordered[0] == "vasuki_cloud"
+
+
+def test_explicit_vasuki_cloud_route_is_unchanged():
+    settings = _settings()
+
+    assert apply_auto_provider_policy(
+        ["vasuki_cloud"],
+        "vasuki_cloud",
+        settings,
+    ) == ["vasuki_cloud"]
 
 def test_vasuki_cloud_gradio_configuration_without_external_api_key():
     settings = _settings(

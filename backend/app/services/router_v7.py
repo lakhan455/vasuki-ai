@@ -121,6 +121,41 @@ def configured_provider(name: str, s: Settings) -> bool:
         "mistral": bool(getattr(s, "mistral_ai_api", None)),
     }.get(name, False)
 
+def apply_auto_provider_policy(
+    names: list[str],
+    provider: str,
+    settings: Any,
+) -> list[str]:
+    """Keep Vasuki Cloud controlled in auto routing.
+
+    Explicit vasuki_cloud requests are unchanged.
+    When auto-primary is disabled, Vasuki Cloud remains available
+    but stays behind the existing configured providers.
+    """
+    ordered = list(dict.fromkeys(names))
+
+    if provider != "auto":
+        return ordered
+
+    if bool(
+        getattr(
+            settings,
+            "vasuki_cloud_auto_primary",
+            False,
+        )
+    ):
+        return ordered
+
+    if "vasuki_cloud" not in ordered:
+        return ordered
+
+    return [
+        name
+        for name in ordered
+        if name != "vasuki_cloud"
+    ] + ["vasuki_cloud"]
+
+
 def base_candidates(d: RoutingDecision, provider: str) -> list[str]:
     if provider != "auto":
         return [provider]

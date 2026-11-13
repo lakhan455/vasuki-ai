@@ -9,6 +9,7 @@ from app.services.cache_v7 import RESPONSE_CACHE, norm
 from app.services.chat_v4 import safe_error
 from app.services.chat_v5 import _stream_provider_segment, build_resume_messages
 from app.services.router_v7 import base_candidates, classify_route, configured_provider, last_user_query
+from app.services.router_v7 import apply_auto_provider_policy
 from app.services.telemetry_v7 import available, attempt, success, failure, record
 from app.services.quality_v9 import rank_for_task
 from app.v13.context import compress_messages
@@ -86,7 +87,11 @@ def _select_chat_candidates(
     """
     configured = [
         name
-        for name in base_candidates(decision, provider)
+        for name in apply_auto_provider_policy(
+            base_candidates(decision, provider),
+            provider,
+            settings,
+        )
         if configured_provider(name, settings)
     ]
     base = [
@@ -114,10 +119,16 @@ def _select_chat_candidates(
             rank_for_task(names, decision.task_type),
             decision.tier,
         )
-        return adaptive_reliability_order(
+        reliability_ranked = adaptive_reliability_order(
             quality_ranked,
             decision.task_type,
             decision.tier,
+            settings,
+        )
+
+        return apply_auto_provider_policy(
+            reliability_ranked,
+            provider,
             settings,
         )
 

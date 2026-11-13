@@ -56,6 +56,9 @@ class Settings(BaseSettings):
 
     # VASUKI_CLOUD_INFERENCE_V1_START
     vasuki_cloud_enabled: bool = False
+    # Keep ZeroGPU behind existing providers unless explicitly enabled
+    # for preview/canary traffic.
+    vasuki_cloud_auto_primary: bool = False
     vasuki_cloud_transport: str = "openai"
     vasuki_cloud_base_url: str = ""
     vasuki_cloud_api_key: str | None = None
