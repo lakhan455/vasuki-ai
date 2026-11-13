@@ -195,3 +195,69 @@ def test_roman_hindi_memory_recall_keeps_remote_context():
         ],
         request,
     ) is False
+
+
+def test_success_provider_diagnostic_omits_empty_error(
+    monkeypatch,
+):
+    import app.main_v5 as main_v5
+
+    captured = {}
+
+    def fake_log(event, **fields):
+        captured["event"] = event
+        captured["fields"] = fields
+
+    monkeypatch.setattr(
+        main_v5.v4,
+        "_log",
+        fake_log,
+    )
+
+    main_v5._log_provider_diagnostic(
+        "request-1",
+        {
+            "provider": "groq",
+            "status": "completed:v47",
+            "error": "",
+        },
+    )
+
+    assert captured["event"] == "provider_attempt"
+    assert captured["fields"]["provider"] == "groq"
+    assert (
+        captured["fields"]["status"]
+        == "completed:v47"
+    )
+    assert "error" not in captured["fields"]
+
+
+def test_failed_provider_diagnostic_keeps_error(
+    monkeypatch,
+):
+    import app.main_v5 as main_v5
+
+    captured = {}
+
+    def fake_log(event, **fields):
+        captured["fields"] = fields
+
+    monkeypatch.setattr(
+        main_v5.v4,
+        "_log",
+        fake_log,
+    )
+
+    main_v5._log_provider_diagnostic(
+        "request-2",
+        {
+            "provider": "groq",
+            "status": "failed:v47",
+            "error": "simulated failure",
+        },
+    )
+
+    assert (
+        captured["fields"]["error"]
+        == "simulated failure"
+    )

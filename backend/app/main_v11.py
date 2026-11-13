@@ -6,6 +6,7 @@ import json
 import secrets
 import time
 import zipfile
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Body, Depends, File, Form, Header, HTTPException, Query, UploadFile
@@ -18,7 +19,10 @@ import app.main_v10_omni as v10
 import app.services.chat_v7 as chat_v7
 from app.auth import AuthUser, get_current_user
 from app.services.chat_v10 import route_chat_stream_v10, route_chat_v10
-from app.services.cloud_probe import run_cloud_startup_probe
+from app.services.cloud_probe import (
+    run_cloud_startup_probe,
+    run_cloud_stream_startup_probe,
+)
 from app.services.router_v7 import classify_route, last_user_query
 from app.services.image_v10 import route_image_v10
 from app.services.vision import process_vision_request
@@ -232,7 +236,6 @@ async def _v51_bounded_startup_restore() -> None:
         _v11_background_tasks.append(task)
 
 
-@app.on_event("startup")
 async def v11_startup():
     # V51 gives persistence restore a small startup budget, then lets any slow
     # restore finish in the background. The router remains safe without it.
@@ -253,6 +256,30 @@ async def v11_startup():
                 run_cloud_startup_probe(settings)
             )
         )
+    if (
+        bool(
+            getattr(
+                settings,
+                "vasuki_cloud_enabled",
+                False,
+            )
+        )
+        and bool(
+            getattr(
+                settings,
+                "vasuki_cloud_stream_startup_probe",
+                False,
+            )
+        )
+    ):
+        _v11_background_tasks.append(
+            asyncio.create_task(
+                run_cloud_stream_startup_probe(
+                    settings
+                )
+            )
+        )
+
     if bool(getattr(settings, "v11_scheduler_enabled", True)):
         _v11_background_tasks.append(asyncio.create_task(_v11_scheduler_loop()))
     if bool(getattr(settings, "v49_live_knowledge_enabled", True)):
@@ -260,7 +287,6 @@ async def v11_startup():
     if bool(getattr(settings, "v11_auto_rollback_enabled", False)):
         _v11_background_tasks.append(asyncio.create_task(_v11_release_guard_loop()))
 
-@app.on_event("shutdown")
 async def v11_shutdown():
     for task in _v11_background_tasks:
         task.cancel()
@@ -289,6 +315,29 @@ async def v11_shutdown():
         await v73_shutdown_multi_agent_jobs()
     except Exception as exc:
         record_degraded("shutdown", "multi_agent_jobs", exc, severity="info")
+
+
+# Preserve every lifecycle hook registered by lower Vasuki versions,
+# then add V11 startup/shutdown around that existing lifecycle.
+_v11_previous_lifespan_context = (
+    app.router.lifespan_context
+)
+
+
+@asynccontextmanager
+async def _v11_lifespan(app_instance):
+    async with _v11_previous_lifespan_context(
+        app_instance
+    ):
+        await v11_startup()
+
+        try:
+            yield
+        finally:
+            await v11_shutdown()
+
+
+app.router.lifespan_context = _v11_lifespan
 
 
 @app.get("/health/v50")
@@ -4149,7 +4198,3 @@ for _v49_route in _v49_runtime_router.routes:
         _v49_existing_route_keys.add(_v49_key)
 app.openapi_schema = None
 # VASUKI_V49_DIRECT_ROUTE_FALLBACK_END
-
-
-
-

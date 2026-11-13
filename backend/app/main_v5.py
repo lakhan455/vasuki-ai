@@ -187,6 +187,38 @@ def _should_skip_simple_context(
     )
 
 
+def _log_provider_diagnostic(
+    request_id: str,
+    event: dict,
+) -> None:
+    fields = {
+        "request_id": request_id,
+        "provider": str(
+            event.get("provider", "")
+            or ""
+        ),
+        "status": str(
+            event.get("status", "")
+            or ""
+        ),
+    }
+
+    error = str(
+        event.get("error", "")
+        or ""
+    ).strip()
+
+    # Do not emit an empty "error" key for successful attempts.
+    # Render can otherwise classify healthy diagnostics as errors.
+    if error:
+        fields["error"] = error
+
+    v4._log(
+        "provider_attempt",
+        **fields,
+    )
+
+
 # Keep v4 diagnostics middleware and parallel-context helpers, but replace
 # only its stream route.
 v4._remove_route("/api/chat/stream", "POST")
@@ -622,12 +654,9 @@ async def chat_stream_v5(
                         {"token": token},
                     )
                 elif event_type == "diagnostic":
-                    v4._log(
-                        "provider_attempt",
-                        request_id=request_id,
-                        provider=event.get("provider", ""),
-                        status=event.get("status", ""),
-                        error=event.get("error", ""),
+                    _log_provider_diagnostic(
+                        request_id,
+                        event,
                     )
                     yield legacy._sse(
                         "diagnostic",

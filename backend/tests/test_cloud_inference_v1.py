@@ -356,3 +356,89 @@ def test_vasuki_cloud_stream_provider_segment_uses_live_gradio(
     assert events[-1]["type"] == "finish"
     assert events[-1]["reason"] == "stop"
 
+
+def test_vasuki_cloud_stream_startup_probe_success(
+    monkeypatch,
+):
+    import asyncio
+
+    from app.services import cloud_probe
+
+    async def fake_stream(
+        messages,
+        settings,
+        web_context="",
+        *,
+        require_current,
+        as_of,
+    ):
+        assert (
+            messages[-1]["content"]
+            == cloud_probe._STREAM_CANARY_PROMPT
+        )
+
+        yield "VASUKI "
+        yield "STREAM READY ONE TWO THREE "
+        yield "FOUR FIVE SIX SEVEN EIGHT NINE TEN"
+
+    monkeypatch.setattr(
+        cloud_probe,
+        "_stream_vasuki_cloud_gradio",
+        fake_stream,
+    )
+
+    settings = _settings(
+        vasuki_cloud_enabled=True,
+        vasuki_cloud_transport="gradio",
+        vasuki_cloud_stream_startup_probe=True,
+    )
+
+    result = asyncio.run(
+        cloud_probe.run_cloud_stream_startup_probe(
+            settings
+        )
+    )
+
+    assert result["ran"] is True
+    assert result["ok"] is True
+    assert result["status"] == "success"
+    assert result["chunk_count"] == 3
+    assert result["first_chunk_ms"] is not None
+
+
+def test_vasuki_cloud_stream_probe_rejects_single_chunk(
+    monkeypatch,
+):
+    import asyncio
+
+    from app.services import cloud_probe
+
+    async def fake_stream(*args, **kwargs):
+        yield (
+            "VASUKI STREAM READY ONE TWO THREE "
+            "FOUR FIVE SIX SEVEN EIGHT NINE TEN"
+        )
+
+    monkeypatch.setattr(
+        cloud_probe,
+        "_stream_vasuki_cloud_gradio",
+        fake_stream,
+    )
+
+    settings = _settings(
+        vasuki_cloud_enabled=True,
+        vasuki_cloud_transport="gradio",
+        vasuki_cloud_stream_startup_probe=True,
+    )
+
+    result = asyncio.run(
+        cloud_probe.run_cloud_stream_startup_probe(
+            settings
+        )
+    )
+
+    assert result["ran"] is True
+    assert result["ok"] is False
+    assert result["status"] == "failed"
+    assert result["chunk_count"] == 1
+    assert result["error_type"] == "RuntimeError"
