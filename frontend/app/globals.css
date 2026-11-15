@@ -5943,3 +5943,15 @@ html[data-pv-theme="light"] .pv-user-bubble {
 .pv-v71-brain {
   width: 100%;
 }
+
+/* VASUKI_REMOVE_COMPOSER_SHORTCUT_HINT_START */
+.pv-composer-frame kbd,
+.pv-composer-frame [class*="shortcut"],
+.pv-composer-frame [class*="hotkey"],
+.pv-composer-frame [data-shortcut],
+.pv-composer-frame [aria-label*="shortcut" i],
+.pv-composer-frame [title*="shortcut" i] {
+  display: none !important;
+}
+/* VASUKI_REMOVE_COMPOSER_SHORTCUT_HINT_END */
+
