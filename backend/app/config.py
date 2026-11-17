@@ -210,6 +210,13 @@ class Settings(BaseSettings):
     v73_agent_timeout_seconds: float = 35.0
     # VASUKI_V73_MULTI_AGENT_BRAIN_END
 
+
+    # VASUKI_V79_SEMANTIC_MEMORY_PROACTIVE_START
+    v79_memory_vector_enabled: bool = True
+    v79_vector_match_count: int = 8
+    v79_short_term_messages: int = 10
+    v79_proactive_horizon_minutes: int = 180
+    # VASUKI_V79_SEMANTIC_MEMORY_PROACTIVE_END
     # VASUKI_V17_MISSION_CONTROL_START
     v17_max_concurrent_builds: int = 2
     v17_job_ttl_seconds: int = 3600
