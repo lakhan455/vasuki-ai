@@ -82,10 +82,7 @@ async def proactive_snapshot(
         "v11_scheduled_tasks",
         params={
             "user_id": f"eq.{user_id}",
-            "select": (
-                "id,title,run_at,status,"
-                "last_run_at,result,cron,created_at"
-            ),
+            "select": "*",
             "order": "run_at.asc",
             "limit": "100",
         },
