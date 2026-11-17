@@ -137,6 +137,15 @@ from app.v75.autonomous_tasks import (
     pause_task as v75_pause_task,
     resume_task as v75_resume_task,
 )
+from app.v79.memory_vector import (
+    health_snapshot as v79_memory_health,
+    memory79_snapshot as v79_memory_snapshot,
+    novel_memory_context as v79_novel_memory_context,
+)
+from app.v79.proactive import (
+    health_snapshot as v79_proactive_health,
+    proactive_snapshot as v79_proactive_snapshot,
+)
 from app.v76.live_workspace import (
     WorkspaceConflict as V76WorkspaceConflict,
     create_workspace as v76_create_workspace,
@@ -3694,6 +3703,108 @@ async def v74_memory_inspect(
     )
 
 
+
+# VASUKI_V79_SEMANTIC_MEMORY_PROACTIVE_INTEGRATION
+
+# VASUKI_V79_SAFE_SEMANTIC_CHAT_INTEGRATION_START
+_v79_semantic_base_private_context = v10.legacy._private_context
+
+
+async def _v79_semantic_private_context(
+    *,
+    user_id: str,
+    access_token: str,
+    query: str,
+    request,
+):
+    base_context, document_sources = (
+        await _v79_semantic_base_private_context(
+            user_id=user_id,
+            access_token=access_token,
+            query=query,
+            request=request,
+        )
+    )
+
+    semantic_context = ""
+
+    try:
+        snapshot = await asyncio.wait_for(
+            v79_memory_snapshot(
+                settings,
+                user_id=user_id,
+                query=query,
+                messages=_v74_request_messages(request),
+            ),
+            timeout=3.0,
+        )
+
+        semantic_context = v79_novel_memory_context(
+            base_context,
+            snapshot.get("long_term") or [],
+        )
+
+    except Exception:
+        semantic_context = ""
+
+    return (
+        v10.legacy._join_context(
+            base_context,
+            semantic_context,
+        ),
+        document_sources,
+    )
+
+
+v10.legacy._private_context = _v79_semantic_private_context
+# VASUKI_V79_SAFE_SEMANTIC_CHAT_INTEGRATION_END
+
+class V79MemoryInspectRequest(BaseModel):
+    query: str = Field(
+        default="",
+        max_length=12000,
+    )
+
+    messages: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
+
+
+@app.get("/health/v79")
+async def health_v79() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "version": "v79",
+        "memory": v79_memory_health(settings),
+        "proactive": v79_proactive_health(settings),
+    }
+
+
+@app.post("/api/v79/memory/inspect")
+async def v79_memory_inspect(
+    payload: V79MemoryInspectRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+
+    return await v79_memory_snapshot(
+        settings,
+        user_id=user.id,
+        query=payload.query,
+        messages=payload.messages,
+    )
+
+
+@app.get("/api/v79/proactive")
+async def v79_proactive(
+    horizon_minutes: int | None = None,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+
+    return await v79_proactive_snapshot(
+        settings,
+        user_id=user.id,
+        horizon_minutes=horizon_minutes,
+    )
 class V40CreatorInspectRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=30000)
     provider: str = Field(default="auto", max_length=80)
