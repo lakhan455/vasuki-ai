@@ -3717,26 +3717,39 @@ async def _v79_semantic_private_context(
     query: str,
     request,
 ):
-    base_context, document_sources = (
-        await _v79_semantic_base_private_context(
+    # Start V79 semantic retrieval immediately so it runs in parallel
+    # with the existing V74/private-context lookup.
+    semantic_task = asyncio.create_task(
+        v79_memory_snapshot(
+            settings,
             user_id=user_id,
-            access_token=access_token,
             query=query,
-            request=request,
+            messages=_v74_request_messages(request),
         )
     )
+
+    try:
+        base_context, document_sources = (
+            await _v79_semantic_base_private_context(
+                user_id=user_id,
+                access_token=access_token,
+                query=query,
+                request=request,
+            )
+        )
+    except Exception:
+        if not semantic_task.done():
+            semantic_task.cancel()
+        raise
 
     semantic_context = ""
 
     try:
+        # Most semantic work should already have happened while V74
+        # context was loading. Never add a multi-second delay to chat.
         snapshot = await asyncio.wait_for(
-            v79_memory_snapshot(
-                settings,
-                user_id=user_id,
-                query=query,
-                messages=_v74_request_messages(request),
-            ),
-            timeout=3.0,
+            semantic_task,
+            timeout=0.5,
         )
 
         semantic_context = v79_novel_memory_context(
@@ -3745,6 +3758,8 @@ async def _v79_semantic_private_context(
         )
 
     except Exception:
+        if not semantic_task.done():
+            semantic_task.cancel()
         semantic_context = ""
 
     return (
