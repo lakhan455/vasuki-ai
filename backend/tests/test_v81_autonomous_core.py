@@ -3,6 +3,8 @@ from app.v81.autonomous_core import (
     health_snapshot,
     risk_snapshot,
     verify_work_snapshot,
+    chat_action_decision,
+    chat_guard_message,
 )
 
 
@@ -84,3 +86,51 @@ def test_v81_failed_work_can_retry():
     assert verification["verified_complete"] is False
     assert verification["verdict"] == "needs-recovery"
     assert verification["retry_allowed"] is True
+
+
+
+def test_v81_intercepts_direct_protected_chat_action():
+    decision = chat_action_decision(
+        "Deploy my website and delete the old production release."
+    )
+
+    assert decision["intercept"] is True
+    assert (
+        decision["reason"]
+        == "protected-action-requires-approval"
+    )
+
+    message = chat_guard_message(
+        "Deploy my website and delete the old production release."
+    )
+
+    assert message is not None
+    assert "not executed" in message
+    assert "explicit approval" in message
+
+
+def test_v81_does_not_block_deployment_explanation():
+    decision = chat_action_decision(
+        "How do I deploy a website safely?"
+    )
+
+    assert decision["intercept"] is False
+    assert decision["reason"] == "informational-request"
+
+
+def test_v81_normal_chat_is_wired_to_guard():
+    from pathlib import Path
+
+    source = (
+        Path(__file__).parents[1]
+        / "app"
+        / "main.py"
+    ).read_text(encoding="utf-8")
+
+    assert source.count(
+        "v81_chat_guard_message(query)"
+    ) >= 2
+
+    assert source.count(
+        'provider="vasuki-autonomous-core"'
+    ) >= 2
