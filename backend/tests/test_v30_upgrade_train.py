@@ -127,7 +127,7 @@ def test_main_v11_v30_integration_present():
 def test_frontend_shows_v30_without_status_badges():
     repo = Path(__file__).resolve().parents[2]
     source = (repo / "frontend" / "components" / "ChatApp.tsx").read_text(encoding="utf-8")
-    assert "Vasuki Intelligence" in source
+    assert "How can I help?" in source
     assert "pv-living-mind-badge" not in source
     assert '<div className="pv-header-right">' in source
-    assert "Private workspace" in source
+    assert "Private workspace" not in source

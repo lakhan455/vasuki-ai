@@ -40,7 +40,7 @@ def test_v45_frontend_meta_and_badge():
     assert "first_token_ms?: number;" in api
     assert "duration_ms?: number;" in api
     assert "VASUKI_V45_PROVIDER_BADGE_START" in chat
-    assert "pv-provider-diagnostic" in chat
+    assert "pv-provider-diagnostic" not in chat
 
 
 def test_v45_health_endpoint():
