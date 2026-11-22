@@ -5955,3 +5955,118 @@ html[data-pv-theme="light"] .pv-user-bubble {
 }
 /* VASUKI_REMOVE_COMPOSER_SHORTCUT_HINT_END */
 
+
+/* ===== V80 CLEAN COMPETITION CHAT UI ===== */
+
+/* Keep intelligence internal. UI should feel like a normal assistant. */
+
+.pv-workspace-pill,
+.pv-chat-work-toggle,
+.pv-answer-status,
+.pv-provider-diagnostic {
+  display: none !important;
+}
+
+/* Remove decorative landing-page effects. */
+.pv-welcome::before,
+.pv-composer-frame--welcome::before,
+.pv-composer-frame--welcome .pv-composer-light {
+  display: none !important;
+  animation: none !important;
+}
+
+/* Clean centered opening screen. */
+.pv-welcome {
+  padding: 72px 20px 40px;
+}
+
+.pv-welcome-inner {
+  width: min(100%, 768px);
+  padding-top: 0 !important;
+  transform: translateY(-3vh);
+}
+
+.pv-welcome-logo,
+.pv-welcome-heading > p,
+.pv-welcome-subline,
+.pv-command-rail {
+  display: none !important;
+}
+
+.pv-welcome-heading {
+  margin: 0 0 28px;
+  text-align: center;
+}
+
+.pv-welcome-heading h1 {
+  margin: 0;
+  color: var(--pv-text);
+  font-size: clamp(28px, 3.2vw, 34px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+/* Cleaner top bar. */
+.pv-header {
+  height: 56px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--pv-main) 92%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--pv-border) 65%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.pv-model-button {
+  padding: 6px 8px;
+  font-weight: 600;
+}
+
+/* Plain, focused composer. */
+.pv-composer {
+  border-radius: 24px;
+  border: 1px solid var(--pv-border);
+  background: var(--pv-surface);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.14);
+}
+
+.pv-composer:focus-within {
+  border-color: var(--pv-border-strong);
+  box-shadow: 0 3px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* Assistant output should read naturally, without dashboard decoration. */
+.pv-message--assistant .pv-message-body {
+  max-width: 100%;
+}
+
+.pv-message--assistant .pv-markdown {
+  line-height: 1.7;
+}
+
+/* Keep actions subtle until needed. */
+.pv-message-actions {
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.pv-message:hover .pv-message-actions,
+.pv-message-actions:focus-within {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .pv-welcome-inner {
+    transform: translateY(-1vh);
+  }
+
+  .pv-welcome-heading h1 {
+    font-size: 27px;
+  }
+
+  .pv-message-actions {
+    opacity: 1;
+  }
+}
+
+/* ===== V80 CLEAN COMPETITION CHAT UI END ===== */
+

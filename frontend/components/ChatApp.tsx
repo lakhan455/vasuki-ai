@@ -189,43 +189,8 @@ type PendingAttachment = {
 type ActionMode = "chat" | "image" | "write" | "web" | "analyze" | "research" | "agents";
 
 /* VASUKI_V45_PROVIDER_BADGE_START */
-function providerDisplayName(value?: string) {
-  const provider = String(value || "").replace(/^cache:/i, "").trim();
-  const labels: Record<string, string> = {
-    opencode_zen: "OpenCode Zen",
-    zai_glm: "Z.AI GLM",
-    groq_fast: "Groq Fast",
-    groq: "Groq",
-    openrouter: "OpenRouter",
-    gemini: "Gemini",
-    mistral: "Mistral",
-    cerebras: "Cerebras",
-    sambanova: "SambaNova",
-  };
-  return labels[provider] || provider || "Vasuki";
-}
 
-function intelligenceModeLabel(value?: string) {
-  const labels: Record<string, string> = {
-    "verified-research": "Verified research",
-    "deep-reasoning": "Deep reasoning",
-    engineering: "Engineering",
-    artifact: "Artifact",
-    image: "Image",
-    direct: "Direct",
-  };
-  return value ? labels[value] || value : "";
-}
 
-function latencyLabel(milliseconds?: number) {
-  if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds)) {
-    return "";
-  }
-  if (milliseconds < 1000) {
-    return `${Math.max(1, Math.round(milliseconds))} ms`;
-  }
-  return `${(milliseconds / 1000).toFixed(milliseconds < 10000 ? 1 : 0)} s`;
-}
 
 function readResponseAloud(value: string) {
   const text = value.trim();
@@ -2936,26 +2901,6 @@ if (
               </div>
             </div>
 
-            <div className="pv-chat-work-toggle" role="group" aria-label="Vasuki mode">
-              <button
-                type="button"
-                className={!workMode ? "is-active" : ""}
-                aria-pressed={!workMode}
-                onClick={() => setWorkMode(false)}
-              >
-                Chat
-              </button>
-              <button
-                type="button"
-                className={workMode ? "is-active" : ""}
-                aria-pressed={workMode}
-                onClick={() => setWorkMode(true)}
-                title="Plan and execute real supported work with proof"
-              >
-                Work
-              </button>
-            </div>
-
             {activeProject ? (
               <div
                 className="pv-project-context pv-desktop-only"
@@ -2968,10 +2913,6 @@ if (
           </div>
 
           <div className="pv-header-right">
-            <span className="pv-workspace-pill">
-              <span className="pv-workspace-dot" aria-hidden="true" />
-              Private workspace
-            </span>
             <button
               type="button"
               className="pv-theme-toggle"
@@ -2989,57 +2930,8 @@ if (
         {!hasMessages ? (
           <section className="pv-welcome">
             <div className="pv-welcome-inner">
-              <Logo className="pv-welcome-logo" />
               <div className="pv-welcome-heading">
-                <p>Vasuki Intelligence</p>
-                <h1>What can Vasuki help you build today?</h1>
-                <div className="pv-welcome-subline">
-                  {workMode
-                    ? "Work Mode plans, executes supported tools, asks before writes, and shows proof."
-                    : "Research, create, code and analyze in one focused workspace."}
-                </div>
-              </div>
-
-              <div className="pv-command-rail" aria-label="Quick starts">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setInput("Build a complete production-ready web app for ")
-                  }
-                >
-                  <strong>Build</strong>
-                  <small>Apps · websites · code · files</small>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setInput("Fix and improve this project: ")
-                  }
-                >
-                  <strong>Improve project</strong>
-                  <small>Upload · inspect · fix · validate</small>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("research");
-                    setWebEnabled(true);
-                    setInput("Research and verify ");
-                  }}
-                >
-                  <strong>Research</strong>
-                  <small>Current web · evidence · sources</small>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("image");
-                    setInput("Create a premium visual of ");
-                  }}
-                >
-                  <strong>Create image</strong>
-                  <small>Posters · concepts · visuals</small>
-                </button>
+                <h1>How can I help?</h1>
               </div>
 
               <Composer
@@ -3097,88 +2989,7 @@ if (
                             </div>
                           ) : null}
 
-                          {(message.intelligenceMode ||
-                            message.qualityChecked ||
-                            message.verificationRequired ||
-                            message.evidenceDisagreement) && (
-                            <div
-                              className="pv-answer-status"
-                              aria-label="Answer quality status"
-                            >
-                              {message.intelligenceMode &&
-                              message.intelligenceMode !== "direct" ? (
-                                <span>
-                                  {intelligenceModeLabel(
-                                    message.intelligenceMode,
-                                  )}
-                                </span>
-                              ) : null}
-
-                              {message.verificationRequired &&
-                              (message.sources?.length || 0) > 0 ? (
-                                <span>Verified sources</span>
-                              ) : null}
-
-                              {message.qualityChecked ? (
-                                <span>
-                                  Quality checked
-                                  {typeof message.qualityScore === "number"
-                                    ? ` · ${Math.round(
-                                        message.qualityScore,
-                                      )}`
-                                    : ""}
-                                </span>
-                              ) : null}
-
-                              {typeof message.intelligenceConfidence ===
-                                "number" &&
-                              message.intelligenceConfidence >= 0.82 ? (
-                                <span>High confidence</span>
-                              ) : null}
-
-                              {message.evidenceDisagreement ? (
-                                <span className="pv-answer-status--warning">
-                                  Sources may disagree
-                                </span>
-                              ) : null}
-                            </div>
-                          )}
-
                           <SourceStrip sources={message.sources} />
-
-                          {message.provider && (
-                            <div
-                              className="pv-provider-diagnostic"
-                              title="Provider diagnostics"
-                            >
-                              <span>{providerDisplayName(message.provider)}</span>
-                              {message.providerModel ? (
-                                <span>{message.providerModel}</span>
-                              ) : null}
-                              {message.firstTokenMs ? (
-                                <span>
-                                  first token {latencyLabel(message.firstTokenMs)}
-                                </span>
-                              ) : null}
-                              {message.durationMs ? (
-                                <span>
-                                  total {latencyLabel(message.durationMs)}
-                                </span>
-                              ) : null}
-                              {message.attemptCount && message.attemptCount > 1 ? (
-                                <span>fallback {message.attemptCount - 1}</span>
-                              ) : null}
-                              {message.adaptiveRouting ? (
-                                <span>adaptive</span>
-                              ) : null}
-                              {message.routerVersion ? (
-                                <span>{message.routerVersion.toUpperCase()}</span>
-                              ) : null}
-                              {typeof message.reliabilityScore === "number" ? (
-                                <span>health {Math.round(message.reliabilityScore * 100)}%</span>
-                              ) : null}
-                            </div>
-                          )}
 
                           {message.imageUrl && (
                             <img
