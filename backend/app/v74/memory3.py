@@ -369,18 +369,27 @@ async def memory3_snapshot(
     messages: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     personal_task = asyncio.create_task(
-        list_user_memories(user_id, settings, limit=60)
+        asyncio.wait_for(
+            list_user_memories(user_id, settings, limit=60),
+            timeout=1.5,
+        )
     )
     temporal_task = asyncio.create_task(
-        active_memory(settings, user_id=user_id, limit=200)
+        asyncio.wait_for(
+            active_memory(settings, user_id=user_id, limit=200),
+            timeout=1.5,
+        )
     )
     project_task = (
         asyncio.create_task(
-            list_project_memories(
-                settings,
-                user_id=user_id,
-                project_id=project_id,
-                limit=120,
+            asyncio.wait_for(
+                list_project_memories(
+                    settings,
+                    user_id=user_id,
+                    project_id=project_id,
+                    limit=120,
+                ),
+                timeout=1.5,
             )
         )
         if project_id
