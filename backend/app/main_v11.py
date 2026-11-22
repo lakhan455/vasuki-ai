@@ -146,6 +146,11 @@ from app.v79.proactive import (
     health_snapshot as v79_proactive_health,
     proactive_snapshot as v79_proactive_snapshot,
 )
+from app.v81.autonomous_core import (
+    build_autonomous_plan as v81_build_autonomous_plan,
+    health_snapshot as v81_health_snapshot,
+    verify_work_snapshot as v81_verify_work_snapshot,
+)
 from app.v76.live_workspace import (
     WorkspaceConflict as V76WorkspaceConflict,
     create_workspace as v76_create_workspace,
@@ -3820,6 +3825,173 @@ async def v79_proactive(
         user_id=user.id,
         horizon_minutes=horizon_minutes,
     )
+
+
+# VASUKI_V81_AUTONOMOUS_CORE_INTEGRATION
+
+
+class V81AutonomousGoalRequest(BaseModel):
+    goal: str = Field(min_length=3, max_length=20000)
+    project_id: str | None = Field(default=None, max_length=120)
+    auto_start: bool = True
+
+
+@app.get("/health/v81")
+async def health_v81() -> dict[str, Any]:
+    return v81_health_snapshot()
+
+
+@app.post("/api/v81/autonomous/goal")
+async def v81_autonomous_goal(
+    payload: V81AutonomousGoalRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    plan = v81_build_autonomous_plan(
+        payload.goal,
+        project_id=payload.project_id,
+    )
+
+    risk = plan.get("risk") or {}
+
+    if bool(risk.get("approval_required")):
+        return {
+            "ok": True,
+            "version": "v81",
+            "status": "approval-required",
+            "started": False,
+            "plan": plan,
+            "message": (
+                "This goal contains a risky external or destructive action. "
+                "V81 will not auto-execute it without an explicit approved path."
+            ),
+        }
+
+    if not payload.auto_start:
+        return {
+            "ok": True,
+            "version": "v81",
+            "status": "planned",
+            "started": False,
+            "plan": plan,
+        }
+
+    try:
+        job = await create_work_job(
+            settings,
+            user_id=user.id,
+            goal=payload.goal,
+            project_id=payload.project_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "ok": True,
+        "version": "v81",
+        "status": "started",
+        "started": True,
+        "plan": plan,
+        "job": job,
+    }
+
+
+@app.get("/api/v81/autonomous/jobs/{job_id}")
+async def v81_autonomous_status(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    job = await get_work_job(
+        user_id=user.id,
+        job_id=job_id,
+    )
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Autonomous work job not found.",
+        )
+
+    return {
+        "ok": True,
+        "version": "v81",
+        "job": job,
+        "verification": v81_verify_work_snapshot(job),
+    }
+
+
+@app.post("/api/v81/autonomous/jobs/{job_id}/retry")
+async def v81_autonomous_retry(
+    job_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    previous = await get_work_job(
+        user_id=user.id,
+        job_id=job_id,
+    )
+
+    if previous is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Autonomous work job not found.",
+        )
+
+    verification = v81_verify_work_snapshot(previous)
+
+    if not verification.get("retry_allowed"):
+        raise HTTPException(
+            status_code=409,
+            detail="This job is not in a safe retry state.",
+        )
+
+    goal = str(previous.get("goal") or "").strip()
+    project_id = (
+        str(previous.get("project_id") or "").strip()
+        or None
+    )
+
+    plan = v81_build_autonomous_plan(
+        goal,
+        project_id=project_id,
+    )
+
+    if bool((plan.get("risk") or {}).get("approval_required")):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Retry requires an explicit approved path "
+                "because the goal is classified as risky."
+            ),
+        )
+
+    try:
+        job = await create_work_job(
+            settings,
+            user_id=user.id,
+            goal=goal,
+            project_id=project_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "ok": True,
+        "version": "v81",
+        "status": "retried",
+        "previous_job_id": job_id,
+        "job": job,
+        "verification": v81_verify_work_snapshot(job),
+    }
 class V40CreatorInspectRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=30000)
     provider: str = Field(default="auto", max_length=80)
