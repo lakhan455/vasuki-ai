@@ -250,6 +250,134 @@ def verify_work_snapshot(
     }
 
 
+
+_INFORMATIONAL_PREFIXES = (
+    "how ",
+    "how do ",
+    "how can ",
+    "how to ",
+    "what ",
+    "why ",
+    "explain ",
+    "describe ",
+    "show me how ",
+    "give me an example",
+    "write a guide",
+    "create a guide",
+    "tutorial",
+)
+
+
+def chat_action_decision(query: str) -> dict[str, Any]:
+    """Decide whether a normal chat request is asking Vasuki to perform
+    a protected real-world action rather than merely explain it.
+    """
+    value = _clean_goal(query)
+    lowered = value.casefold().strip()
+
+    risk = risk_snapshot(value)
+
+    if not risk["approval_required"]:
+        return {
+            "intercept": False,
+            "reason": "no-protected-action",
+            "risk": risk,
+        }
+
+    if any(lowered.startswith(prefix) for prefix in _INFORMATIONAL_PREFIXES):
+        return {
+            "intercept": False,
+            "reason": "informational-request",
+            "risk": risk,
+        }
+
+    action_markers = (
+        "deploy ",
+        "deploy my ",
+        "delete ",
+        "delete my ",
+        "merge ",
+        "merge my ",
+        "release ",
+        "publish ",
+        "send ",
+        "pay ",
+        "buy ",
+        "purchase ",
+        "remove ",
+        "please deploy",
+        "please delete",
+        "go ahead and deploy",
+        "go ahead and delete",
+        "do the deployment",
+    )
+
+    action_intent = (
+        any(lowered.startswith(item) for item in action_markers)
+        or any(
+            phrase in lowered
+            for phrase in (
+                "deploy my website",
+                "deploy my app",
+                "delete the old",
+                "delete production",
+                "merge the pr",
+                "publish it",
+                "send the email",
+                "make the payment",
+            )
+        )
+    )
+
+    return {
+        "intercept": bool(action_intent),
+        "reason": (
+            "protected-action-requires-approval"
+            if action_intent
+            else "ambiguous-protected-language"
+        ),
+        "risk": risk,
+    }
+
+
+def chat_guard_message(query: str) -> str | None:
+    decision = chat_action_decision(query)
+
+    if not decision["intercept"]:
+        return None
+
+    reasons = set(
+        (decision.get("risk") or {}).get("reasons") or []
+    )
+
+    destructive = bool(
+        reasons.intersection(
+            {
+                "destructive-delete",
+                "financial-action",
+                "external-publication",
+                "external-communication",
+                "deployment",
+                "release",
+                "repository-write",
+            }
+        )
+    )
+
+    if destructive:
+        return (
+            "This request includes a protected real-world action. "
+            "I have not executed the deployment, deletion, payment, "
+            "publication, message, or repository change. "
+            "I can prepare and verify the required steps, but the actual "
+            "protected action requires your explicit approval before execution."
+        )
+
+    return (
+        "I have not executed this action. "
+        "It requires explicit approval before Vasuki can perform it."
+    )
+
 def health_snapshot() -> dict[str, Any]:
     return {
         "ok": True,

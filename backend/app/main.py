@@ -91,6 +91,10 @@ from app.v57.coding_brain import build_coding_policy
 from app.v58.fresh_facts import fresh_fact_answer_policy
 from app.v59.fresh_fact_resolver import fresh_fact_evidence_context
 from app.v67.reliability import observe_live_search
+from app.v81.autonomous_core import (
+    chat_action_decision as v81_chat_action_decision,
+    chat_guard_message as v81_chat_guard_message,
+)
 
 
 settings = get_settings()
@@ -716,6 +720,17 @@ async def chat(
             used_context_chars=len(query),
         )
 
+    v81_guard_answer = v81_chat_guard_message(query)
+    if v81_guard_answer:
+        return ChatResponse(
+            answer=v81_guard_answer,
+            provider="vasuki-autonomous-core",
+            sources=[],
+            context_trimmed=False,
+            original_context_chars=original_chars,
+            used_context_chars=len(query),
+        )
+
     explicit_memory, memory_followup = (
         extract_explicit_memory_command(query)
         if request.use_memory
@@ -1042,6 +1057,13 @@ async def chat_stream(
         return _direct_stream(
             identity_answer,
             provider="vasuki-identity",
+        )
+
+    v81_guard_answer = v81_chat_guard_message(query)
+    if v81_guard_answer:
+        return _direct_stream(
+            v81_guard_answer,
+            provider="vasuki-autonomous-core",
         )
 
     explicit_memory, memory_followup = (
