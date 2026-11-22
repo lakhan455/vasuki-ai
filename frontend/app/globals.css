@@ -6070,3 +6070,115 @@ html[data-pv-theme="light"] .pv-user-bubble {
 
 /* ===== V80 CLEAN COMPETITION CHAT UI END ===== */
 
+
+/* ===== V80.1 FINAL COMPETITION POLISH ===== */
+
+/* Desktop: sidebar already carries the brand, so keep the chat canvas clean. */
+@media (min-width: 769px) {
+  .pv-header {
+    display: none;
+  }
+
+  .pv-conversation {
+    padding-top: 34px;
+  }
+}
+
+/* More balanced empty-chat composition. */
+.pv-welcome {
+  padding-top: 46px;
+  padding-bottom: 46px;
+}
+
+.pv-welcome-inner {
+  width: min(100%, 720px);
+  transform: translateY(-1.5vh);
+}
+
+.pv-welcome-heading {
+  margin-bottom: 24px;
+}
+
+.pv-welcome-heading h1 {
+  font-size: clamp(28px, 3vw, 32px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+/* Compact, ChatGPT-like composer proportions. */
+.pv-composer {
+  border-radius: 20px;
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.pv-composer textarea {
+  min-height: 48px;
+  padding: 13px 17px 2px;
+  font-size: 15.5px;
+}
+
+.pv-composer--welcome textarea {
+  min-height: 50px;
+}
+
+.pv-composer-toolbar {
+  min-height: 43px;
+  padding: 2px 8px 7px;
+}
+
+.pv-composer-tools > button {
+  width: 34px;
+  height: 34px;
+}
+
+.pv-composer-dock-inner {
+  width: min(100%, 720px);
+}
+
+/* Reduce visual noise around answers. */
+.pv-message-list {
+  width: min(100%, 760px);
+}
+
+.pv-message--assistant {
+  margin-bottom: 26px;
+}
+
+.pv-message--assistant .pv-markdown {
+  font-size: 15px;
+  line-height: 1.72;
+}
+
+/* Sidebar refinement without removing useful competition capabilities. */
+.pv-nav-button {
+  border-radius: 9px;
+}
+
+.pv-recent-button {
+  border-radius: 8px;
+}
+
+/* Keep mobile navigation usable. */
+@media (max-width: 768px) {
+  .pv-header {
+    display: flex;
+  }
+
+  .pv-welcome {
+    padding-top: 68px;
+  }
+
+  .pv-welcome-inner {
+    width: min(100%, 680px);
+    transform: none;
+  }
+
+  .pv-composer-dock-inner {
+    width: 100%;
+  }
+}
+
+/* ===== V80.1 FINAL COMPETITION POLISH END ===== */
+
